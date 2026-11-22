@@ -1,28 +1,12 @@
-/* The setup field is dark in both themes. Browsers resolve light-dark() inside a custom property
-   where the property is declared (on :root), so this scope re-declares the semantic tokens its
-   contents use with their dark values (the same values as tokens.css, dark side). */
+/* The setup field is dark in both themes: the root carries data-theme="dark" (StepScreen.tsx), so
+   every semantic token resolves to its dark value here (tokens.css). White focus rings sit on it. */
 .step-screen {
-  --bg: var(--slate-950);
-  --surface: var(--slate-900);
-  --surface-2: color-mix(in srgb, var(--slate-50) 5%, transparent);
-  --surface-3: color-mix(in srgb, var(--slate-50) 9%, transparent);
-  --text: var(--slate-50);
-  --text-2: var(--slate-300);
-  --text-3: var(--slate-400);
-  --hairline: color-mix(in srgb, var(--slate-50) 10%, transparent);
-  --accent: var(--blue-300);
-  --on-accent: var(--slate-950);
-  --danger: var(--rose-300);
-  --success: var(--emerald-300);
-  --dot-dim: color-mix(in srgb, var(--slate-50) 17%, transparent);
-  --overlay-hover: color-mix(in srgb, var(--slate-50) 6%, transparent);
   --focus-ring: var(--white);
   position: relative;
   display: flex;
   justify-content: center;
   min-height: 100vh; /* fallback */
   min-height: 100dvh;
-  color-scheme: dark;
   background: var(--slate-950);
   color: var(--white);
   overflow: clip;

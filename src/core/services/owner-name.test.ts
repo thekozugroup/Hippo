@@ -93,5 +93,7 @@ describe('first-run settings', () => {
     await markSeen(db, 'giverIntro', 5)
     await markSeen(db, 'setupChecklist', 6)
     expect((await getSettings(db)).seen).toEqual({ giverIntro: 5, setupChecklist: 6 })
+    await markSeen(db, 'linkPreviewHint', 7)
+    expect((await getSettings(db)).seen).toEqual({ giverIntro: 5, setupChecklist: 6, linkPreviewHint: 7 })
   })
 })

@@ -85,7 +85,7 @@ Share links contain the web address, so choose your final address before you sha
 
 ### 6. Check the result
 
-Open your site, go to **Settings**, and read **Deployment checks**. Each line shows a status and what to do.
+Open your site, go to **Settings**, scroll to the bottom and open **Deployment checks**. Each check is one line; a check that is not fine is marked **Needs attention** (or **Could not check**) and says what to do. **Check again** runs them again.
 
 | Check | What it tells you |
 |---|---|
@@ -125,7 +125,7 @@ GitHub switches off scheduled workflows after 60 days without any activity in th
 - **Changing a link (rotation) or deleting a list** keeps the old keys on your device until the relays have accepted the "no longer shared" notice for the old link. Hippo retries this, and any list change no relay has accepted yet, at start, when the device comes back online, when the app comes back to the foreground, and every few minutes while something is waiting.
 - **Framing.** GitHub Pages cannot send the `frame-ancestors` header, and a policy set in a `<meta>` tag cannot include it. So Hippo checks for itself: if it is shown inside another site's frame, it starts nothing and shows a message with a link that opens Hippo in its own tab. If you host Hippo where you control headers, also send `Content-Security-Policy: frame-ancestors 'none'`.
 - **Content-Security-Policy is set by a `<meta>` tag**, because GitHub Pages cannot send custom headers. The policy allows plain `ws:` only for loopback addresses (the developer relay override), so test and production builds are identical. `require-trusted-types-for 'script'` is not set: with it, Chromium blocks the service worker registration (a `TrustedScriptURL` sink) unless a Trusted Types policy is added.
-- **Link preview is off by default.** If you turn it on in Settings, Hippo sends the link of each wish you add to Microlink (`api.microlink.io`), a third-party service, so it can look up the page's title and picture. Only the link is sent, after tracking parameters and the part after `#` are removed, and only for `https` links to public sites. Microlink sees the link and your IP address, as any web server would. Nothing is sent to it while the setting is off. This host is the only one besides the relays that the content policy allows Hippo to contact.
+- **Link lookup is off by default.** If you turn on **Link lookup** in Settings, Hippo sends the link of each wish you add to Microlink (`api.microlink.io`), a third-party service, so it can look up the page's title and picture. Only the link is sent, after tracking parameters and the part after `#` are removed, and only for `https` links to public sites. Microlink sees the link and your IP address, as any web server would. Nothing is sent to it while the setting is off. This host is the only one besides the relays that the content policy allows Hippo to contact.
 - **Removing a list shared with you** hides it on this device but keeps your guest key, so opening the link again lets you change or take back what you said you would get. Backups include hidden lists.
 
 ## Develop
@@ -159,9 +159,9 @@ Source layout:
 | Bookmarklet (desktop) or Shortcut (iOS) | Title, link, picture and price, read from the page you are looking at | None |
 | Share sheet (Android, desktop Chrome or Edge, with Hippo installed) | Title and link, whatever the sharing app provides | None |
 | Pasting a link | A title guessed from the link | None |
-| Pasting a link or using the share sheet, with link preview turned on | Title and picture looked up for you | Microlink, see security notes |
+| Pasting a link or using the share sheet, with Link lookup turned on | Title and picture looked up for you | Microlink, see security notes |
 
-The bookmarklet and the Shortcut run inside the page you are viewing, so they can read its picture and price. They hand these to Hippo in the address, and no other site is contacted. This is the method that works without any third party. A static site cannot read another site's page by itself, which is why the other methods need either the sharing app's help or the optional link preview.
+The bookmarklet and the Shortcut run inside the page you are viewing, so they can read its picture and price. They hand these to Hippo in the address, and no other site is contacted. This is the method that works without any third party. A static site cannot read another site's page by itself, which is why the other methods need either the sharing app's help or the optional Link lookup.
 
 - Android, and desktop Chrome or Edge: install Hippo, then use the system share sheet from any browser or shopping app and pick Hippo.
 - iOS: Safari does not let web apps appear in the share sheet. Use the Shortcut recipe or paste the link into Hippo. Both are described in the app under Settings.

@@ -1,4 +1,4 @@
-/* Setup screens. The field is dark in both themes (StepScreen sets color-scheme: dark), so the
+/* Setup screens. The field is dark in both themes (StepScreen sets data-theme="dark"), so the
    semantic tokens below resolve to their dark values. Tokens only. */
 
 .step-screen--blank {

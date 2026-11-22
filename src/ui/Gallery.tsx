@@ -240,7 +240,7 @@ function Showcase({ theme }: { theme: Theme }) {
             </Button>
           </div>
         </div>
-        <div className="gx-on-field gx-on-field--short">
+        <div className="gx-on-field gx-on-field--short" data-theme="dark">
           <HeroBackground variant="dark" />
           <div className="gx-on-field__inner">
             <div className="frost frost--panel gx-panel-sample">
@@ -366,7 +366,7 @@ function Showcase({ theme }: { theme: Theme }) {
           ))}
         </div>
         {dark ? (
-          <div className="gx-on-field gx-on-field--short">
+          <div className="gx-on-field gx-on-field--short" data-theme="dark">
             <HeroBackground variant="dark" />
             <div className="gx-on-field__inner gx-row">
               <div className="frost frost--panel gx-row gx-panel-sample">

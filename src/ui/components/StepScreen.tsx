@@ -72,7 +72,7 @@ export function StepScreen({
     onBack()
   }
   return (
-    <div {...rest} className={cx('step-screen', contained && 'step-screen--contained', className)} onKeyDown={onKeyDown}>
+    <div data-theme="dark" {...rest} className={cx('step-screen', contained && 'step-screen--contained', className)} onKeyDown={onKeyDown}>
       <HeroBackground variant="night" />
       <div className="step-screen__col">
         <header className="step-screen__top">

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ClipboardEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ClipboardEvent, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { Archive, ArchiveRestore, Plus, Trash2 } from 'lucide-react'
 import { useLocation } from 'wouter'
 import {
@@ -22,11 +22,16 @@ import {
   createCategory,
   createItem,
   deleteItem,
+  fillEmptyFields,
   findFirstHttpUrl,
+  getLinkPreviewEnabled,
+  getSettings,
   guessTitleFromUrl,
   IMPORTANCE_LEVELS,
   isHippoError,
   LIMITS,
+  lookupLinkPreview,
+  markSeen,
   stripTrackingParams,
   unarchiveItem,
   updateItem,
@@ -120,6 +125,110 @@ function focusFirstError(): void {
   })
 }
 
+type LookupNote = { kind: 'pending' | 'done'; text: string } | { kind: 'off-hint' }
+
+const OFF_HINT = 'Pictures come automatically when you add with the bookmarklet or Shortcut. You can also turn on Link lookup in Settings.'
+const FAILURE_TEXT: Record<'rate-limited' | 'other', string> = {
+  'rate-limited': 'The free lookup service has no lookups left for now. You can add the title and picture yourself.',
+  other: 'Could not look up this link. You can add the title and picture yourself.',
+}
+
+/** Words for what a lookup filled in. */
+function filledText(patch: { title?: string; imageUrl?: string; price?: Money }): string {
+  const parts = [patch.title ? 'title' : '', patch.imageUrl ? 'picture' : '', patch.price ? 'price' : ''].filter(Boolean)
+  if (parts.length === 0) return ''
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  return `Filled in the ${list}. Check it before saving.`
+}
+
+/**
+ * Opt-in link lookup for the wish form. `start` is called for a link the user just pasted or was
+ * handed (never for one read from a saved wish), and only asks the service when the setting is on
+ * and the title or picture is still empty. The result fills empty fields only. A newer link, an
+ * edit of the link field or leaving the screen cancels the lookup (its answer is dropped); nothing
+ * is retried. With the setting off nothing is sent, and a pasted link without a picture gets one
+ * quiet hint, once per device.
+ */
+function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, prefilled: boolean) {
+  const core = useCore()
+  const [note, setNote] = useState<LookupNote | undefined>()
+  const run = useRef<{ id: number; url: string | undefined }>({ id: 0, url: undefined })
+  // The answer may arrive after the person kept typing: merge into what the form holds then.
+  const latest = useRef(f)
+  useEffect(() => {
+    latest.current = f
+  })
+
+  const cancel = () => {
+    run.current = { id: run.current.id + 1, url: undefined }
+    setNote(undefined)
+  }
+
+  const start = (url: string, now: FormState, pasted: boolean) => {
+    const titleBlank = !now.title.trim() || now.title === guessTitleFromUrl(url)
+    if (!titleBlank && now.imageUrl.trim()) return
+    if (run.current.url === url) return // one lookup per link, never a retry
+    const id = run.current.id + 1
+    run.current = { id, url }
+    setNote(undefined)
+    void (async () => {
+      const on = await getLinkPreviewEnabled(core.db)
+      if (run.current.id !== id) return
+      if (!on) {
+        if (pasted && !now.imageUrl.trim()) {
+          const seen = await getSettings(core.db).then((st) => st.seen.linkPreviewHint !== undefined, () => true)
+          if (run.current.id !== id || seen) return
+          setNote({ kind: 'off-hint' })
+          void markSeen(core.db, 'linkPreviewHint', Date.now()).catch(() => undefined)
+        }
+        return
+      }
+      setNote({ kind: 'pending', text: 'Looking up the title and picture\u2026' })
+      const result = await lookupLinkPreview(url, { db: core.db })
+      if (run.current.id !== id) return
+      if (result.kind === 'found') {
+        const prev = latest.current
+        const typedPrice = parseMoneyInput(prev.price, prev.currency)
+        const patch = fillEmptyFields(
+          {
+            title: prev.title === guessTitleFromUrl(url) ? '' : prev.title,
+            imageUrl: prev.imageUrl.trim(),
+            price: prev.price.trim() ? (typedPrice ?? { amount: 1, currency: prev.currency }) : undefined,
+          },
+          result.patch,
+        )
+        setF((cur) => ({
+          ...cur,
+          ...(patch.title ? { title: patch.title } : {}),
+          ...(patch.imageUrl ? { imageUrl: patch.imageUrl } : {}),
+          ...(patch.price ? { price: moneyInputValue(patch.price), currency: patch.price.currency } : {}),
+        }))
+        const filled = filledText(patch)
+        setNote(filled ? { kind: 'done', text: filled } : undefined)
+      } else if (result.kind === 'nothing-found') {
+        setNote({ kind: 'done', text: 'No title or picture found for this link. You can add them yourself.' })
+      } else if (result.kind === 'failed') {
+        setNote({ kind: 'done', text: FAILURE_TEXT[result.reason === 'rate-limited' ? 'rate-limited' : 'other'] })
+      } else {
+        setNote(undefined)
+      }
+    })()
+  }
+
+  // A link handed over by the share target or a deep link is looked up once, on arrival.
+  useEffect(() => {
+    if (prefilled) start(f.url, f, false)
+    return () => {
+      run.current = { id: run.current.id + 1, url: undefined }
+    }
+    // Once per mount: later changes to the form never start a lookup by themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const hint = note?.kind === 'off-hint' ? OFF_HINT : note?.text
+  return { start, cancel, hint }
+}
+
 function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null }) {
   const core = useCore()
   const notify = useNotify()
@@ -136,18 +245,21 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setF((prev) => ({ ...prev, [key]: value }))
   const onLists = item ? lists.filter((l) => l.itemIds.includes(item.id)) : []
+  const lookup = useLinkLookup(f, setF, !item && Boolean(draft?.url))
+  const startLookup = lookup.start
 
   /** FR-7: a pasted shop link fills the address and suggests a name. */
-  const takeUrl = (text: string) => {
+  const takeUrl = (text: string, pasted = false) => {
     const found = findFirstHttpUrl(text)
     if (!found) return false
     const url = stripTrackingParams(found)
     setF((prev) => ({ ...prev, url, title: prev.title.trim() ? prev.title : guessTitleFromUrl(url) }))
+    startLookup(url, f, pasted)
     return true
   }
 
   const onPasteUrl = (e: ClipboardEvent<HTMLInputElement>) => {
-    if (takeUrl(e.clipboardData.getData('text'))) e.preventDefault()
+    if (takeUrl(e.clipboardData.getData('text'), true)) e.preventDefault()
   }
 
   const [addingCat, setAddingCat] = useState(false)
@@ -281,16 +393,25 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
           inputMode="url"
           autoComplete="off"
           placeholder="https://"
-          hint="Paste a link and we will suggest a name."
+          hint={lookup.hint ?? 'Paste a link and we will suggest a name.'}
           value={f.url}
           maxLength={LIMITS.url}
-          onChange={(e) => set('url', e.target.value)}
+          onChange={(e) => {
+            lookup.cancel()
+            set('url', e.target.value)
+          }}
           onPaste={onPasteUrl}
           onBlur={() => {
-            if (f.url.trim() && !f.title.trim()) takeUrl(f.url)
+            const typed = f.url.trim()
+            if (!typed) return
+            if (!f.title.trim()) takeUrl(f.url)
+            else if (typed !== (item?.url ?? draft?.url ?? '')) startLookup(typed, f, false)
           }}
           {...err('url')}
         />
+        <span className="sr-only" role="status">
+          {lookup.hint ?? ''}
+        </span>
         <TextField
           label="Name"
           required

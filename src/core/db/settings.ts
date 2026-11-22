@@ -9,7 +9,7 @@ import type { HippoDb } from './schema.ts'
 export type Theme = 'system' | 'light' | 'dark'
 
 /** One-time hints the app has shown on this device. */
-export type SeenFlag = 'giverIntro' | 'setupChecklist'
+export type SeenFlag = 'giverIntro' | 'setupChecklist' | 'linkPreviewHint'
 
 /**
  * First-run setup progress. The app owns the meaning of `step` and the
@@ -39,7 +39,7 @@ export interface Settings {
   seen: Partial<Record<SeenFlag, number>>
 }
 
-const SEEN_FLAGS: readonly SeenFlag[] = ['giverIntro', 'setupChecklist']
+const SEEN_FLAGS: readonly SeenFlag[] = ['giverIntro', 'setupChecklist', 'linkPreviewHint']
 const ANSWER_KEYS_MAX = 12
 const ANSWER_MAX = 300
 

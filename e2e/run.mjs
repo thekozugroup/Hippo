@@ -7,6 +7,7 @@ import { freePort, loadPlaywright, ROOT, startPreview, tests } from './harness.m
 import './flows.test.mjs'
 import './review.test.mjs'
 import './onboarding.test.mjs'
+import './wire.test.mjs'
 
 if (!existsSync(ROOT + 'dist/index.html')) {
   console.error('dist/ is missing: run `npm run build` first (npm run test:e2e does this).')

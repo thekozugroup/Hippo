@@ -5,6 +5,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   getItem,
+  getLinkPreviewEnabled,
   getSettings,
   getSharedList,
   listCategories,
@@ -52,4 +53,10 @@ export function useGuestLists(): GuestListSummary[] | undefined {
 export function useSettings(): Settings | undefined {
   const { db } = useCore()
   return useLiveQuery(() => getSettings(db), [db])
+}
+
+/** The opt-in for link lookups (off by default); `undefined` while it loads. */
+export function useLinkPreviewEnabled(): boolean | undefined {
+  const { db } = useCore()
+  return useLiveQuery(() => getLinkPreviewEnabled(db), [db])
 }

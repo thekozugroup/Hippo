@@ -9,15 +9,12 @@
   pointer-events: none;
 }
 
-/* The dark field in either theme: light-dark() inside the tokens resolves to the dark stops. */
-.hero-bg--dark {
-  color-scheme: dark;
-}
+/* The dark field in either theme comes from data-theme="dark" on the element (tokens.css):
+   the hero tokens re-resolve there, so it needs no rules of its own. */
 
 /* Setup field (both themes): blue-700 to blue-900 at the top, falling to slate-950 by the middle,
    where the headline and controls sit. White text keeps 15:1 or better over the lower half. */
 .hero-bg--night {
-  color-scheme: dark;
   background-color: var(--slate-950);
   background-image:
     radial-gradient(ellipse 90% 45% at 20% 18%, color-mix(in srgb, var(--blue-600) 55%, transparent) 0%, transparent 100%),
@@ -40,8 +37,7 @@
 }
 
 @media (forced-colors: active) {
-  .hero-bg,
-  .hero-bg--dark {
+  .hero-bg {
     background: Canvas;
   }
   .hero-bg::after {

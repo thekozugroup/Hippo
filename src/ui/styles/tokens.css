@@ -120,25 +120,7 @@
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --grain-opacity: 0.55;
 
-  /* Hero field. One gradient serves both themes: light-dark() picks the stops from the
-     element's colour scheme, so `.hero-bg--dark` (color-scheme: dark) and a pinned
-     data-theme both work without a second copy.
-     Light: a diagonal from blue-900 (top right) through blue-800 and blue-700 to blue-600
-     (bottom left). Every stop keeps white text at 5.1:1 or better. A vertical layer then
-     fades every column to the flat fill, so there is no seam on wide screens.
-     Dark: flat slate-950 with a soft blue-800 glow. */
-  --hero-fill: light-dark(var(--blue-600), var(--slate-950));
   --hero-fill-dark: var(--slate-950);
-  --hero-bg:
-    radial-gradient(ellipse 100% 55% at 30% 30%, light-dark(transparent, color-mix(in srgb, var(--blue-800) 70%, transparent)) 0%, transparent 100%),
-    linear-gradient(to bottom, transparent 55%, var(--hero-fill) 100%),
-    linear-gradient(
-      205deg,
-      light-dark(var(--blue-900), var(--slate-950)) 0%,
-      light-dark(var(--blue-800), var(--slate-950)) 42%,
-      light-dark(var(--blue-700), var(--slate-950)) 76%,
-      var(--hero-fill) 100%
-    );
 
   /* Primary button: blue gradient, light glow along the bottom edge (label stays on blue-600 or darker). */
   --primary-from: var(--blue-800);
@@ -159,6 +141,46 @@
   --frost-scrim-tint: color-mix(in srgb, var(--slate-950) 36%, transparent);
   --frost-scrim-filter: blur(12px);
   --frost-scrim-solid: color-mix(in srgb, var(--slate-950) 80%, transparent);
+
+  /* Follows the system by default; data-theme pins one scheme. */
+  color-scheme: light dark;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/* Scheme-dependent tokens. Declared on the root and again on every element that carries
+   data-theme, so any subtree can be pinned to a scheme: set data-theme="light" or "dark" on its
+   root element (DESIGN.md section 2). light-dark() reads the used color-scheme of the element
+   it is evaluated on, and each element here has just set that scheme, so a token is resolved
+   where it is declared and again for the subtree, whichever way an engine resolves a
+   light-dark() inside a custom property. Everything that holds light-dark(), or a var() of
+   something that does, lives in this one block. :where() keeps the specificity at zero, so a
+   component can still override a token on its own root (`--focus-ring` on the hero). */
+:where(:root, [data-theme]) {
+  /* Hero field. One gradient serves both themes: light-dark() picks the stops from the
+     element's colour scheme, so a hero with data-theme="dark" and a pinned page both work
+     without a second copy.
+     Light: a diagonal from blue-900 (top right) through blue-800 and blue-700 to blue-600
+     (bottom left). Every stop keeps white text at 5.1:1 or better. A vertical layer then
+     fades every column to the flat fill, so there is no seam on wide screens.
+     Dark: flat slate-950 with a soft blue-800 glow. */
+  --hero-fill: light-dark(var(--blue-600), var(--slate-950));
+  --hero-bg:
+    radial-gradient(ellipse 100% 55% at 30% 30%, light-dark(transparent, color-mix(in srgb, var(--blue-800) 70%, transparent)) 0%, transparent 100%),
+    linear-gradient(to bottom, transparent 55%, var(--hero-fill) 100%),
+    linear-gradient(
+      205deg,
+      light-dark(var(--blue-900), var(--slate-950)) 0%,
+      light-dark(var(--blue-800), var(--slate-950)) 42%,
+      light-dark(var(--blue-700), var(--slate-950)) 76%,
+      var(--hero-fill) 100%
+    );
 
   /* Semantic colours. light-dark() reads the used color-scheme, so this one block serves
      the system theme (color-scheme: light dark) and the data-theme override. */
@@ -202,17 +224,6 @@
   --tone-emerald-bg: light-dark(var(--emerald-100), color-mix(in srgb, var(--emerald-400) 16%, transparent));
   --tone-amber-fg: light-dark(var(--amber-800), var(--amber-200));
   --tone-amber-bg: light-dark(var(--amber-100), color-mix(in srgb, var(--amber-400) 16%, transparent));
-
-  /* Follows the system by default; data-theme pins one scheme. */
-  color-scheme: light dark;
-}
-
-[data-theme='light'] {
-  color-scheme: light;
-}
-
-[data-theme='dark'] {
-  color-scheme: dark;
 }
 
 /* Narrow phones: smaller gutter, and every type role steps down one level. */

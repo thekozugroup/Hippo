@@ -15,8 +15,10 @@ export function HeroBackground({ variant = 'blue', className, ...rest }: HeroBac
   return (
     <div
       aria-hidden="true"
+      // `dark` and `night` are dark in either page theme: data-theme scopes the tokens to this element.
+      {...(variant === 'blue' ? {} : { 'data-theme': 'dark' })}
       {...rest}
-      className={cx('hero-bg', variant === 'dark' && 'hero-bg--dark', variant === 'night' && 'hero-bg--night', className)}
+      className={cx('hero-bg', variant === 'night' && 'hero-bg--night', className)}
     />
   )
 }

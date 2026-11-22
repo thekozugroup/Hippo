@@ -36,7 +36,7 @@ After any item change, call `syncListsForItem(core, itemId)` to republish lists 
 | `findFirstHttpUrl`, `guessTitleFromUrl`, `parsePrice(str, currency?)`, `currencyDigits(code)` | The pieces. `parsePrice` returns minor units or `undefined` when ambiguous. |
 | `stripTrackingParams(url)`, `isTrackingParam(name)`, `TRACKING_PARAMS` | Remove well-known tracking parameters (`utm_*`, `fbclid`, `gclid`, ...) and text fragments from a captured link; other parameters are kept. `draftFromCapture` applies it. |
 
-### Link preview (opt-in)
+### Link preview (opt-in; shown to people as "Link lookup" in Settings)
 
 For wishes added from a pasted link or the share sheet. Off by default; see the README security notes.
 
@@ -100,7 +100,7 @@ Claim actions return `{ claim, result: PublishResult }`. They update the view im
 | `isFramed(window)` | True when `window.top !== window.self` (or reading it throws). |
 | `blockIfFramed(window, document, location.href)` | Used by `src/main.tsx` before anything starts. When framed, replaces the page with a plain message and a link that opens Hippo in its own tab, and returns `true`. |
 | `checkDeployment(env)` | Returns `Promise<DeploymentCheck[]>`. Never throws; waits at most the relay timeout (default 4 s). |
-| `browserDeploymentEnv(relays)` | Builds `env` from the real `window`, `navigator`, `indexedDB` and `WebSocket`. Settings should call `checkDeployment(browserDeploymentEnv(DEFAULT_RELAYS))`, or the relays from `getSettings(db).relays` when set. |
+| `browserDeploymentEnv(relays)` | Builds `env` from the real `window`, `navigator`, `indexedDB` and `WebSocket`. Settings (the **Deployment checks** row, at the bottom) calls `checkDeployment(browserDeploymentEnv(relays))` with the forced test relays, else `getSettings(db).relays`, else `DEFAULT_RELAYS`. |
 
 ```ts
 type CheckStatus = 'ok' | 'warning' | 'problem' | 'unknown'
@@ -122,7 +122,7 @@ The list always has these seven entries in this order. `unknown` means the brows
 | `importData(db, parsedJson, { mode: 'merge' \| 'replace' })` | Validates everything first; rejects other versions, any bad record, and FR-25 conflicts (`invalid-import`). Merge never replaces lists already on the device (`skippedLists`). |
 | `getSettings(db)`, `setTheme(db, theme)`, `setRelayOverride(db, relays?)` | Settings; the relay override applies to lists created afterwards and accepts public `wss://` relays only (`isRelayUrl`). |
 | `setOwnerName(db, name?)` | The owner's first name or nickname (max 40, whitespace collapsed; `RangeError` when longer). Published lists carry it as `ownerName` in their meta from their next sync, so call `syncList` for published lists after a change. |
-| `setOnboarding(db, state?)`, `markSeen(db, flag, at)` | First-run setup progress (`{ status, step, answers, listId?, itemId?, updatedAt }`, validated on write and read) and one-time hints (`giverIntro`, `setupChecklist`), returned by `getSettings` as `onboarding` and `seen`. |
+| `setOnboarding(db, state?)`, `markSeen(db, flag, at)` | First-run setup progress (`{ status, step, answers, listId?, itemId?, updatedAt }`, validated on write and read) and one-time hints (`giverIntro`, `setupChecklist`, `linkPreviewHint`), returned by `getSettings` as `onboarding` and `seen`. |
 
 ## Other exports
 

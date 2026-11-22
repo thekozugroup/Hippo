@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bookmark, Copy, Download, ExternalLink, RotateCcw, Tags, Upload } from 'lucide-react'
-import { BottomSheet, Button, SectionHeader, SegmentedControl, TextArea, TextField } from '../../../ui/index.ts'
+import { BottomSheet, Button, SectionHeader, SegmentedControl, Switch, TextArea, TextField } from '../../../ui/index.ts'
 import {
   DEFAULT_RELAYS,
   importData,
   isHippoError,
   isRelayUrl,
   LIMITS,
+  LINK_PREVIEW_DISCLOSURE,
   parseExportFile,
+  setLinkPreviewEnabled,
   setOnboarding,
   setOwnerName,
   setRelayOverride,
@@ -16,7 +18,7 @@ import {
   type Theme,
 } from '../../../core/index.ts'
 import { useCore } from '../../core/context.ts'
-import { useSettings, useSharedLists } from '../../core/data.ts'
+import { useLinkPreviewEnabled, useSettings, useSharedLists } from '../../core/data.ts'
 import { useNotify } from '../../core/notify.ts'
 import { applyTheme } from '../../core/theme.ts'
 import { newFlow, toStored } from '../../core/onboarding.ts'
@@ -28,6 +30,7 @@ import { appBaseUrl, bookmarkletCode, shortcutScript } from '../../lib/capture-t
 import { plural, possessive } from '../../lib/format.ts'
 import { resyncLists } from '../../lib/sync.ts'
 import { CategoriesSheet } from '../CategoriesSheet.tsx'
+import { DeploymentChecks } from './DeploymentChecks.tsx'
 import './SettingsScreen.css'
 
 const SOURCE_URL = 'https://github.com/thekozugroup/Hippo'
@@ -377,6 +380,38 @@ function CaptureSection() {
   )
 }
 
+/** Opt-in lookup of a link's title and picture. Off until switched on; the sentence is core's, unchanged. */
+function LinkLookupSection() {
+  const { db } = useCore()
+  const notify = useNotify()
+  const enabled = useLinkPreviewEnabled()
+  const change = async (on: boolean) => {
+    try {
+      await setLinkPreviewEnabled(db, on)
+    } catch {
+      notify('Could not save this setting. Please try again.')
+    }
+  }
+  return (
+    <section className="app-stack" aria-labelledby="set-lookup">
+      <h2 id="set-lookup" className="app-section-title">
+        Link lookup
+      </h2>
+      <Switch
+        label="Look up the title and picture of links"
+        description={LINK_PREVIEW_DISCLOSURE}
+        aria-describedby="set-lookup-limits"
+        checked={enabled === true}
+        disabled={enabled === undefined}
+        onChange={(e) => void change(e.target.checked)}
+      />
+      <p id="set-lookup-limits" className="app-note">
+        The free service only handles a few lookups a day, and it returns a title and a picture, not a price.
+      </p>
+    </section>
+  )
+}
+
 function RelaySection() {
   const core = useCore()
   const notify = useNotify()
@@ -477,7 +512,7 @@ function AboutSection() {
         <li>Shared lists, and who is getting or chipping in on what, are end-to-end encrypted. The key is in the link, which is never sent to any server.</li>
         <li>Hiding gifts from you, the owner, is done by the Hippo app, not by encryption: Hippo cannot stop you from opening your own link in another browser. Please do not peek.</li>
         <li>Chipping in is a promise between friends. Hippo never handles money.</li>
-        <li>The only other requests Hippo makes are for pictures you attach to wishes.</li>
+        <li>The only other requests Hippo makes are for pictures you attach to wishes, and for link lookups if you turn them on.</li>
       </ul>
       <div className="app-row">
         <a className="btn btn--secondary btn--md" href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
@@ -511,8 +546,10 @@ export default function SettingsScreen() {
       </section>
       <BackupSection />
       <CaptureSection />
+      <LinkLookupSection />
       <RelaySection />
       <AboutSection />
+      <DeploymentChecks />
       <CategoriesSheet open={manage} onClose={() => setManage(false)} />
     </AppScreen>
   )
