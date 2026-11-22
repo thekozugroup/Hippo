@@ -6,6 +6,7 @@ import {
   exportData,
   importData,
   isHippoError,
+  isRelayUrl,
   parseExportFile,
   setRelayOverride,
   setTheme,
@@ -33,14 +34,9 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
+/** Relays end up in share links, so only public wss:// relays are allowed (same rule as core). */
 function isRelayInput(s: string): boolean {
-  try {
-    const u = new URL(s)
-    if (u.protocol === 'wss:') return u.hostname.length > 0
-    return u.protocol === 'ws:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname)
-  } catch {
-    return false
-  }
+  return isRelayUrl(s)
 }
 
 function ThemeSection() {
@@ -123,8 +119,12 @@ function BackupSection() {
       const r = await importData(db, pending.file, { mode })
       setPending(null)
       notify(`Imported ${plural(r.items, 'wish', 'wishes')} and ${plural(r.sharedLists + r.guestLists, 'list', 'lists')}.`)
-    } catch {
-      setError('The import failed. Nothing was changed.')
+    } catch (e) {
+      setError(
+        isHippoError(e, 'invalid-import')
+          ? `This backup was not imported because it contains one of your own lists as a list shared with you, or the other way round. Nothing was changed.`
+          : 'The import failed. Nothing was changed.',
+      )
     } finally {
       setBusy(false)
     }
@@ -299,7 +299,7 @@ function RelaySection() {
       .filter(Boolean)
     const bad = lines.filter((l) => !isRelayInput(l))
     if (bad.length > 0) {
-      setError(`Not a valid relay address: ${bad.slice(0, 2).join(', ')}. Use addresses that start with wss://`)
+      setError(`Not a valid relay address: ${bad.slice(0, 2).join(', ')}. Use public addresses that start with wss://`)
       return
     }
     if (lines.length === 0) {
@@ -329,7 +329,7 @@ function RelaySection() {
       </p>
       {core.forcedRelays ? (
         <p className="app-banner" role="note">
-          {`Test mode is on: every list on this device uses only ${core.forcedRelays.join(', ')}.`}
+          {`Test mode is on in this tab: every list uses only ${core.forcedRelays.join(', ')}.`}
         </p>
       ) : null}
       <TextArea

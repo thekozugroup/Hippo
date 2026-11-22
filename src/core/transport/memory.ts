@@ -14,8 +14,13 @@ interface Sub {
 
 /** A shared in-memory "relay" that several MemoryTransports can attach to. */
 export class MemoryNetwork {
-  readonly store = new RelayStore()
+  readonly store: RelayStore
   private readonly subs = new Set<Sub>()
+
+  /** `nowSeconds` lets tests move the relay's clock (NIP-40 expiration). */
+  constructor(options: { nowSeconds?: () => number } = {}) {
+    this.store = new RelayStore(options.nowSeconds)
+  }
 
   attach(sub: Sub): () => void {
     this.subs.add(sub)

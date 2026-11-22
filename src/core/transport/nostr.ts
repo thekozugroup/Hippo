@@ -2,6 +2,7 @@
 
 import { SimplePool } from 'nostr-tools/pool'
 import { normalizeURL } from 'nostr-tools/utils'
+import { LIMITS } from '../model/limits.ts'
 import type { EoseInfo, Filter, NostrEvent, PublishResult, RelayResult, Transport, TransportProvider, Unsubscribe } from './types.ts'
 
 export interface NostrTransportOptions {
@@ -150,7 +151,8 @@ export class NostrTransport implements Transport {
       unsubscribe = this.subscribe(
         filter,
         (e) => {
-          if (!seen.has(e.id)) seen.set(e.id, e)
+          // A hostile relay could stream events without end; keep a bounded set.
+          if (!seen.has(e.id) && seen.size < LIMITS.eventsPerFetch) seen.set(e.id, e)
         },
         () => queueMicrotask(finish),
       )

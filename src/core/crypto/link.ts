@@ -2,6 +2,7 @@
 //   v1: 0x01 || ownerPubkey(32) || listSecret(32)                (default relays)
 //   v2: 0x02 || ownerPubkey(32) || listSecret(32) || utf8(relays joined by ",")
 
+import { DEFAULT_RELAYS, sameRelaySet } from '../config.ts'
 import { LIMITS } from '../model/limits.ts'
 import { isRelayUrl } from '../model/validate.ts'
 import { HippoError } from '../errors.ts'
@@ -44,6 +45,8 @@ function validateRelays(relays: string[]): void {
   if (relays.length === 0 || relays.length > LIMITS.relays) {
     throw new HippoError('invalid-link', 'relay list must have 1 to 20 entries')
   }
+  // Public wss:// hosts only: a link must not point a giver's browser at
+  // loopback, LAN or link-local services (see isRelayUrl).
   for (const r of relays) {
     if (r.length > LIMITS.relayUrl || !isRelayUrl(r)) throw new HippoError('invalid-link', 'invalid relay URL in link')
   }
@@ -105,4 +108,14 @@ export function extractSharePayload(input: string): string {
 
 export function parseShareLink(input: string): SharePayload {
   return decodeSharePayload(extractSharePayload(input))
+}
+
+/** Full share link for keys and relays; a v1 payload when the relays are the defaults. */
+export function shareLinkFor(p: { ownerPubkey: string; listSecret: string; relays: readonly string[] }, appBaseUrl: string): string {
+  const payload = encodeSharePayload({
+    ownerPubkey: p.ownerPubkey,
+    listSecret: p.listSecret,
+    ...(sameRelaySet(p.relays, DEFAULT_RELAYS) ? {} : { relays: [...p.relays] }),
+  })
+  return buildShareUrl(appBaseUrl, payload)
 }

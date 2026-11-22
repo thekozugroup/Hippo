@@ -76,7 +76,7 @@ export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchase
       {myConflict ? (
         <div className="app-banner app-banner--warn" role="note">
           <TriangleAlert aria-hidden="true" />
-          <p>Someone else marked this a moment before you, so your mark did not count. You can take it back.</p>
+          <p>Someone else&apos;s mark was counted first (or they have already bought it), so yours is not counted. No harm done: you can take yours back and pick something else.</p>
         </div>
       ) : null}
 

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import type { ClaimPayload, ItemPayload } from '../model/types.ts'
-import { resolveItemState, type ResolveClaim } from './resolve.ts'
+import { effectiveClaimTime, resolveItemState, type ResolveClaim } from './resolve.ts'
 
 const ITEM = 'a'.repeat(32)
 let seq = 0
@@ -10,12 +10,13 @@ function item(extra: Partial<ItemPayload> = {}): ItemPayload {
   return { v: 1, id: ITEM, title: 'Hippo', quantity: 1, importance: 'love', allowContributions: true, updatedAt: 1, ...extra }
 }
 
-function claim(extra: Partial<ClaimPayload> & { pubkey?: string; eventId?: string } = {}): ResolveClaim {
+function claim(extra: Partial<ClaimPayload> & { pubkey?: string; eventId?: string; eventCreatedAt?: number } = {}): ResolveClaim {
   seq++
-  const { pubkey = 'p'.repeat(64), eventId = seq.toString(16).padStart(64, '0'), ...payload } = extra
+  const { pubkey = 'p'.repeat(64), eventId = seq.toString(16).padStart(64, '0'), eventCreatedAt = 2_000_000_000, ...payload } = extra
   return {
     eventId,
     pubkey,
+    eventCreatedAt,
     payload: { v: 1, id: seq.toString(16).padStart(32, '0'), itemId: ITEM, kind: 'full', status: 'reserved', createdAt: seq, updatedAt: seq, ...payload },
   }
 }
@@ -125,5 +126,49 @@ describe('resolveItemState', () => {
       const shuffled = [...claims].sort(() => Math.random() - 0.5)
       expect(resolveItemState(it, shuffled)).toEqual(expected)
     }
+  })
+
+  describe('claim ordering (PROTOCOL.md section 6)', () => {
+    const HONEST = 'h'.repeat(64)
+    const ATTACKER = 'x'.repeat(64)
+
+    it('never lets a backdated reserved claim displace a purchased one', () => {
+      const honest = claim({ createdAt: 1_790_000_000_000, status: 'purchased', pubkey: HONEST })
+      const backdated = claim({ createdAt: 0, pubkey: ATTACKER })
+      const s = resolveItemState(item(), [honest, backdated], { myPubkey: HONEST })
+      expect(s.status).toBe('purchased')
+      const mine = s.rows.find((r) => r.mine)
+      expect(mine?.conflict).toBe(false)
+      expect(s.rows.find((r) => !r.mine)?.conflict).toBe(true)
+    })
+
+    it('ranks purchased claims ahead of reserved ones for the remaining quantity', () => {
+      const early = claim({ createdAt: 1, quantity: 2, pubkey: 'a'.repeat(64) })
+      const bought = claim({ createdAt: 50, quantity: 2, status: 'purchased', pubkey: 'b'.repeat(64) })
+      const s = resolveItemState(item({ quantity: 3 }), [early, bought])
+      expect(s.rows.map((r) => [r.claimId, r.conflict])).toEqual([
+        [early.payload.id, true],
+        [bought.payload.id, false],
+      ])
+      expect(s.grantedQuantity).toBe(2)
+    })
+
+    it('bounds a claim time above by its signed event: a late-dated payload cannot jump the queue backwards or forwards', () => {
+      // Payload says "very late" but the event was signed early: the event time counts.
+      const c = claim({ createdAt: 9_000_000_000_000, eventCreatedAt: 100 })
+      expect(effectiveClaimTime(c)).toBe(100_000)
+      const other = claim({ createdAt: 200_000, pubkey: 'o'.repeat(64) })
+      const s = resolveItemState(item(), [other, c])
+      expect(s.rows[0]?.claimId).toBe(c.payload.id)
+      expect(s.rows[0]?.createdAt).toBe(100_000)
+      expect(s.rows[1]?.conflict).toBe(true)
+    })
+
+    it('still lets a backdated reserved claim win among reserved claims (documented residual limitation)', () => {
+      const honest = claim({ createdAt: 1_790_000_000_000, pubkey: HONEST })
+      const backdated = claim({ createdAt: 0, eventCreatedAt: 0, pubkey: ATTACKER })
+      const s = resolveItemState(item(), [honest, backdated], { myPubkey: HONEST })
+      expect(s.rows.find((r) => r.mine)?.conflict).toBe(true)
+    })
   })
 })

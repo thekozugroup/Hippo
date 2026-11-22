@@ -6,6 +6,8 @@ import { verifyEvent } from 'nostr-tools/pure'
 import type { NostrEvent } from 'nostr-tools/core'
 import { decryptJson } from '../crypto/aead.ts'
 import { isHex } from '../model/guards.ts'
+import { LIMITS } from '../model/limits.ts'
+import { isExpired } from './build.ts'
 import type { ClaimPayload, ItemPayload, ListMetaPayload } from '../model/types.ts'
 import { parseClaimPayload, parseItemPayload, parseListMetaPayload, tryParse } from '../model/validate.ts'
 import { HIPPO_KIND, parseSlot } from './slots.ts'
@@ -16,6 +18,8 @@ export interface ReceiveContext {
   contentKey: Uint8Array
   /** Absent on the owner side: claim events are then always rejected. */
   claimsKey?: Uint8Array
+  /** Milliseconds since epoch; used to drop expired events and future-dated claims. Defaults to Date.now. */
+  now?: () => number
 }
 
 export type AcceptedEvent =
@@ -35,6 +39,8 @@ export type RejectReason =
   | 'decrypt-failed'
   | 'invalid-payload'
   | 'id-mismatch'
+  | 'expired'
+  | 'future'
 
 export type ReceiveResult = { ok: true; accepted: AcceptedEvent } | { ok: false; reason: RejectReason }
 
@@ -88,6 +94,11 @@ export function receiveEvent(raw: unknown, ctx: ReceiveContext): ReceiveResult {
   if (d === null || !slot) return { ok: false, reason: 'bad-slot' }
   if (slot.type !== 'claim' && event.pubkey !== ctx.ownerPubkey) return { ok: false, reason: 'not-owner' }
   if (slot.type === 'claim' && !ctx.claimsKey) return { ok: false, reason: 'no-claims-key' }
+  const now = (ctx.now ?? Date.now)()
+  if (event.tags.filter((t) => t[0] === 'expiration').length > 1) return { ok: false, reason: 'malformed' }
+  if (isExpired(event, now)) return { ok: false, reason: 'expired' }
+  const latest = now + LIMITS.futureSkewMs
+  if (slot.type === 'claim' && event.created_at * 1000 > latest) return { ok: false, reason: 'future' }
   // Signature last among the cheap checks: it is the expensive one.
   if (!verifyEvent(event)) return { ok: false, reason: 'bad-signature' }
 
@@ -115,6 +126,7 @@ export function receiveEvent(raw: unknown, ctx: ReceiveContext): ReceiveResult {
       const payload = tryParse(parseClaimPayload, json)
       if (!payload) return { ok: false, reason: 'invalid-payload' }
       if (payload.id !== slot.claimId) return { ok: false, reason: 'id-mismatch' }
+      if (payload.createdAt > latest || payload.updatedAt > latest) return { ok: false, reason: 'future' }
       return { ok: true, accepted: { type: 'claim', event, d, claimId: slot.claimId, payload } }
     }
   }

@@ -74,7 +74,6 @@ export interface ListMetaPayload {
   showPrices: boolean
   showNotes: boolean
   status: 'published' | 'unpublished'
-  movedTo?: string
   updatedAt: number
 }
 
@@ -106,4 +105,29 @@ export interface ClaimPayload {
   nickname?: string
   createdAt: number
   updatedAt: number
+}
+
+/**
+ * A list this device no longer owns under that topic: the old side of a
+ * rotation, or a deleted list. Kept for good so the device never opens the
+ * topic or owner key as a guest (FR-25). `pending` holds the old secrets
+ * only until the old link has been cut off (unpublished meta and item
+ * tombstones accepted by at least one relay).
+ */
+export interface RetiredList {
+  topic: string
+  ownerPubkey: string
+  listId: string
+  reason: 'rotated' | 'deleted'
+  retiredAt: number
+  pending?: RetiredListSecrets
+}
+
+export interface RetiredListSecrets {
+  ownerSecretKey: string
+  listSecret: string
+  relays: string[]
+  name: string
+  /** Shared (derived) item ids whose slots need a tombstone. */
+  itemIds: string[]
 }

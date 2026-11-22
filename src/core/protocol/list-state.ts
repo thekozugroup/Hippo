@@ -3,10 +3,11 @@
 // owns a claim slot) and rule 7 (last writer wins per slot and author).
 
 import type { NostrEvent } from 'nostr-tools/core'
+import { LIMITS } from '../model/limits.ts'
 import type { AcceptedEvent, ReceiveContext, RejectReason } from './receive.ts'
 import { compareFirstSeen, isNewer, receiveEvent } from './receive.ts'
 
-export type IngestOutcome = 'accepted' | 'duplicate' | 'stale' | 'slot-taken' | RejectReason
+export type IngestOutcome = 'accepted' | 'duplicate' | 'stale' | 'slot-taken' | 'too-many' | RejectReason
 
 export type AcceptedMeta = Extract<AcceptedEvent, { type: 'meta' }>
 export type AcceptedItem = Extract<AcceptedEvent, { type: 'item' }>
@@ -32,6 +33,8 @@ export class ListState {
     if (a.type === 'claim') {
       const author = this.slotAuthors.get(a.d)
       if (author !== undefined && author !== a.event.pubkey) return { outcome: 'slot-taken' }
+      // Bound memory and cache growth: new claim slots beyond the cap are ignored.
+      if (author === undefined && this.slotAuthors.size >= LIMITS.claimsPerList) return { outcome: 'too-many' }
     }
     const current = this.slots.get(a.d)
     if (current) {

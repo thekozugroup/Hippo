@@ -2,19 +2,35 @@
 // access goes through OwnerChannel, which only ever asks for the owner's own
 // events; owner code never derives the claims key.
 
-import { DEFAULT_RELAYS, sameRelaySet } from '../config.ts'
+import { DEFAULT_RELAYS } from '../config.ts'
 import { decryptJson } from '../crypto/aead.ts'
 import { randomId } from '../crypto/bytes.ts'
-import { deriveContentKeys, generateListSecret, generateSigningKey, publicKeyOf, topicForSecret } from '../crypto/keys.ts'
-import { buildShareUrl, encodeSharePayload } from '../crypto/link.ts'
+import {
+  deriveContentKeys,
+  generateListSecret,
+  generateSigningKey,
+  publicKeyOf,
+  sharedItemIdWith,
+  topicForSecret,
+} from '../crypto/keys.ts'
+import { shareLinkFor } from '../crypto/link.ts'
 import { cacheIfNewer, deleteCachedTopic, getCachedEvents } from '../db/event-cache.ts'
 import type { CachedEvent, HippoDb } from '../db/schema.ts'
 import { getSettings } from '../db/settings.ts'
 import { HippoError } from '../errors.ts'
 import { SchemaError, readOptionalDate, readOptionalString, readString } from '../model/guards.ts'
 import { LIMITS } from '../model/limits.ts'
-import type { Item, ItemPayload, ListMetaPayload, SharedList } from '../model/types.ts'
-import { buildItemEvent, buildItemTombstone, buildMetaEvent, nextCreatedAt } from '../protocol/build.ts'
+import type { Item, ItemPayload, ListMetaPayload, RetiredList, SharedList } from '../model/types.ts'
+import { parseListMetaPayload, tryParse } from '../model/validate.ts'
+import {
+  buildItemEvent,
+  buildItemTombstone,
+  buildMetaEvent,
+  expiresSoon,
+  isExpired,
+  nextCreatedAt,
+  type SignOptions,
+} from '../protocol/build.ts'
 import { itemSlot, metaSlot, parseSlot } from '../protocol/slots.ts'
 import type { NostrEvent, PublishResult } from '../transport/types.ts'
 import type { CoreDeps } from './deps.ts'
@@ -142,12 +158,26 @@ export async function findListsContainingItem(db: HippoDb, itemId: string): Prom
   return all.filter((l) => l.status === 'published' && l.itemIds.includes(itemId))
 }
 
+// ---- Shared item ids ----
+
+/** The id a local wishlist item has inside this list's shared space (PROTOCOL.md section 2). */
+export function sharedItemIdFor(list: Pick<SharedList, 'listSecret'>, localItemId: string): string {
+  return sharedItemIdWith(deriveContentKeys(list.listSecret).slotKey, localItemId)
+}
+
+/** Maps a shared item id back to the local wishlist item id; `undefined` if the list does not link it. */
+export function localItemIdFor(list: Pick<SharedList, 'listSecret' | 'itemIds'>, sharedId: string): string | undefined {
+  const { slotKey } = deriveContentKeys(list.listSecret)
+  return list.itemIds.find((id) => sharedItemIdWith(slotKey, id) === sharedId)
+}
+
 // ---- Payloads ----
 
-export function itemPayloadFor(item: Item, list: Pick<SharedList, 'showPrices' | 'showNotes'>): ItemPayload {
+/** `sharedId` is the item's id in this list (see `sharedItemIdFor`); the local id never leaves the device. */
+export function itemPayloadFor(item: Item, list: Pick<SharedList, 'showPrices' | 'showNotes'>, sharedId: string): ItemPayload {
   const p: ItemPayload = {
     v: 1,
-    id: item.id,
+    id: sharedId,
     title: item.title,
     quantity: item.quantity,
     importance: item.importance,
@@ -161,11 +191,12 @@ export function itemPayloadFor(item: Item, list: Pick<SharedList, 'showPrices' |
   return p
 }
 
-export function metaPayloadFor(list: SharedList, liveItemIds: string[]): ListMetaPayload {
+/** `sharedItemIds` are the live items' shared ids, in list order. */
+export function metaPayloadFor(list: SharedList, sharedItemIds: string[]): ListMetaPayload {
   const p: ListMetaPayload = {
     v: 1,
     name: list.name,
-    itemIds: liveItemIds,
+    itemIds: sharedItemIds,
     showPrices: list.showPrices,
     showNotes: list.showNotes,
     status: 'published',
@@ -178,18 +209,33 @@ export function metaPayloadFor(list: SharedList, liveItemIds: string[]): ListMet
 
 // ---- Publishing ----
 
+/** Everything needed to sign and publish under one topic, for a current or a retired list. */
 interface OwnerContext {
-  list: SharedList
+  listId: string
   topic: string
   contentKey: Uint8Array
+  slotKey: Uint8Array
   ownerPubkey: string
+  secretKey: string
   channel: OwnerChannel
 }
 
+function contextFor(deps: CoreDeps, k: { listId: string; ownerSecretKey: string; listSecret: string; relays: readonly string[] }): OwnerContext {
+  const { topic, contentKey, slotKey } = deriveContentKeys(k.listSecret)
+  const ownerPubkey = publicKeyOf(k.ownerSecretKey)
+  return {
+    listId: k.listId,
+    topic,
+    contentKey,
+    slotKey,
+    ownerPubkey,
+    secretKey: k.ownerSecretKey,
+    channel: new OwnerChannel(deps.transports(k.relays), topic, ownerPubkey),
+  }
+}
+
 function ownerContext(deps: CoreDeps, list: SharedList): OwnerContext {
-  const { topic, contentKey } = deriveContentKeys(list.listSecret)
-  const ownerPubkey = publicKeyOf(list.ownerSecretKey)
-  return { list, topic, contentKey, ownerPubkey, channel: new OwnerChannel(deps.transports(list.relays), topic, ownerPubkey) }
+  return contextFor(deps, { listId: list.id, ownerSecretKey: list.ownerSecretKey, listSecret: list.listSecret, relays: list.relays })
 }
 
 async function publishAndCache(
@@ -200,18 +246,12 @@ async function publishAndCache(
   kind: PublishedEventReport['kind'],
 ): Promise<PublishedEventReport> {
   const result = await ctx.channel.publish(event)
-  await cacheIfNewer(deps.db, ctx.topic, d, event, !result.ok)
+  await cacheIfNewer(deps.db, ctx.topic, d, event, { pending: !result.ok })
   return { d, kind, result }
 }
 
-function signOptions(deps: CoreDeps, ctx: OwnerContext, previous: CachedEvent | undefined) {
-  const o: { topic: string; secretKey: string; createdAt: number; eventDate?: string } = {
-    topic: ctx.topic,
-    secretKey: ctx.list.ownerSecretKey,
-    createdAt: nextCreatedAt(deps.now(), previous?.event.created_at),
-  }
-  if (ctx.list.eventDate) o.eventDate = ctx.list.eventDate
-  return o
+function signOptions(deps: CoreDeps, ctx: OwnerContext, previous: CachedEvent | undefined): SignOptions {
+  return { topic: ctx.topic, secretKey: ctx.secretKey, createdAt: nextCreatedAt(deps.now(), previous?.event.created_at) }
 }
 
 function report(listId: string, events: PublishedEventReport[]): SyncReport {
@@ -220,25 +260,23 @@ function report(listId: string, events: PublishedEventReport[]): SyncReport {
 
 /**
  * Publishes the payloads that differ from what this device last published,
- * plus any of its events that no relay has accepted yet. Items go before the
- * meta event so a giver who sees the new item order can find every item.
+ * events close to expiry (re-signed so the list does not lapse), and any of
+ * its events that no relay has accepted yet. Items go before the meta event
+ * so a giver who sees the new item order can find every item.
  */
-async function syncPublished(deps: CoreDeps, ctx: OwnerContext, force: boolean): Promise<PublishedEventReport[]> {
-  const { list, topic, contentKey } = ctx
+async function syncPublished(deps: CoreDeps, ctx: OwnerContext, list: SharedList, force: boolean): Promise<PublishedEventReport[]> {
+  const { topic, contentKey } = ctx
   const cached = new Map((await getCachedEvents(deps.db, topic)).map((r) => [r.d, r]))
   const items = (await deps.db.items.bulkGet(list.itemIds)).filter(
     (i): i is Item => i !== undefined && i.archivedAt === undefined,
   )
+  const now = deps.now()
   const out: PublishedEventReport[] = []
 
-  const publishIfChanged = async (
-    d: string,
-    payload: ItemPayload | ListMetaPayload,
-    kind: 'meta' | 'item',
-  ): Promise<void> => {
+  const publishIfChanged = async (d: string, payload: ItemPayload | ListMetaPayload, kind: 'meta' | 'item'): Promise<void> => {
     const prev = cached.get(d)
     const same = prev !== undefined && stableStringify(decryptJson(contentKey, prev.event.content, d)) === stableStringify(payload)
-    if (same && !force) {
+    if (same && !force && !expiresSoon(prev.event, now)) {
       if (prev.pending) out.push(await publishAndCache(deps, ctx, d, prev.event, 'republish'))
       return
     }
@@ -247,8 +285,13 @@ async function syncPublished(deps: CoreDeps, ctx: OwnerContext, force: boolean):
     out.push(await publishAndCache(deps, ctx, d, event, kind))
   }
 
-  for (const item of items) await publishIfChanged(itemSlot(topic, item.id), itemPayloadFor(item, list), 'item')
-  await publishIfChanged(metaSlot(topic), metaPayloadFor(list, items.map((i) => i.id)), 'meta')
+  const sharedIds: string[] = []
+  for (const item of items) {
+    const sharedId = sharedItemIdWith(ctx.slotKey, item.id)
+    sharedIds.push(sharedId)
+    await publishIfChanged(itemSlot(topic, sharedId), itemPayloadFor(item, list, sharedId), 'item')
+  }
+  await publishIfChanged(metaSlot(topic), metaPayloadFor(list, sharedIds), 'meta')
   return out
 }
 
@@ -261,7 +304,7 @@ export function syncList(deps: CoreDeps, listId: string, options: { force?: bool
   return serialize(lockKey(deps, listId), async () => {
     const list = await requireList(deps.db, listId)
     if (list.status !== 'published') return report(listId, [])
-    return report(listId, await syncPublished(deps, ownerContext(deps, list), options.force ?? false))
+    return report(listId, await syncPublished(deps, ownerContext(deps, list), list, options.force ?? false))
   })
 }
 
@@ -284,44 +327,76 @@ export function publishList(deps: CoreDeps, listId: string): Promise<SyncReport>
       }
       return l
     })
-    return report(listId, await syncPublished(deps, ownerContext(deps, list), false))
+    return report(listId, await syncPublished(deps, ownerContext(deps, list), list, false))
   })
 }
 
+interface UnpublishContent {
+  name: string
+  showPrices: boolean
+  showNotes: boolean
+  updatedAt: number
+  /** Shared ids to tombstone, in addition to every item slot in the cache. */
+  sharedItemIds: readonly string[]
+}
+
+function isUnpublishedMeta(ctx: OwnerContext, row: CachedEvent | undefined): boolean {
+  if (!row) return false
+  const meta = tryParse(parseListMetaPayload, decryptJson(ctx.contentKey, row.event.content, row.d))
+  return meta !== null && meta.status === 'unpublished' && meta.itemIds.length === 0
+}
+
 /**
- * PROTOCOL.md section 9: meta with status 'unpublished' and no items, and an
- * empty tombstone for every item slot this device ever published.
+ * PROTOCOL.md section 9: an empty tombstone for every item slot (the given
+ * ids plus every item slot in the cache) and meta with status 'unpublished'
+ * and no items. Idempotent: what is already cut off is left alone, and what
+ * no relay accepted yet is sent again.
  */
-async function publishUnpublished(deps: CoreDeps, ctx: OwnerContext): Promise<PublishedEventReport[]> {
+async function publishUnpublished(deps: CoreDeps, ctx: OwnerContext, content: UnpublishContent): Promise<PublishedEventReport[]> {
   const cached = await getCachedEvents(deps.db, ctx.topic)
-  const itemIds = new Set(ctx.list.itemIds)
   const byD = new Map(cached.map((r) => [r.d, r]))
+  const itemIds = new Set(content.sharedItemIds)
   for (const r of cached) {
     const slot = parseSlot(r.d, ctx.topic)
     if (slot?.type === 'item') itemIds.add(slot.itemId)
   }
+  const now = deps.now()
   const out: PublishedEventReport[] = []
+  const settle = async (d: string, prev: CachedEvent | undefined, done: boolean, build: () => NostrEvent, kind: 'tombstone' | 'meta') => {
+    if (done && prev && !isExpired(prev.event, now)) {
+      if (prev.pending) out.push(await publishAndCache(deps, ctx, d, prev.event, 'republish'))
+      return
+    }
+    out.push(await publishAndCache(deps, ctx, d, build(), kind))
+  }
   for (const itemId of itemIds) {
     const d = itemSlot(ctx.topic, itemId)
     const prev = byD.get(d)
-    if (prev?.event.content === '') {
-      if (prev.pending) out.push(await publishAndCache(deps, ctx, d, prev.event, 'republish'))
-      continue
-    }
-    out.push(await publishAndCache(deps, ctx, d, buildItemTombstone(itemId, signOptions(deps, ctx, prev)), 'tombstone'))
+    await settle(d, prev, prev?.event.content === '', () => buildItemTombstone(itemId, signOptions(deps, ctx, prev)), 'tombstone')
   }
   const d = metaSlot(ctx.topic)
+  const prev = byD.get(d)
   const meta: ListMetaPayload = {
     v: 1,
-    name: ctx.list.name,
+    name: content.name,
     itemIds: [],
-    showPrices: ctx.list.showPrices,
-    showNotes: ctx.list.showNotes,
+    showPrices: content.showPrices,
+    showNotes: content.showNotes,
     status: 'unpublished',
-    updatedAt: ctx.list.updatedAt,
+    updatedAt: content.updatedAt,
   }
-  out.push(await publishAndCache(deps, ctx, d, buildMetaEvent(meta, ctx.contentKey, signOptions(deps, ctx, byD.get(d))), 'meta'))
+  await settle(d, prev, isUnpublishedMeta(ctx, prev), () => buildMetaEvent(meta, ctx.contentKey, signOptions(deps, ctx, prev)), 'meta')
   return out
+}
+
+function unpublishContent(list: SharedList, slotKey: Uint8Array): UnpublishContent {
+  return {
+    name: list.name,
+    showPrices: list.showPrices,
+    showNotes: list.showNotes,
+    updatedAt: list.updatedAt,
+    sharedItemIds: list.itemIds.map((id) => sharedItemIdWith(slotKey, id)),
+  }
 }
 
 export function unpublishList(deps: CoreDeps, listId: string): Promise<SyncReport> {
@@ -334,53 +409,152 @@ export function unpublishList(deps: CoreDeps, listId: string): Promise<SyncRepor
       await deps.db.sharedLists.put(l)
       return l
     })
-    return report(listId, await publishUnpublished(deps, ownerContext(deps, list)))
+    const ctx = ownerContext(deps, list)
+    return report(listId, await publishUnpublished(deps, ctx, unpublishContent(list, ctx.slotKey)))
   })
+}
+
+// ---- Retired lists (rotation and deletion) ----
+
+/** The retired record for a list's current keys, holding the secrets until the old link is cut off. */
+async function retiredRecordFor(deps: CoreDeps, list: SharedList, reason: RetiredList['reason']): Promise<RetiredList> {
+  const { topic, slotKey } = deriveContentKeys(list.listSecret)
+  const record: RetiredList = {
+    topic,
+    ownerPubkey: publicKeyOf(list.ownerSecretKey),
+    listId: list.id,
+    reason,
+    retiredAt: deps.now(),
+  }
+  if (list.status === 'draft') return record // never published: nothing to cut off
+  const itemIds = new Set(list.itemIds.map((id) => sharedItemIdWith(slotKey, id)))
+  for (const r of await getCachedEvents(deps.db, topic)) {
+    const slot = parseSlot(r.d, topic)
+    if (slot?.type === 'item') itemIds.add(slot.itemId)
+  }
+  record.pending = {
+    ownerSecretKey: list.ownerSecretKey,
+    listSecret: list.listSecret,
+    relays: [...list.relays],
+    name: list.name,
+    itemIds: [...itemIds],
+  }
+  return record
+}
+
+function retiredLockKey(deps: CoreDeps, topic: string): string {
+  return `${deps.db.name}:retired:${topic}`
+}
+
+/**
+ * Cuts off a retired topic: publishes its unpublished meta and item
+ * tombstones. Once every one of them has been accepted by at least one relay,
+ * the old secrets are dropped from the record (topic and owner key stay, for
+ * FR-25) and the old topic's cache is deleted. Safe to call repeatedly.
+ */
+function cutOffRetired(deps: CoreDeps, topic: string): Promise<SyncReport> {
+  return serialize(retiredLockKey(deps, topic), async () => {
+    const record = await deps.db.retiredLists.get(topic)
+    if (!record?.pending) {
+      if (record) await deleteCachedTopic(deps.db, topic)
+      return report(record?.listId ?? '', [])
+    }
+    const p = record.pending
+    const ctx = contextFor(deps, { listId: record.listId, ownerSecretKey: p.ownerSecretKey, listSecret: p.listSecret, relays: p.relays })
+    const events = await publishUnpublished(deps, ctx, {
+      name: p.name,
+      showPrices: false,
+      showNotes: false,
+      updatedAt: record.retiredAt,
+      sharedItemIds: p.itemIds,
+    })
+    const stillPending = (await getCachedEvents(deps.db, topic)).some((r) => r.pending)
+    if (events.every((e) => e.result.ok) && !stillPending) {
+      await deps.db.transaction('rw', deps.db.retiredLists, deps.db.events, async () => {
+        const current = await deps.db.retiredLists.get(topic)
+        if (current) {
+          delete current.pending
+          await deps.db.retiredLists.put(current)
+        }
+        await deleteCachedTopic(deps.db, topic)
+      })
+    }
+    return report(record.listId, events)
+  })
+}
+
+/** Retries cutting off every retired topic whose old link is not yet cut off. Call at startup and when back online. */
+export async function repairRetiredLists(deps: CoreDeps, options: { listId?: string } = {}): Promise<SyncReport[]> {
+  const pending = (await deps.db.retiredLists.toArray()).filter(
+    (r) => r.pending !== undefined && (options.listId === undefined || r.listId === options.listId),
+  )
+  const out: SyncReport[] = []
+  for (const r of pending) out.push(await cutOffRetired(deps, r.topic))
+  return out
+}
+
+/** Retired records (no secrets) for a list, e.g. to show that an old link is still being cut off. */
+export async function listRetiredLists(db: HippoDb): Promise<Array<Omit<RetiredList, 'pending'> & { cutOff: boolean }>> {
+  return (await db.retiredLists.toArray()).map(({ pending, ...r }) => ({ ...r, cutOff: pending === undefined }))
 }
 
 /**
  * New list secret and owner key; publishes the list under the new topic,
- * then unpublishes the old topic without `movedTo` so old link holders are
- * cut off. Claims are not migrated. Returns reports for both topics.
+ * then unpublishes the old topic so old link holders are cut off. Claims are
+ * not migrated. The old keys are kept in a retired record (written in the
+ * same transaction as the new keys, so a crash cannot lose them) until the
+ * old link is cut off; `repairRetiredLists` retries. `unpublishedOld.ok` is
+ * false while that is still pending.
  */
 export function rotateList(deps: CoreDeps, listId: string): Promise<{ list: SharedList; published: SyncReport; unpublishedOld: SyncReport }> {
   return serialize(lockKey(deps, listId), async () => {
     const before = await requireList(deps.db, listId)
     if (before.status === 'draft') throw new HippoError('not-published', 'list was never published')
-    const oldCtx = ownerContext(deps, before)
+    const retired = await retiredRecordFor(deps, before, 'rotated')
     const after: SharedList = {
       ...before,
       ownerSecretKey: generateSigningKey(),
       listSecret: generateListSecret(),
-      status: 'published',
       updatedAt: Math.max(deps.now(), before.updatedAt + 1),
-      publishedAt: deps.now(),
     }
-    await deps.db.sharedLists.put(after)
-    const published = report(listId, await syncPublished(deps, ownerContext(deps, after), true))
-    const unpublishedOld = report(listId, await publishUnpublished(deps, { ...oldCtx, list: { ...before, updatedAt: after.updatedAt } }))
-    await deleteCachedTopic(deps.db, oldCtx.topic)
+    if (after.status === 'published') after.publishedAt = deps.now()
+    await deps.db.transaction('rw', deps.db.sharedLists, deps.db.retiredLists, async () => {
+      await deps.db.retiredLists.put(retired)
+      await deps.db.sharedLists.put(after)
+    })
+    const published =
+      after.status === 'published' ? report(listId, await syncPublished(deps, ownerContext(deps, after), after, true)) : report(listId, [])
+    const unpublishedOld = await cutOffRetired(deps, retired.topic)
     return { list: after, published, unpublishedOld }
   })
 }
 
-/** Unpublishes a published list, then deletes it and its cached events. */
-export async function deleteSharedList(deps: CoreDeps, listId: string): Promise<SyncReport | null> {
-  const list = await requireList(deps.db, listId)
-  const r = list.status === 'published' ? await unpublishList(deps, listId) : null
-  await deps.db.sharedLists.delete(listId)
-  await deleteCachedTopic(deps.db, topicForSecret(list.listSecret))
-  return r
+/**
+ * Deletes the list. Its topic and owner key are remembered (FR-25); a list
+ * that was ever published is cut off first, and if no relay accepts that
+ * yet, `repairRetiredLists` keeps trying. Returns the cut-off report, or
+ * `null` for a draft.
+ */
+export function deleteSharedList(deps: CoreDeps, listId: string): Promise<SyncReport | null> {
+  return serialize(lockKey(deps, listId), async () => {
+    const list = await requireList(deps.db, listId)
+    const retired = await retiredRecordFor(deps, list, 'deleted')
+    await deps.db.transaction('rw', deps.db.sharedLists, deps.db.retiredLists, async () => {
+      // Keep an older rotation record for the same topic if there is one.
+      if (!(await deps.db.retiredLists.get(retired.topic))) await deps.db.retiredLists.put(retired)
+      await deps.db.sharedLists.delete(listId)
+    })
+    if (!retired.pending) {
+      await deleteCachedTopic(deps.db, retired.topic)
+      return null
+    }
+    return cutOffRetired(deps, retired.topic)
+  })
 }
 
 /** `https://host/base/#/l/<payload>`; a v1 payload when the list uses the default relays. */
 export function buildShareLink(list: Pick<SharedList, 'ownerSecretKey' | 'listSecret' | 'relays'>, appBaseUrl: string): string {
-  const payload = encodeSharePayload({
-    ownerPubkey: publicKeyOf(list.ownerSecretKey),
-    listSecret: list.listSecret,
-    ...(sameRelaySet(list.relays, DEFAULT_RELAYS) ? {} : { relays: list.relays }),
-  })
-  return buildShareUrl(appBaseUrl, payload)
+  return shareLinkFor({ ownerPubkey: publicKeyOf(list.ownerSecretKey), listSecret: list.listSecret, relays: list.relays }, appBaseUrl)
 }
 
 /** The topic of a list's current secret (to detect FR-25 and to inspect the cache). */
@@ -391,10 +565,11 @@ export function topicOfList(list: Pick<SharedList, 'listSecret'>): string {
 /**
  * PROTOCOL.md section 8 for the owner: fetch my own events for the list,
  * republish cached events the relays lack (unchanged, same signature), then
- * publish anything local changes still need.
+ * publish anything local changes or near expiry still need, and retry
+ * cutting off this list's retired topics.
  */
 export function repairOwnerList(deps: CoreDeps, listId: string, options: { timeoutMs?: number } = {}): Promise<SyncReport> {
-  return serialize(lockKey(deps, listId), async () => {
+  const run = serialize(lockKey(deps, listId), async () => {
     const list = await requireList(deps.db, listId)
     if (list.status === 'draft') return report(listId, [])
     const ctx = ownerContext(deps, list)
@@ -406,13 +581,20 @@ export function repairOwnerList(deps: CoreDeps, listId: string, options: { timeo
       const cur = newestRemote.get(d)
       if (!cur || e.created_at > cur.created_at) newestRemote.set(d, e)
     }
+    const now = deps.now()
     const out: PublishedEventReport[] = []
     for (const row of await getCachedEvents(deps.db, ctx.topic)) {
+      if (isExpired(row.event, now)) continue // relays refuse it; a live list re-signs below
+      if (list.status === 'published' && expiresSoon(row.event, now)) continue // re-signed below
       const r = newestRemote.get(row.d)
       const present = r !== undefined && (r.id === row.event.id || r.created_at > row.event.created_at)
       if (!present || row.pending) out.push(await publishAndCache(deps, ctx, row.d, row.event, 'republish'))
     }
-    if (list.status === 'published') out.push(...(await syncPublished(deps, ctx, false)))
+    if (list.status === 'published') out.push(...(await syncPublished(deps, ctx, list, false)))
     return report(listId, out)
+  })
+  return run.then(async (r) => {
+    await repairRetiredLists(deps, { listId })
+    return r
   })
 }

@@ -8,7 +8,7 @@ import { randomId } from '../crypto/bytes.ts'
 import { publicKeyOf } from '../crypto/keys.ts'
 import { openDb } from '../db/schema.ts'
 import { addGuestListFromLink, openGuestList } from '../services/giver-lists.ts'
-import { buildShareLink, createSharedList, publishList, repairOwnerList } from '../services/owner-lists.ts'
+import { buildShareLink, createSharedList, publishList, repairOwnerList, sharedItemIdFor } from '../services/owner-lists.ts'
 import type { CoreDeps } from '../services/deps.ts'
 import { createItem } from '../services/wishlist.ts'
 import { startMockRelay, type MockRelay } from '../testing/mock-relay.ts'
@@ -148,21 +148,21 @@ describe('NostrTransport against the mock relay', () => {
     const { provider, close } = createNostrTransportProvider({ publishTimeoutMs: 2000, fetchTimeoutMs: 2000, eoseTimeoutMs: 2000 })
     try {
       const now = () => Date.now()
-      const ownerDeps: CoreDeps = { db: openDb(`hippo-test-${randomId()}`), transports: provider, now }
-      await ownerDeps.db.settings.put({ key: 'relays', value: [relay.url] })
+      // Loopback relays cannot appear in lists or links; route every relay set
+      // to the mock relay the way the developer override does.
+      const forced = () => provider([relay.url])
+      const ownerDeps: CoreDeps = { db: openDb(`hippo-test-${randomId()}`), transports: forced, now }
       const item = await createItem(ownerDeps.db, { title: 'Hippo' })
       const list = await createSharedList(ownerDeps, { name: 'Zoo', itemIds: [item.id] })
-      expect(list.relays).toEqual([relay.url])
       expect((await publishList(ownerDeps, list.id)).ok).toBe(true)
       const link = buildShareLink(list, 'http://localhost:5173/')
 
-      const giverDeps: CoreDeps = { db: openDb(`hippo-test-${randomId()}`), transports: provider, now }
+      const giverDeps: CoreDeps = { db: openDb(`hippo-test-${randomId()}`), transports: forced, now }
       const guest = await addGuestListFromLink(giverDeps, link)
-      expect(guest.relays).toEqual([relay.url])
       const session = await openGuestList(giverDeps, guest.topic, { eoseTimeoutMs: 3000 })
       await session.start()
       await waitFor(() => session.getSnapshot().status === 'live' && session.getSnapshot().items.length === 1)
-      const { result } = await session.claim(item.id)
+      const { result } = await session.claim(sharedItemIdFor(list, item.id))
       expect(result.ok).toBe(true)
       await waitFor(() => session.getSnapshot().items[0]?.state.status === 'claimed')
       session.stop()

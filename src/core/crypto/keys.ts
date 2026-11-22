@@ -1,4 +1,5 @@
 import { hkdf } from '@noble/hashes/hkdf.js'
+import { hmac } from '@noble/hashes/hmac.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure'
@@ -16,6 +17,11 @@ export interface ContentKeys {
   topic: string
 }
 
+/** What the owner needs: content keys plus the key that maps local item ids to shared ones. */
+export interface OwnerKeys extends ContentKeys {
+  slotKey: Uint8Array
+}
+
 export interface ListKeys extends ContentKeys {
   claimsKey: Uint8Array
 }
@@ -29,9 +35,29 @@ function secretBytes(listSecretHex: string): Uint8Array {
  * Keys the owner needs. Deliberately excludes `claimsKey` so owner code
  * paths cannot decrypt claims even by mistake (PRD FR-17).
  */
-export function deriveContentKeys(listSecretHex: string): ContentKeys {
+export function deriveContentKeys(listSecretHex: string): OwnerKeys {
   const secret = secretBytes(listSecretHex)
-  return { contentKey: derive(secret, 'content'), topic: bytesToHex(derive(secret, 'topic')) }
+  return {
+    contentKey: derive(secret, 'content'),
+    topic: bytesToHex(derive(secret, 'topic')),
+    slotKey: derive(secret, 'slot'),
+  }
+}
+
+/**
+ * The id an item has inside one shared list: HMAC-SHA256(slotKey, localId)
+ * truncated to 16 bytes, lowercase hex. The local wishlist id never leaves
+ * the device, so the same wish in two lists (or before and after a
+ * rotation) has unrelated ids on the wire.
+ */
+export function sharedItemIdWith(slotKey: Uint8Array, localItemId: string): string {
+  if (!isHex(localItemId, 16)) throw new Error('item id must be 16 bytes hex')
+  return bytesToHex(hmac(sha256, slotKey, hexToBytes(localItemId)).subarray(0, 16))
+}
+
+/** `sharedItemIdWith` for a list secret. */
+export function sharedItemId(listSecretHex: string, localItemId: string): string {
+  return sharedItemIdWith(derive(secretBytes(listSecretHex), 'slot'), localItemId)
 }
 
 /** All keys, for givers. */

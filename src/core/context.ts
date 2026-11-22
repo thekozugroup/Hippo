@@ -2,7 +2,7 @@
 
 import { RELAY_FORCE_QUERY_PARAM, RELAY_FORCE_STORAGE_KEY } from './config.ts'
 import { openDb, type HippoDb } from './db/schema.ts'
-import { sanitizeRelays } from './db/settings.ts'
+import { isLoopbackRelayUrl } from './model/validate.ts'
 import type { CoreDeps } from './services/deps.ts'
 import { createNostrTransportProvider } from './transport/nostr.ts'
 import type { Transport, TransportProvider } from './transport/types.ts'
@@ -13,34 +13,59 @@ export interface CreateCoreOptions {
   dbName?: string
   /** Use this transport (e.g. MemoryTransport) or provider instead of Nostr relays. */
   transport?: Transport | TransportProvider
-  /** Force every transport onto these relays (overrides list, link and settings relays). */
+  /** Force every transport onto these loopback relays (overrides list, link and settings relays). */
   forceRelays?: string[]
   now?: () => number
 }
 
 export interface Core extends CoreDeps {
-  /** Relays every transport is forced onto, when an override is active (end-to-end tests). */
+  /** Loopback relays every transport is forced onto, when the developer override is active. Show a notice. */
   forcedRelays?: string[]
   close(): void
 }
 
-function readForcedRelaysFromStorage(): string[] | undefined {
+/** The developer relay override accepts loopback `ws://` / `wss://` URLs only (at most 20). */
+export function sanitizeOverrideRelays(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const relays = value.filter((v): v is string => typeof v === 'string' && isLoopbackRelayUrl(v))
+  return relays.length > 0 ? [...new Set(relays)].slice(0, 20) : undefined
+}
+
+function sessionStore(): Storage | undefined {
   try {
-    const raw = globalThis.localStorage?.getItem(RELAY_FORCE_STORAGE_KEY)
-    return raw ? sanitizeRelays(raw.split(',').map((s) => s.trim())) : undefined
+    return globalThis.sessionStorage ?? undefined
   } catch {
     return undefined
   }
 }
 
 /**
- * Copies `?relays=ws://127.0.0.1:7447,...` from a URL into localStorage so a
- * reload keeps it. Returns the relays applied, if any. Call before
- * `createCore()`. Only loopback ws:// or wss:// URLs are accepted, so a
- * crafted link cannot silently point someone's app at an arbitrary relay
- * over plain text; the UI should still show when an override is active.
+ * The developer relay override for this browser tab, if one is active. It
+ * lives in sessionStorage, so it ends with the tab; only loopback relays are
+ * honoured. The UI should show a notice while it is active.
+ */
+export function readRelayOverride(): string[] | undefined {
+  try {
+    const raw = sessionStore()?.getItem(RELAY_FORCE_STORAGE_KEY)
+    return raw ? sanitizeOverrideRelays(raw.split(',').map((s) => s.trim())) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Copies `?relays=ws://127.0.0.1:7447,...` from a URL into sessionStorage so
+ * a reload in the same tab keeps it. Returns the relays applied, if any. Call
+ * before `createCore()`. Only loopback relays are accepted, and the override
+ * ends with the tab, so a crafted link cannot redirect the app elsewhere or
+ * for good. Also removes the persistent localStorage value older builds used.
  */
 export function applyRelayOverrideFromUrl(url: string | URL): string[] | undefined {
+  try {
+    globalThis.localStorage?.removeItem(RELAY_FORCE_STORAGE_KEY)
+  } catch {
+    // Storage unavailable.
+  }
   let u: URL
   try {
     u = new URL(url)
@@ -49,22 +74,15 @@ export function applyRelayOverrideFromUrl(url: string | URL): string[] | undefin
   }
   const raw = u.searchParams.get(RELAY_FORCE_QUERY_PARAM)
   if (raw === null) return undefined
-  const relays = sanitizeRelays(raw.split(',').map((s) => s.trim()).filter(isLoopbackRelay))
+  const relays = sanitizeOverrideRelays(raw.split(',').map((s) => s.trim()))
   try {
-    if (relays) globalThis.localStorage?.setItem(RELAY_FORCE_STORAGE_KEY, relays.join(','))
-    else globalThis.localStorage?.removeItem(RELAY_FORCE_STORAGE_KEY)
+    const store = sessionStore()
+    if (relays) store?.setItem(RELAY_FORCE_STORAGE_KEY, relays.join(','))
+    else store?.removeItem(RELAY_FORCE_STORAGE_KEY)
   } catch {
     // Storage unavailable (private mode); the override then lasts for this page only.
   }
   return relays
-}
-
-function isLoopbackRelay(url: string): boolean {
-  try {
-    return ['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname)
-  } catch {
-    return false
-  }
 }
 
 export function createCore(options: CreateCoreOptions = {}): Core {
@@ -83,7 +101,7 @@ export function createCore(options: CreateCoreOptions = {}): Core {
       },
     }
   }
-  const forced = options.forceRelays ? sanitizeRelays(options.forceRelays) : readForcedRelaysFromStorage()
+  const forced = options.forceRelays ? sanitizeOverrideRelays(options.forceRelays) : readRelayOverride()
   const nostr = createNostrTransportProvider()
   const transports: TransportProvider = forced ? () => nostr.provider(forced) : nostr.provider
   const core: Core = {

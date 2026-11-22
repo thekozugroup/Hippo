@@ -62,7 +62,7 @@ describe('keys', () => {
 
   it('owner keys do not include the claims key', () => {
     const k = deriveContentKeys(generateListSecret())
-    expect(Object.keys(k).sort()).toEqual(['contentKey', 'topic'])
+    expect(Object.keys(k).sort()).toEqual(['contentKey', 'slotKey', 'topic'])
   })
 
   it('matches a fixed HKDF-SHA256 vector', () => {
@@ -137,7 +137,7 @@ describe('share link', () => {
     expect(base64UrlDecode(v1).length).toBe(65)
     expect(base64UrlDecode(v1)[0]).toBe(1)
     expect(decodeSharePayload(v1)).toEqual({ ownerPubkey, listSecret })
-    const relays = ['wss://relay.example.com', 'ws://127.0.0.1:7447']
+    const relays = ['wss://relay.example.com', 'wss://nos.lol:8443/path']
     const v2 = encodeSharePayload({ ownerPubkey, listSecret, relays })
     expect(base64UrlDecode(v2)[0]).toBe(2)
     expect(decodeSharePayload(v2)).toEqual({ ownerPubkey, listSecret, relays })
@@ -165,6 +165,16 @@ describe('share link', () => {
     ['v2 bad utf8', bad([2, ...pk, ...sk, 0xff, 0xfe])],
     ['v2 http relay', bad([2, ...pk, ...sk, ...utf8Encode('https://relay.example.com')])],
     ['v2 plain ws remote', bad([2, ...pk, ...sk, ...utf8Encode('ws://relay.example.com')])],
+    ['v2 loopback ws relay', bad([2, ...pk, ...sk, ...utf8Encode('ws://127.0.0.1:7447')])],
+    ['v2 loopback wss relay', bad([2, ...pk, ...sk, ...utf8Encode('wss://127.0.0.1:7447')])],
+    ['v2 localhost relay', bad([2, ...pk, ...sk, ...utf8Encode('wss://localhost')])],
+    ['v2 private relay', bad([2, ...pk, ...sk, ...utf8Encode('wss://192.168.1.1')])],
+    ['v2 link-local relay', bad([2, ...pk, ...sk, ...utf8Encode('wss://169.254.169.254')])],
+    ['v2 .local relay', bad([2, ...pk, ...sk, ...utf8Encode('wss://router.local:8443')])],
+    ['v2 IPv6 loopback relay', bad([2, ...pk, ...sk, ...utf8Encode('wss://[::1]')])],
+    ['v2 IPv6 unique-local relay', bad([2, ...pk, ...sk, ...utf8Encode('wss://[fd00::1]')])],
+    ['v2 single-label relay', bad([2, ...pk, ...sk, ...utf8Encode('wss://router')])],
+    ['v2 relay with credentials', bad([2, ...pk, ...sk, ...utf8Encode('wss://u:p@relay.example.com')])],
     ['v2 empty relay entry', bad([2, ...pk, ...sk, ...utf8Encode('wss://a.example,')])],
     ['invalid pubkey', bad([1, ...new Array<number>(32).fill(0), ...sk])],
     ['non base64url', 'abc+def'],

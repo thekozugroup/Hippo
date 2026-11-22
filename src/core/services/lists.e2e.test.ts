@@ -13,6 +13,7 @@ import {
   publishList,
   repairOwnerList,
   rotateList,
+  sharedItemIdFor,
   syncList,
   syncListsForItem,
   topicOfList,
@@ -37,7 +38,9 @@ async function ownerWithList(network: MemoryNetwork) {
   const list = await createSharedList(owner, { name: 'Birthday', message: 'Thanks!', eventDate: '2026-12-24', itemIds: [scarf.id, bike.id, socks.id] })
   const report = await publishList(owner, list.id)
   expect(report.ok).toBe(true)
-  return { owner, clock, list, scarf, bike, socks, link: buildShareLink(list, BASE) }
+  // Givers only ever see shared (derived) item ids.
+  const shared = (it: { id: string }) => ({ ...it, localId: it.id, id: sharedItemIdFor(list, it.id) })
+  return { owner, clock, list, scarf: shared(scarf), bike: shared(bike), socks: shared(socks), link: buildShareLink(list, BASE) }
 }
 
 async function giver(network: MemoryNetwork, link: string, name: string, clock = testClock()) {
@@ -154,8 +157,8 @@ describe('shared lists end to end (MemoryTransport)', () => {
     await ann.session.claim(scarf.id)
 
     clock.advance(5000)
-    await updateItem(owner.db, bike.id, { title: 'Blue bike', price: { amount: 40000, currency: 'EUR' } }, clock.now())
-    const reports = await syncListsForItem(owner, bike.id)
+    await updateItem(owner.db, bike.localId, { title: 'Blue bike', price: { amount: 40000, currency: 'EUR' } }, clock.now())
+    const reports = await syncListsForItem(owner, bike.localId)
     expect(reports).toHaveLength(1)
     // Only the changed item was republished.
     expect(reports[0]?.events.map((e) => e.kind)).toEqual(['item'])
@@ -167,14 +170,14 @@ describe('shared lists end to end (MemoryTransport)', () => {
     expect(itemView(ann.session, bike.id).item.price).toBeUndefined()
 
     // Removing a claimed item: giver keeps the claim under "removed by owner"; owner gets no warning.
-    await updateSharedList(owner, list.id, { itemIds: [bike.id] })
+    await updateSharedList(owner, list.id, { itemIds: [bike.localId] })
     await syncList(owner, list.id)
     await waitFor(() => ann.view().items.length === 1)
     expect(ann.view().removedItemsWithMyClaims).toMatchObject([{ itemId: scarf.id, item: { title: 'Scarf' } }])
 
     // Archiving hides an item too.
-    await archiveItem(owner.db, bike.id, clock.now())
-    await syncListsForItem(owner, bike.id)
+    await archiveItem(owner.db, bike.localId, clock.now())
+    await syncListsForItem(owner, bike.localId)
     await waitFor(() => ann.view().items.length === 0)
   })
 
@@ -209,15 +212,21 @@ describe('shared lists end to end (MemoryTransport)', () => {
     expect(rotated.listSecret).not.toBe(list.listSecret)
     expect(rotated.ownerSecretKey).not.toBe(list.ownerSecretKey)
     await waitFor(() => ann.view().status === 'unpublished')
-    expect(ann.view().meta?.movedTo).toBeUndefined()
+    expect(ann.view().meta).not.toHaveProperty('movedTo')
     const newLink = buildShareLink(rotated, BASE)
     expect(newLink).not.toBe(link)
     const ben = await giver(network, newLink, 'ben')
     expect(ben.view().items).toHaveLength(3)
-    expect(itemView(ben.session, scarf.id).state.status).toBe('available')
-    // Old topic cache is gone on the owner device.
+    // Item ids are derived per list secret, so they differ after rotation.
+    const newScarfId = sharedItemIdFor(rotated, scarf.localId)
+    expect(newScarfId).not.toBe(scarf.id)
+    expect(itemView(ben.session, newScarfId).state.status).toBe('available')
+    // Old topic is cut off: cache gone, secrets dropped, topic and key remembered.
     expect(await owner.db.events.where('topic').equals(topicOfList(list)).count()).toBe(0)
-    await ben.session.claim(scarf.id)
+    const retired = await owner.db.retiredLists.get(topicOfList(list))
+    expect(retired).toMatchObject({ reason: 'rotated', ownerPubkey: publicKeyOf(list.ownerSecretKey) })
+    expect(retired?.pending).toBeUndefined()
+    await ben.session.claim(newScarfId)
     await repairOwnerList(owner, list.id)
     assertOwnerNeverSawClaims(owner, [publicKeyOf(list.ownerSecretKey), publicKeyOf(rotated.ownerSecretKey)])
   })

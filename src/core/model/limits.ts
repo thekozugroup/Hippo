@@ -10,8 +10,6 @@ export const LIMITS = {
   message: 1000,
   categoryName: 60,
   emoji: 16,
-  /** A share-link payload carried in `movedTo`. */
-  movedTo: 2000,
   /** Items per shared list. */
   itemIds: 1000,
   /** Quantity wanted per item. */
@@ -25,4 +23,10 @@ export const LIMITS = {
   content: 65_536,
   relays: 20,
   relayUrl: 200,
+  /** Distinct claim slots kept per list; further new slots are ignored. */
+  claimsPerList: 5000,
+  /** Events kept from one fetch or one initial subscription burst. */
+  eventsPerFetch: 10_000,
+  /** How far in the future a claim may be dated (clock skew allowance), ms. */
+  futureSkewMs: 10 * 60 * 1000,
 } as const

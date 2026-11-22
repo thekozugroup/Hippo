@@ -7,41 +7,39 @@ import { DEFAULT_RELAYS } from '../config.ts'
 import { decryptJson } from '../crypto/aead.ts'
 import { randomId } from '../crypto/bytes.ts'
 import { deriveListKeys, generateSigningKey, publicKeyOf, topicForSecret, type ListKeys } from '../crypto/keys.ts'
-import { parseShareLink } from '../crypto/link.ts'
-import { cacheIfNewer, deleteCachedTopic, getCachedEvent, getCachedEvents } from '../db/event-cache.ts'
+import { parseShareLink, shareLinkFor } from '../crypto/link.ts'
+import { cacheIfNewer, deleteCachedEvent, deleteCachedTopic, getCachedEvent, getCachedEvents } from '../db/event-cache.ts'
 import type { HippoDb } from '../db/schema.ts'
 import { HippoError } from '../errors.ts'
 import { codePointLength } from '../model/guards.ts'
 import { LIMITS } from '../model/limits.ts'
 import type { ClaimPayload, GuestList, ItemPayload, ListMetaPayload } from '../model/types.ts'
 import { parseListMetaPayload, tryParse } from '../model/validate.ts'
-import { buildClaimEvent, nextCreatedAt } from '../protocol/build.ts'
+import { buildClaimEvent, expiresSoon, isExpired, nextCreatedAt } from '../protocol/build.ts'
 import type { AcceptedClaim } from '../protocol/list-state.ts'
 import { ListState } from '../protocol/list-state.ts'
 import { resolveItemState, type ItemState, type ResolveClaim } from '../protocol/resolve.ts'
 import { HIPPO_KIND, claimSlot, metaSlot } from '../protocol/slots.ts'
 import type { EoseInfo, NostrEvent, PublishResult, Transport, Unsubscribe } from '../transport/types.ts'
 import type { CoreDeps } from './deps.ts'
+import { isOwnListIdentity } from './ownership.ts'
 import { serialize } from './util.ts'
 
 // ---- Guest list records ----
 
-/** FR-25: this device owns a shared list with that topic. */
-async function ownsTopic(db: HippoDb, topic: string): Promise<boolean> {
-  const lists = await db.sharedLists.toArray()
-  return lists.some((l) => topicForSecret(l.listSecret) === topic)
-}
+const OWN_LIST_MESSAGE = 'This is your own list. Hippo hides claims from list owners, so it cannot be opened as a guest on this device.'
 
 /**
  * Parses a share link and remembers the list (FR-24), generating this
  * device's guest key. Returns the existing record when the list was added
- * before. Throws `invalid-link`, or `own-list` when this device owns the list.
+ * before. Throws `invalid-link`, or `own-list` when this device owns, has
+ * rotated away from, or has deleted the list (FR-25).
  */
 export async function addGuestListFromLink(deps: CoreDeps, link: string): Promise<GuestList> {
   const parsed = parseShareLink(link)
   const topic = topicForSecret(parsed.listSecret)
-  if (await ownsTopic(deps.db, topic)) {
-    throw new HippoError('own-list', 'This is your own list. Hippo hides claims from list owners, so it cannot be opened as a guest on this device.')
+  if (await isOwnListIdentity(deps.db, { topic, ownerPubkey: parsed.ownerPubkey })) {
+    throw new HippoError('own-list', OWN_LIST_MESSAGE)
   }
   return deps.db.transaction('rw', deps.db.guestLists, async () => {
     const existing = await deps.db.guestLists.get(topic)
@@ -63,6 +61,11 @@ export async function addGuestListFromLink(deps: CoreDeps, link: string): Promis
     await deps.db.guestLists.add(guest)
     return guest
   })
+}
+
+/** Rebuilds the share link of a list shared with me (to pass it on, or to open it elsewhere). */
+export function buildGuestShareLink(guest: Pick<GuestList, 'ownerPubkey' | 'listSecret' | 'relays'>, appBaseUrl: string): string {
+  return shareLinkFor(guest, appBaseUrl)
 }
 
 export interface GuestListSummary {
@@ -166,7 +169,10 @@ export class GiverListSession {
   private readonly state: ListState
   private readonly transport: Transport
   private readonly listeners = new Set<Listener>()
+  /** Event ids of my events that no relay has accepted yet. */
   private readonly pending = new Set<string>()
+  /** Event ids of my claims whose slot no relay has ever accepted (re-stamped before sending). */
+  private readonly unsent = new Set<string>()
   private readonly eoseTimeoutMs: number
   private readonly retryMs: number
   private connection: 'loading' | 'live' | 'offline' = 'loading'
@@ -189,6 +195,7 @@ export class GiverListSession {
       ownerPubkey: guest.ownerPubkey,
       contentKey: this.keys.contentKey,
       claimsKey: this.keys.claimsKey,
+      now: deps.now,
     })
     this.transport = deps.transports(guest.relays)
     this.eoseTimeoutMs = options.eoseTimeoutMs ?? 8000
@@ -210,8 +217,17 @@ export class GiverListSession {
   /** Loads the cache (status stays 'loading'), then subscribes live. Resolves once the cache is shown. */
   start(): Promise<void> {
     this.startPromise ??= (async () => {
-      const rows = await getCachedEvents(this.deps.db, this.topic)
-      for (const r of rows) if (r.pending) this.pending.add(r.event.id)
+      const now = this.deps.now()
+      const rows = []
+      for (const r of await getCachedEvents(this.deps.db, this.topic)) {
+        if (isExpired(r.event, now)) {
+          await deleteCachedEvent(this.deps.db, this.topic, r.d)
+          continue
+        }
+        rows.push(r)
+        if (r.pending) this.pending.add(r.event.id)
+        if (r.unsent) this.unsent.add(r.event.id)
+      }
       this.state.ingestBatch(rows.map((r) => r.event))
       this.emit()
       if (!this.stopped) this.connect()
@@ -245,7 +261,7 @@ export class GiverListSession {
     this.unsubscribe = this.transport.subscribe(
       giverFilter(this.topic),
       (e) => {
-        if (!eosed) remote.push(e)
+        if (!eosed && remote.length < LIMITS.eventsPerFetch) remote.push(e)
         this.receive(e)
       },
       (info: EoseInfo) => {
@@ -298,7 +314,7 @@ export class GiverListSession {
     const byItem = new Map<string, ResolveClaim[]>()
     for (const c of claims) {
       const list = byItem.get(c.payload.itemId) ?? []
-      list.push({ eventId: c.event.id, pubkey: c.event.pubkey, payload: c.payload })
+      list.push({ eventId: c.event.id, pubkey: c.event.pubkey, eventCreatedAt: c.event.created_at, payload: c.payload })
       byItem.set(c.payload.itemId, list)
     }
     const live = meta && meta.status === 'published' ? meta.itemIds : []
@@ -361,29 +377,34 @@ export class GiverListSession {
 
   // ---- Claim actions ----
 
-  private async publishClaim(payload: ClaimPayload): Promise<ClaimActionResult> {
+  /**
+   * Signs and sends one version of a claim. The event is written to the
+   * cache (marked pending) before it is shown, so a failed write never
+   * leaves a claim that exists only on screen. `fresh` marks a claim whose
+   * slot no relay has accepted yet; edits of such a claim stay `unsent`.
+   */
+  private async publishClaim(payload: ClaimPayload, fresh = false): Promise<ClaimActionResult> {
     return serialize(`${this.deps.db.name}:claim:${payload.id}`, async () => {
       const d = claimSlot(this.topic, payload.id)
       const prev = await getCachedEvent(this.deps.db, this.topic, d)
       const current = this.state.get(d)
       const previousCreatedAt = Math.max(prev?.event.created_at ?? -1, current?.event.created_at ?? -1)
-      const o: { topic: string; secretKey: string; createdAt: number; eventDate?: string } = {
+      const event = buildClaimEvent(payload, this.keys.claimsKey, {
         topic: this.topic,
         secretKey: this.guest.guestSecretKey,
         createdAt: nextCreatedAt(this.deps.now(), previousCreatedAt < 0 ? undefined : previousCreatedAt),
-      }
-      const eventDate = this.state.meta?.payload.eventDate
-      if (eventDate) o.eventDate = eventDate
-      const event = buildClaimEvent(payload, this.keys.claimsKey, o)
-      // Show it immediately; relays confirm (or not) afterwards.
-      this.state.ingest(event)
+      })
+      const unsent = fresh || prev?.unsent === true || (current !== undefined && this.unsent.has(current.event.id))
+      await cacheIfNewer(this.deps.db, this.topic, d, event, { pending: true, unsent })
       this.pending.add(event.id)
-      await cacheIfNewer(this.deps.db, this.topic, d, event, true)
+      if (unsent) this.unsent.add(event.id)
+      this.state.ingest(event)
       this.emit()
       const result = await this.transport.publish(event)
       if (result.ok) {
         this.pending.delete(event.id)
-        await cacheIfNewer(this.deps.db, this.topic, d, event, false)
+        this.unsent.delete(event.id)
+        await cacheIfNewer(this.deps.db, this.topic, d, event)
         this.emit()
       }
       return { claim: payload, result }
@@ -405,7 +426,7 @@ export class GiverListSession {
     if (state.pledgeCount > 0) throw new HippoError('invalid-input', 'this item has pledges; use "cover the rest"')
     if (!Number.isSafeInteger(quantity) || quantity < 1) throw new HippoError('invalid-input', 'quantity must be a positive integer')
     if (quantity > state.remainingQuantity) throw new HippoError('item-unavailable', 'not enough quantity left')
-    return this.publishClaim(this.newClaim(itemId, { kind: 'full', quantity }))
+    return this.publishClaim(this.newClaim(itemId, { kind: 'full', quantity }), true)
   }
 
   /** Pledge `amount` minor units in the item currency (FR-20). */
@@ -414,7 +435,7 @@ export class GiverListSession {
     if (!item.allowContributions) throw new HippoError('contributions-disabled', 'this item does not accept contributions')
     if (!item.price) throw new HippoError('contributions-disabled', 'this item has no price to contribute towards')
     this.checkAmount(amount)
-    return this.publishClaim(this.newClaim(itemId, { kind: 'pledge', amount: { amount, currency: item.price.currency } }))
+    return this.publishClaim(this.newClaim(itemId, { kind: 'pledge', amount: { amount, currency: item.price.currency } }), true)
   }
 
   /** Pledges exactly what is still needed (PRD 4.6). Allowed even if contributions were turned off later. */
@@ -426,6 +447,7 @@ export class GiverListSession {
     if (state.remainingAmount <= 0) throw new HippoError('item-unavailable', 'this item is already fully covered')
     return this.publishClaim(
       this.newClaim(itemId, { kind: 'pledge', amount: { amount: state.remainingAmount, currency: item.price.currency } }),
+      true,
     )
   }
 
@@ -495,11 +517,30 @@ export class GiverListSession {
   }
 
   /**
-   * Republishes, unchanged, every current event this client holds that the
-   * relays lack: my own claims first (required), then other authors' events
-   * (optional in the protocol, cheap, and it helps lists survive relay loss).
+   * My claims first: a claim no relay has ever accepted is re-stamped with
+   * the current time and sent (so an offline draft is dated when it reaches
+   * the relays); a live claim close to expiry is re-signed; anything else
+   * the relays lack is republished unchanged. Then other authors' current
+   * events the relays lack (optional in the protocol, cheap, and it helps
+   * lists survive relay loss). Expired events are never sent.
    */
   private async repairFrom(remote: readonly NostrEvent[]): Promise<PublishResult[]> {
+    const now = this.deps.now()
+    const results: PublishResult[] = []
+    const resent = new Set<string>()
+
+    for (const c of this.myClaims()) {
+      if (this.unsent.has(c.event.id)) {
+        const at = this.deps.now()
+        const restamped: ClaimPayload = { ...c.payload, createdAt: at, updatedAt: Math.max(at, c.payload.updatedAt) }
+        results.push((await this.publishClaim(restamped, true)).result)
+        resent.add(c.d)
+      } else if (c.payload.status !== 'withdrawn' && expiresSoon(c.event, now)) {
+        results.push((await this.publishClaim(c.payload)).result)
+        resent.add(c.d)
+      }
+    }
+
     const remoteBySlot = new Map<string, NostrEvent>()
     for (const e of remote) {
       const d = e.tags.find((t) => t[0] === 'd')?.[1]
@@ -508,16 +549,17 @@ export class GiverListSession {
       if (!cur || e.created_at > cur.created_at) remoteBySlot.set(`${e.pubkey}:${d}`, e)
     }
     const missing = this.state.all().filter((a) => {
+      if (isExpired(a.event, now) || resent.has(a.d)) return false
       const r = remoteBySlot.get(`${a.event.pubkey}:${a.d}`)
       return this.pending.has(a.event.id) || !r || (r.id !== a.event.id && r.created_at <= a.event.created_at)
     })
     missing.sort((a, b) => Number(b.event.pubkey === this.myPubkey) - Number(a.event.pubkey === this.myPubkey))
-    const results: PublishResult[] = []
     for (const a of missing) {
       const result = await this.transport.publish(a.event)
       results.push(result)
       if (result.ok && this.pending.delete(a.event.id)) {
-        await cacheIfNewer(this.deps.db, this.topic, a.d, a.event, false)
+        this.unsent.delete(a.event.id)
+        await cacheIfNewer(this.deps.db, this.topic, a.d, a.event)
         this.emit()
       }
     }
@@ -527,14 +569,15 @@ export class GiverListSession {
 
 /**
  * Opens a remembered list as a giver. Refuses with `own-list` when this
- * device owns the list (FR-25), and `not-found` when it was never added.
- * Call `start()` on the result; call `stop()` when the screen unmounts.
+ * device owns, rotated or deleted the list (FR-25), and `not-found` when it
+ * was never added. Call `start()` on the result; call `stop()` when the
+ * screen unmounts.
  */
 export async function openGuestList(deps: CoreDeps, topic: string, options: GiverSessionOptions = {}): Promise<GiverListSession> {
-  if (await ownsTopic(deps.db, topic)) {
-    throw new HippoError('own-list', 'This is your own list. Hippo hides claims from list owners, so it cannot be opened as a guest on this device.')
-  }
   const guest = await deps.db.guestLists.get(topic)
+  if (await isOwnListIdentity(deps.db, { topic, ...(guest ? { ownerPubkey: guest.ownerPubkey } : {}) })) {
+    throw new HippoError('own-list', OWN_LIST_MESSAGE)
+  }
   if (!guest) throw new HippoError('not-found', 'list not found on this device')
   guest.lastOpenedAt = deps.now()
   await deps.db.guestLists.put(guest)

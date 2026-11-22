@@ -7,7 +7,8 @@ export { isSafeHttpUrl } from './model/guards.ts'
 export { HippoError, isHippoError, type HippoErrorCode } from './errors.ts'
 export { DEFAULT_RELAYS, RELAY_FORCE_QUERY_PARAM, RELAY_FORCE_STORAGE_KEY } from './config.ts'
 
-export { createCore, applyRelayOverrideFromUrl, type Core, type CreateCoreOptions } from './context.ts'
+export { isRelayUrl } from './model/validate.ts'
+export { createCore, applyRelayOverrideFromUrl, readRelayOverride, type Core, type CreateCoreOptions } from './context.ts'
 export type { CoreDeps } from './services/deps.ts'
 
 export { HippoDb, openDb, DB_NAME, type CachedEvent } from './db/schema.ts'
@@ -57,8 +58,12 @@ export {
   rotateList,
   deleteSharedList,
   repairOwnerList,
+  repairRetiredLists,
+  listRetiredLists,
   buildShareLink,
   topicOfList,
+  sharedItemIdFor,
+  localItemIdFor,
   type SharedListInput,
   type SharedListPatch,
   type SyncReport,
@@ -70,6 +75,7 @@ export {
   listGuestLists,
   removeGuestList,
   openGuestList,
+  buildGuestShareLink,
   GiverListSession,
   type GiverListView,
   type GiverItemView,
@@ -82,7 +88,7 @@ export {
 
 export { exportData, importData, parseExportFile, type ExportFile, type ImportResult } from './services/backup.ts'
 
-export { resolveItemState, type ItemState, type ItemStatus, type ClaimRow, type ResolveClaim } from './protocol/resolve.ts'
+export { resolveItemState, effectiveClaimTime, type ItemState, type ItemStatus, type ClaimRow, type ResolveClaim } from './protocol/resolve.ts'
 export { parseShareLink, type SharePayload } from './crypto/link.ts'
 
 export type { Transport, TransportProvider, PublishResult, RelayResult, EoseInfo, Unsubscribe } from './transport/types.ts'

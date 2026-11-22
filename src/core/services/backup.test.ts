@@ -37,7 +37,7 @@ describe('export / import', () => {
 
     const target = openDb(`hippo-test-${randomId()}`)
     const result = await importData(target, json)
-    expect(result).toEqual({ items: 1, categories: 1, sharedLists: 1, guestLists: 1 })
+    expect(result).toEqual({ items: 1, categories: 1, sharedLists: 1, guestLists: 1, skippedLists: 0 })
     expect(await target.items.toArray()).toEqual(await source.db.items.toArray())
     expect(await target.categories.toArray()).toEqual(await source.db.categories.toArray())
     expect(await target.sharedLists.toArray()).toEqual(await source.db.sharedLists.toArray())
@@ -82,6 +82,10 @@ describe('export / import', () => {
       (f) => (rec(f, 'guestLists').guestSecretKey = 'short'),
       (f) => (rec(f, 'items').title = ''),
       (f) => (rec(f, 'sharedLists').relays = ['http://evil.example']),
+      (f) => (rec(f, 'sharedLists').relays = ['wss://10.0.0.1']),
+      (f) => (rec(f, 'sharedLists').ownerSecretKey = 'f'.repeat(64)), // >= curve order: not a valid key
+      (f) => (rec(f, 'guestLists').ownerPubkey = '0'.repeat(64)), // not on the curve
+      (f) => (rec(f, 'guestLists').topic = 'ab'.repeat(32)), // does not match the list secret
       (f) => f.items?.push(rec(f, 'items')),
     ]
     for (const mutate of variants) {

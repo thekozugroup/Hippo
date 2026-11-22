@@ -8,6 +8,8 @@ export type ItemStatus = 'available' | 'partial' | 'funded' | 'claimed' | 'purch
 export interface ResolveClaim {
   eventId: string
   pubkey: string
+  /** The current event's `created_at` (unix seconds); bounds the claim's effective time. */
+  eventCreatedAt: number
   payload: ClaimPayload
 }
 
@@ -21,10 +23,16 @@ export interface ClaimRow {
   status: 'reserved' | 'purchased'
   nickname?: string
   mine: boolean
-  /** A full claim that did not fit in the wanted quantity (FR-23). */
+  /**
+   * A full claim that did not fit in the wanted quantity (FR-23): another
+   * claim was counted first. Purchased claims are counted before reserved
+   * ones, so a reserved claim can also be displaced by someone who already
+   * bought the gift.
+   */
   conflict: boolean
   /** A pledge whose currency differs from the item price; it is not counted. */
   currencyMismatch: boolean
+  /** Effective time: `min(payload.createdAt, event created_at)`, ms. */
   createdAt: number
 }
 
@@ -46,9 +54,26 @@ export interface ItemState {
 
 export type ResolvableItem = Pick<ItemPayload, 'id' | 'quantity' | 'price'>
 
-function compareClaims(a: ResolveClaim, b: ResolveClaim): number {
-  if (a.payload.createdAt !== b.payload.createdAt) return a.payload.createdAt - b.payload.createdAt
+/**
+ * A claim's effective time. The payload's `createdAt` is chosen by its
+ * author; it may not be later than the signed event that carries it.
+ */
+export function effectiveClaimTime(c: Pick<ResolveClaim, 'eventCreatedAt' | 'payload'>): number {
+  return Math.min(c.payload.createdAt, c.eventCreatedAt * 1000)
+}
+
+function compareByTime(a: ResolveClaim, b: ResolveClaim): number {
+  const ta = effectiveClaimTime(a)
+  const tb = effectiveClaimTime(b)
+  if (ta !== tb) return ta - tb
   return a.eventId < b.eventId ? -1 : a.eventId > b.eventId ? 1 : 0
+}
+
+/** Grant order: purchased claims first, then reserved ones, each by effective time. */
+function compareForGrant(a: ResolveClaim, b: ResolveClaim): number {
+  const pa = a.payload.status === 'purchased' ? 0 : 1
+  const pb = b.payload.status === 'purchased' ? 0 : 1
+  return pa - pb || compareByTime(a, b)
 }
 
 export function resolveItemState(
@@ -58,11 +83,23 @@ export function resolveItemState(
 ): ItemState {
   const live = claims
     .filter((c) => c.payload.itemId === item.id && c.payload.status !== 'withdrawn')
-    .sort(compareClaims)
+    .sort(compareByTime)
 
-  const price = item.price
+  // Decide which full claims fit, in grant order, before building rows in time order.
+  const grantedIds = new Set<string>()
   let granted = 0
   let grantedAllPurchased = true
+  for (const c of [...live].sort(compareForGrant)) {
+    if (c.payload.kind !== 'full') continue
+    const q = c.payload.quantity ?? 1
+    if (granted + q <= item.quantity) {
+      granted += q
+      grantedIds.add(c.eventId)
+      if (c.payload.status !== 'purchased') grantedAllPurchased = false
+    }
+  }
+
+  const price = item.price
   let pledged = 0
   let pledgeCount = 0
   const rows: ClaimRow[] = []
@@ -79,18 +116,12 @@ export function resolveItemState(
       mine: options.myPubkey !== undefined && c.pubkey === options.myPubkey,
       conflict: false,
       currencyMismatch: false,
-      createdAt: p.createdAt,
+      createdAt: effectiveClaimTime(c),
     }
     if (p.nickname !== undefined) row.nickname = p.nickname
     if (p.kind === 'full') {
-      const q = p.quantity ?? 1
-      row.quantity = q
-      if (granted + q <= item.quantity) {
-        granted += q
-        if (status !== 'purchased') grantedAllPurchased = false
-      } else {
-        row.conflict = true
-      }
+      row.quantity = p.quantity ?? 1
+      row.conflict = !grantedIds.has(c.eventId)
     } else if (p.amount) {
       row.amount = p.amount
       if (price && p.amount.currency === price.currency) {

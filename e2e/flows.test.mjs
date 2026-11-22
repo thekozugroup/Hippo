@@ -13,7 +13,7 @@ async function newUser(browser, relay, name, state) {
   const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, acceptDownloads: true })
   await context.addInitScript((url) => {
     try {
-      localStorage.setItem('hippo:relays', url)
+      sessionStorage.setItem('hippo:relays', url)
     } catch {
       // about:blank and downloads have no storage
     }

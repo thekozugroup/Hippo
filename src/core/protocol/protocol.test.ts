@@ -15,7 +15,8 @@ function setup() {
   const ownerSk = generateSigningKey()
   const keys = deriveListKeys(listSecret)
   const ownerPubkey = publicKeyOf(ownerSk)
-  const ctx = { topic: keys.topic, ownerPubkey, contentKey: keys.contentKey, claimsKey: keys.claimsKey }
+  // Clock at 1000 s: events signed at created_at 1000 are fresh, not expired, not future-dated.
+  const ctx = { topic: keys.topic, ownerPubkey, contentKey: keys.contentKey, claimsKey: keys.claimsKey, now: () => 1_000_000 }
   const meta: ListMetaPayload = { v: 1, name: 'Birthday', itemIds: [], showPrices: true, showNotes: true, status: 'published', updatedAt: 1 }
   const item = (id = randomId(), extra: Partial<ItemPayload> = {}): ItemPayload => ({
     v: 1, id, title: 'Hippo', quantity: 1, importance: 'love', allowContributions: false, updatedAt: 1, ...extra,
@@ -45,17 +46,32 @@ describe('build', () => {
     const s = setup()
     const e = buildMetaEvent(s.meta, s.keys.contentKey, s.sign(s.ownerSk, 1_700_000_000))
     expect(e.kind).toBe(HIPPO_KIND)
-    expect(e.tags).toEqual([
+    expect(e.tags.slice(0, 2)).toEqual([
       ['d', metaSlot(s.keys.topic)],
       ['t', s.keys.topic],
-      ['expiration', String(1_700_000_000 + 400 * 86400)],
     ])
+    expect(e.tags[2]?.[0]).toBe('expiration')
+    const exp = Number(e.tags[2]?.[1])
+    const base = expirationFor(1_700_000_000, 0)
+    expect(exp - base).toBeGreaterThanOrEqual(0)
+    expect(exp - base).toBeLessThanOrEqual(30 * 86400)
+    expect((exp - base) % 86400).toBe(0)
   })
 
-  it('computes expiration from the event date, never already expired', () => {
-    const created = Date.UTC(2026, 0, 1) / 1000
-    expect(expirationFor(created, '2026-12-24')).toBe(Date.UTC(2026, 11, 24) / 1000 + 180 * 86400)
-    expect(expirationFor(created, '2020-01-01')).toBe(created + 30 * 86400)
+  it('computes expiration as created + 400 days, rounded up to the next month, plus 0-30 days', () => {
+    const created = Date.UTC(2026, 0, 10) / 1000 // + 400 days = 2027-02-14
+    expect(expirationFor(created, 0)).toBe(Date.UTC(2027, 2, 1) / 1000)
+    expect(expirationFor(created, 30)).toBe(Date.UTC(2027, 2, 31) / 1000)
+    // Independent of everything in the list, including the event date.
+    const seen = new Set<number>()
+    for (let i = 0; i < 200; i++) {
+      const v = expirationFor(created) - Date.UTC(2027, 2, 1) / 1000
+      expect(v % 86400).toBe(0)
+      seen.add(v / 86400)
+    }
+    expect(Math.min(...seen)).toBeGreaterThanOrEqual(0)
+    expect(Math.max(...seen)).toBeLessThanOrEqual(30)
+    expect(seen.size).toBeGreaterThan(10)
   })
 
   it('makes replacement timestamps strictly increase', () => {
@@ -248,7 +264,7 @@ describe('ListState', () => {
     expect(state.ingest(buildClaimEvent(claim, s.keys.claimsKey, s.sign(alice, 1000))).outcome).toBe('accepted')
     // Same slot and id, newer and even backdated: both refused.
     const hijack = { ...claim, status: 'withdrawn' as const }
-    expect(state.ingest(buildClaimEvent(hijack, s.keys.claimsKey, s.sign(mallory, 5000))).outcome).toBe('slot-taken')
+    expect(state.ingest(buildClaimEvent(hijack, s.keys.claimsKey, s.sign(mallory, 1500))).outcome).toBe('slot-taken')
     expect(state.ingest(buildClaimEvent(hijack, s.keys.claimsKey, s.sign(mallory, 10))).outcome).toBe('slot-taken')
     expect(state.claims()[0]?.payload.status).toBe('reserved')
     // The slot owner can still edit.

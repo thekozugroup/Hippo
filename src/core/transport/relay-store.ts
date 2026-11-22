@@ -36,9 +36,13 @@ export class RelayStore {
   }
 
   add(e: NostrEvent): StoreOutcome {
-    if (this.byId.has(e.id)) return 'duplicate'
+    // Expiry first: an expired event is refused even if an (expired) copy is still stored.
     const exp = expiresAt(e)
-    if (exp !== undefined && exp <= this.nowSeconds()) return 'expired'
+    if (exp !== undefined && exp <= this.nowSeconds()) {
+      this.delete(e.id)
+      return 'expired'
+    }
+    if (this.byId.has(e.id)) return 'duplicate'
     if (isEphemeral(e)) return 'ephemeral'
     const key = replacementKey(e)
     if (key !== null) {

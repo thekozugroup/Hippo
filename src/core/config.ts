@@ -9,13 +9,14 @@ export const DEFAULT_RELAYS: readonly string[] = [
 ]
 
 /**
- * localStorage key (comma-separated relay URLs) that forces every transport
- * onto the given relays, ignoring list and link relays. Meant for end-to-end
- * tests against the mock relay; see README.
+ * sessionStorage key (comma-separated loopback relay URLs) that forces every
+ * transport onto the given relays, ignoring list and link relays. Meant for
+ * end-to-end tests against the mock relay; see README. Session-scoped, so a
+ * crafted link cannot change the app beyond the tab it was opened in.
  */
 export const RELAY_FORCE_STORAGE_KEY = 'hippo:relays'
 
-/** URL query parameter with the same effect; the app copies it into localStorage. */
+/** URL query parameter with the same effect; `applyRelayOverrideFromUrl` copies it into sessionStorage. */
 export const RELAY_FORCE_QUERY_PARAM = 'relays'
 
 export function sameRelaySet(a: readonly string[], b: readonly string[]): boolean {

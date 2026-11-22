@@ -7,6 +7,7 @@ import {
   SchemaError,
   readArray,
   readBoolean,
+  isHex,
   readEnum,
   readHex,
   readId,
@@ -20,6 +21,9 @@ import {
   readString,
   readTimestamp,
 } from './guards.ts'
+import { secp256k1 } from '@noble/curves/secp256k1.js'
+import { hexToBytes } from '../crypto/bytes.ts'
+import { isValidPubkey, publicKeyOf, topicForSecret } from '../crypto/keys.ts'
 import type {
   Category,
   ClaimPayload,
@@ -28,6 +32,8 @@ import type {
   ItemPayload,
   ListMetaPayload,
   Money,
+  RetiredList,
+  RetiredListSecrets,
   SharedList,
 } from './types.ts'
 import { IMPORTANCE_LEVELS } from './types.ts'
@@ -65,7 +71,6 @@ export function parseListMetaPayload(value: unknown): ListMetaPayload {
   }
   assign(out, 'message', readOptionalString(o.message, 'meta.message', LIMITS.message))
   assign(out, 'eventDate', readOptionalDate(o.eventDate, 'meta.eventDate'))
-  assign(out, 'movedTo', readOptionalString(o.movedTo, 'meta.movedTo', LIMITS.movedTo))
   return out
 }
 
@@ -153,20 +158,88 @@ export function readRelayList(value: unknown, path: string): string[] {
   })
 }
 
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
+/** Hostname suffixes that only resolve inside a home or company network. */
+const PRIVATE_SUFFIXES = ['localhost', 'local', 'localdomain', 'internal', 'intranet', 'lan', 'home.arpa']
 
-/** wss:// anywhere; plain ws:// only for loopback (local mock relay in tests). */
-export function isRelayUrl(value: string): boolean {
-  if (value.includes(',') || /\s/.test(value)) return false
+function isPublicIpv4(host: string): boolean {
+  const p = host.split('.').map(Number)
+  const [a = 0, b = 0, c = 0] = p
+  if (a === 0 || a === 10 || a === 127 || a >= 224) return false // this-network, private, loopback, multicast/reserved
+  if (a === 100 && b >= 64 && b <= 127) return false // carrier-grade NAT
+  if (a === 169 && b === 254) return false // link-local
+  if (a === 172 && b >= 16 && b <= 31) return false
+  if (a === 192 && b === 168) return false
+  if (a === 192 && b === 0 && c === 0) return false
+  if (a === 198 && (b === 18 || b === 19)) return false // benchmarking
+  return true
+}
+
+/**
+ * True for a hostname a relay on the public internet can have: no loopback,
+ * private, link-local or reserved IP literal, no `localhost` or `.local`-style
+ * name, and no single-label intranet name.
+ */
+export function isPublicHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, '')
+  if (host.length === 0) return false
+  if (host.startsWith('[')) {
+    // URL serialises IPv6 compressed; only global unicast (2000::/3) is public.
+    const first = host.slice(1).split(':')[0] ?? ''
+    if (first === '') return false
+    const h = parseInt(first, 16)
+    return h >= 0x2000 && h <= 0x3fff
+  }
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return isPublicIpv4(host)
+  if (!host.includes('.')) return false
+  return !PRIVATE_SUFFIXES.some((s) => host === s || host.endsWith('.' + s))
+}
+
+function parseWsUrl(value: string): URL | null {
+  if (value.length > LIMITS.relayUrl || value.includes(',') || /\s/.test(value)) return null
   try {
     const u = new URL(value)
-    if (u.username || u.password) return false
-    if (u.protocol === 'wss:') return u.hostname.length > 0
-    if (u.protocol === 'ws:') return LOCAL_HOSTS.has(u.hostname)
-    return false
+    if (u.username || u.password || u.hash) return null
+    return u
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Relay URLs that may appear in lists, links, settings and backups:
+ * `wss://` with a public hostname only.
+ */
+export function isRelayUrl(value: string): boolean {
+  const u = parseWsUrl(value)
+  return u !== null && u.protocol === 'wss:' && isPublicHostname(u.hostname)
+}
+
+/** Developer override relays (end-to-end tests): `ws://` or `wss://` on a loopback host only. */
+export function isLoopbackRelayUrl(value: string): boolean {
+  const u = parseWsUrl(value)
+  return u !== null && (u.protocol === 'ws:' || u.protocol === 'wss:') && LOOPBACK_HOSTS.has(u.hostname)
+}
+
+/** A valid secp256k1 secret key as 32 bytes of lowercase hex (1 <= k < n). */
+export function isSecretKeyHex(value: unknown): value is string {
+  if (!isHex(value, 32)) return false
+  try {
+    return secp256k1.utils.isValidSecretKey(hexToBytes(value))
   } catch {
     return false
   }
+}
+
+function readSecretKey(value: unknown, path: string): string {
+  if (!isSecretKeyHex(value)) throw new SchemaError(path, 'expected a secp256k1 secret key (32 bytes hex)')
+  return value
+}
+
+function readPubkey(value: unknown, path: string): string {
+  const s = readHex(value, path, 32)
+  if (!isValidPubkey(s)) throw new SchemaError(path, 'not a valid public key')
+  return s
 }
 
 export function parseSharedList(value: unknown, path = 'sharedList'): SharedList {
@@ -177,7 +250,7 @@ export function parseSharedList(value: unknown, path = 'sharedList'): SharedList
     itemIds: readIdList(o.itemIds, `${path}.itemIds`, LIMITS.itemIds),
     showPrices: readBoolean(o.showPrices, `${path}.showPrices`),
     showNotes: readBoolean(o.showNotes, `${path}.showNotes`),
-    ownerSecretKey: readHex(o.ownerSecretKey, `${path}.ownerSecretKey`, 32),
+    ownerSecretKey: readSecretKey(o.ownerSecretKey, `${path}.ownerSecretKey`),
     listSecret: readHex(o.listSecret, `${path}.listSecret`, 32),
     relays: readRelayList(o.relays, `${path}.relays`),
     status: readEnum(o.status, `${path}.status`, ['draft', 'published', 'unpublished'] as const),
@@ -194,14 +267,40 @@ export function parseGuestList(value: unknown, path = 'guestList'): GuestList {
   const o = readObject(value, path)
   const out: GuestList = {
     topic: readHex(o.topic, `${path}.topic`, 32),
-    ownerPubkey: readHex(o.ownerPubkey, `${path}.ownerPubkey`, 32),
+    ownerPubkey: readPubkey(o.ownerPubkey, `${path}.ownerPubkey`),
     listSecret: readHex(o.listSecret, `${path}.listSecret`, 32),
     relays: readRelayList(o.relays, `${path}.relays`),
-    guestSecretKey: readHex(o.guestSecretKey, `${path}.guestSecretKey`, 32),
+    guestSecretKey: readSecretKey(o.guestSecretKey, `${path}.guestSecretKey`),
     addedAt: readTimestamp(o.addedAt, `${path}.addedAt`),
     lastOpenedAt: readTimestamp(o.lastOpenedAt, `${path}.lastOpenedAt`),
   }
   assign(out, 'nickname', readOptionalString(o.nickname, `${path}.nickname`, LIMITS.nickname))
+  if (topicForSecret(out.listSecret) !== out.topic) throw new SchemaError(`${path}.topic`, 'does not match the list secret')
+  return out
+}
+
+export function parseRetiredList(value: unknown, path = 'retiredList'): RetiredList {
+  const o = readObject(value, path)
+  const out: RetiredList = {
+    topic: readHex(o.topic, `${path}.topic`, 32),
+    ownerPubkey: readPubkey(o.ownerPubkey, `${path}.ownerPubkey`),
+    listId: readId(o.listId, `${path}.listId`),
+    reason: readEnum(o.reason, `${path}.reason`, ['rotated', 'deleted'] as const),
+    retiredAt: readTimestamp(o.retiredAt, `${path}.retiredAt`),
+  }
+  if (o.pending !== undefined) {
+    const p = readObject(o.pending, `${path}.pending`)
+    const pending: RetiredListSecrets = {
+      ownerSecretKey: readSecretKey(p.ownerSecretKey, `${path}.pending.ownerSecretKey`),
+      listSecret: readHex(p.listSecret, `${path}.pending.listSecret`, 32),
+      relays: readRelayList(p.relays, `${path}.pending.relays`),
+      name: readString(p.name, `${path}.pending.name`, LIMITS.name),
+      itemIds: readIdList(p.itemIds, `${path}.pending.itemIds`, LIMITS.itemIds * 4),
+    }
+    if (topicForSecret(pending.listSecret) !== out.topic) throw new SchemaError(`${path}.topic`, 'does not match the list secret')
+    if (publicKeyOf(pending.ownerSecretKey) !== out.ownerPubkey) throw new SchemaError(`${path}.ownerPubkey`, 'does not match the secret key')
+    out.pending = pending
+  }
   return out
 }
 
