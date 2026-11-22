@@ -1,0 +1,228 @@
+/* App-level layout helpers. Tokens only; no raw colours. */
+
+.app-logo-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--h-min);
+  padding-inline: var(--sp-1);
+  border-radius: var(--r-pill);
+  color: var(--white);
+}
+
+.app-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  color: var(--white);
+}
+
+.app-hero__title {
+  overflow-wrap: anywhere;
+}
+.app-hero__title:focus {
+  outline: none;
+}
+.app-hero__title:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 4px;
+  border-radius: var(--sp-1);
+}
+
+.app-hero__intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  font-size: 15px;
+  line-height: 20px;
+  color: color-mix(in srgb, var(--white) 86%, transparent);
+  overflow-wrap: anywhere;
+}
+
+.app-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-7);
+  min-width: 0;
+}
+
+/* Vertical groups inside the sheet */
+.app-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.app-stack--tight {
+  gap: var(--sp-2);
+}
+.app-stack--loose {
+  gap: var(--sp-6);
+}
+
+.app-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.app-row--nowrap {
+  flex-wrap: nowrap;
+}
+.app-row--end {
+  justify-content: flex-end;
+}
+.app-row--between {
+  justify-content: space-between;
+}
+
+.app-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+
+.app-muted {
+  color: var(--text-2);
+}
+
+.app-note {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--text-2);
+}
+
+/* Informational banner on the sheet (offline, unpublished, warnings) */
+.app-banner {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  padding: var(--sp-4);
+  border-radius: var(--r-tile);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  font-size: 15px;
+  line-height: 20px;
+}
+.app-banner > svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  color: var(--accent);
+}
+.app-banner--warn > svg {
+  color: var(--danger);
+}
+.app-banner__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.app-banner__title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+/* Chip rows that scroll sideways rather than wrap */
+.app-chips {
+  display: flex;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  margin-inline: calc(-1 * var(--gutter));
+  padding: var(--sp-1) var(--gutter);
+  scrollbar-width: none;
+}
+.app-chips::-webkit-scrollbar {
+  display: none;
+}
+.app-chips > * {
+  flex: none;
+}
+
+/* Numbered how-to steps */
+.app-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  counter-reset: step;
+}
+.app-steps > li {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: var(--sp-3);
+  align-items: start;
+  counter-increment: step;
+  font-size: 15px;
+  line-height: 20px;
+}
+.app-steps > li::before {
+  content: counter(step);
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.app-steps strong {
+  font-weight: 600;
+}
+
+/* Code blocks (capture tools) */
+.app-code {
+  margin: 0;
+  padding: var(--sp-4);
+  border-radius: var(--r-tile);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 160px;
+  overflow: auto;
+}
+
+/* Disclosure for details such as per-server results */
+.app-details > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--h-min);
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 500;
+  border-radius: var(--r-pill);
+}
+.app-details[open] > summary {
+  margin-bottom: var(--sp-2);
+}
+
+.app-text-link {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.app-section-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.app-divider {
+  height: 1px;
+  border: 0;
+  margin: 0;
+  background: var(--hairline);
+}

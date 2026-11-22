@@ -2,8 +2,8 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import './IconButton.css'
 
-export interface IconButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'children' | 'aria-label'> {
-  /** Accessible name; required because the button has no visible text. */
+interface IconButtonCommon {
+  /** Accessible name; required because the control has no visible text. */
   'aria-label': string
   /** The icon (24px lucide icon). */
   icon: ReactNode
@@ -13,17 +13,37 @@ export interface IconButtonProps extends Omit<ComponentPropsWithoutRef<'button'>
   size?: 'md' | 'lg'
 }
 
+export interface IconButtonProps
+  extends IconButtonCommon,
+    Omit<ComponentPropsWithoutRef<'button'>, 'children' | 'aria-label'> {}
+
+export interface IconLinkProps extends IconButtonCommon, Omit<ComponentPropsWithoutRef<'a'>, 'children' | 'aria-label'> {
+  /** Destination; use for navigation (for example a back link). */
+  href: string
+}
+
+function classes(variant: IconButtonCommon['variant'] = 'neutral', size: IconButtonCommon['size'] = 'md', className?: string) {
+  return cx('icon-btn', `icon-btn--${variant}`, `icon-btn--${size}`, variant === 'frost' && 'frost frost--on-hero', className)
+}
+
 /** Circular icon button; always at least 44px. */
-export function IconButton({ icon, variant = 'neutral', size = 'md', className, type = 'button', ...rest }: IconButtonProps) {
+export function IconButton({ icon, variant, size, className, type = 'button', ...rest }: IconButtonProps) {
   return (
-    <button
-      {...rest}
-      type={type}
-      className={cx('icon-btn', `icon-btn--${variant}`, `icon-btn--${size}`, variant === 'frost' && 'frost frost--on-hero', className)}
-    >
+    <button {...rest} type={type} className={classes(variant, size, className)}>
       <span className="icon-btn__icon" aria-hidden="true">
         {icon}
       </span>
     </button>
+  )
+}
+
+/** A link that looks like an `IconButton` (navigation should be a link, not a button). */
+export function IconLink({ icon, variant, size, className, ...rest }: IconLinkProps) {
+  return (
+    <a {...rest} className={classes(variant, size, className)}>
+      <span className="icon-btn__icon" aria-hidden="true">
+        {icon}
+      </span>
+    </a>
   )
 }

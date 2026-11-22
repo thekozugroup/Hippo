@@ -3,7 +3,8 @@ import './ImportanceMark.css'
 
 export type Importance = 1 | 2 | 3
 
-const LABELS: Record<Importance, string> = { 1: 'Nice to have', 2: 'Would love', 3: 'Really want' }
+// Labels follow PRD FR-2: nice = "Nice to have", want = "Want", love = "Would love".
+const LABELS: Record<Importance, string> = { 1: 'Nice to have', 2: 'Want', 3: 'Would love' }
 
 export interface ImportanceMarkProps {
   /** 1 to 3 filled dots. */
