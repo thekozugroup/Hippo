@@ -133,6 +133,7 @@ interface ListMetaPayload {
   name: string;
   message?: string;
   eventDate?: string;
+  ownerName?: string;         // the owner's first name or nickname, max 40 chars; shown to givers
   itemIds: string[];          // shared item ids, in order; the set of live items
   showPrices: boolean;
   showNotes: boolean;
@@ -184,7 +185,7 @@ An event is accepted only if all of these hold:
 4. At most one `expiration` tag, and the event has not expired.
 5. Meta and item events: `pubkey === ownerPubkey`. Anything else in those slots is dropped.
 6. Claim events: any pubkey, but the slot's `claimId` must equal the decrypted `payload.id`; `created_at`, `payload.createdAt` and `payload.updatedAt` may not be more than 10 minutes in the future; and a slot once seen from pubkey A is never overwritten by pubkey B (first author owns the slot; ties broken by lower `created_at`, then lower event id). At most 5,000 claim slots are kept per list; new slots beyond that are ignored.
-7. Decryption succeeds with the right key and AAD, and the payload passes schema validation (types, lengths, non-negative integers, known enums, ids are 16 bytes hex). Strings are length-limited in code points: title 200, notes 2000, url 2000, nickname 40, name 100, message 1000. Quantities are 1 to 9,999; money is at most 10^11 minor units. An item event with empty content is an owner tombstone.
+7. Decryption succeeds with the right key and AAD, and the payload passes schema validation (types, lengths, non-negative integers, known enums, ids are 16 bytes hex). Strings are length-limited in code points: title 200, notes 2000, url 2000, nickname 40, ownerName 40, name 100, message 1000. Quantities are 1 to 9,999; money is at most 10^11 minor units. An item event with empty content is an owner tombstone.
 8. For the same slot and author, the event with the higher `created_at` wins; ties broken by lower event id.
 
 URLs from payloads that are not `http:` or `https:` are dropped during validation, and are only rendered as links or images if their scheme is `http:` or `https:`. Expired events are also removed from the local cache when a list is opened.
