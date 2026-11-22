@@ -15,6 +15,7 @@ import { ImportanceMark } from './components/ImportanceMark.tsx'
 import { List } from './components/List.tsx'
 import { ListRow } from './components/ListRow.tsx'
 import { Logo } from './components/Logo.tsx'
+import { LogoIntro } from './components/LogoIntro.tsx'
 import { MoneyField } from './components/MoneyField.tsx'
 import { MoneyText } from './components/MoneyText.tsx'
 import { Screen } from './components/Screen.tsx'
@@ -191,6 +192,7 @@ function Showcase({ theme }: { theme: Theme }) {
   const [sheet, setSheet] = useState(false)
   const [toast, setToast] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [introRun, setIntroRun] = useState(0)
   const dark = theme === 'dark'
 
   return (
@@ -524,6 +526,18 @@ function Showcase({ theme }: { theme: Theme }) {
             <div className="gx-on-hero__inner">
               <Logo size={32} />
             </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Logo intro" note="The one-time brand moment on the first setup step: large and centred, two blinks, then it travels to its place (about 2 seconds, transform only). It stays put under reduced motion.">
+        <div className="gx-on-field gx-on-field--short" data-theme="dark">
+          <HeroBackground variant="dark" />
+          <div className="gx-on-field__inner gx-row">
+            <LogoIntro key={introRun} size={28} play={introRun > 0} />
+            <Button variant="frost" size="md" onClick={() => setIntroRun((n) => n + 1)}>
+              Play intro
+            </Button>
           </div>
         </div>
       </Section>

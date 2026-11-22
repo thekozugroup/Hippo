@@ -43,10 +43,10 @@ describe('giver wish card states', () => {
   it('partly covered: shows progress, "Cover the rest" and "Chip in"', () => {
     const card = renderCard(item({ ...priced, allowContributions: true }), [claim(OTHER, { kind: 'pledge', amount: { amount: 5000, currency: 'USD' }, nickname: 'Maya' })])
     expect(card.querySelector('.status-pill')).toBeNull()
-    expect(within(card).getByRole('progressbar')).toHaveAttribute('aria-valuetext', '$50.00 of $200.00 covered')
-    expect(within(card).getByText('$50.00 of $200.00')).toBeInTheDocument()
-    expect(within(card).getByText('$150.00 left')).toBeInTheDocument()
-    expect(within(card).queryByText(/%/)).toBeNull()
+    expect(within(card).getByRole('progressbar')).toHaveAttribute('aria-valuetext', '25% covered, $150.00 left')
+    const line = card.querySelector('.giver-item__funding-line')
+    expect(line?.textContent).toBe('25%$150.00 left')
+    expect(within(card).queryByText(/ of \$/)).toBeNull()
     expect(within(card).getByText('Maya chipped in $50.00')).toBeInTheDocument()
     expect(within(card).getByRole('button', { name: 'Cover the rest' })).toHaveClass('btn--primary')
     expect(within(card).getByRole('button', { name: 'Chip in' })).not.toHaveClass('btn--primary')
@@ -56,6 +56,8 @@ describe('giver wish card states', () => {
   it('fully covered: no actions left', () => {
     const card = renderCard(item({ ...priced, allowContributions: true }), [claim(OTHER, { kind: 'pledge', amount: { amount: 20000, currency: 'USD' } })])
     expect(within(card).getByText('Covered', { selector: '.status-pill' })).toBeInTheDocument()
+    expect(card.querySelector('.giver-item__funding-line')?.textContent).toBe('100%Covered')
+    expect(within(card).getByRole('progressbar')).toHaveAttribute('aria-valuetext', '100% covered')
     expect(within(card).queryByRole('button', { name: /Cover the rest|Chip in|I'll get this/ })).toBeNull()
   })
 
@@ -101,6 +103,7 @@ describe('giver wish card: one surface, exceptions only', () => {
     const it2 = item({ ...priced, allowContributions: true })
     const card = renderCard(it2, [claim(OTHER, { kind: 'pledge', amount: { amount: 25000, currency: 'USD' } })])
     expect(within(card).getByText('Covered', { selector: '.status-pill' })).toBeInTheDocument()
+    expect(card.querySelector('.giver-item__funding-line')?.textContent).toBe('100%Covered')
     expect(within(card).getByText('$50.00 more than needed')).toBeInTheDocument()
     expect(within(card).queryAllByRole('button')).toHaveLength(0)
   })

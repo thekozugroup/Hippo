@@ -127,7 +127,7 @@ test('a price change after pledges recomputes the progress', async ({ baseUrl, s
   await owner.getByRole('button', { name: 'Save changes' }).click()
   await owner.waitForURL(/#\/wishlist$/)
   await page.waitForFunction(
-    () => document.querySelector('[aria-valuetext="$25.00 of $50.00 covered"]') !== null,
+    () => document.querySelector('[aria-valuetext="50% covered, $25.00 left"]') !== null,
     undefined,
     { timeout: 15_000 },
   )

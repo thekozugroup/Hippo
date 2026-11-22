@@ -89,9 +89,10 @@ export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchase
         <div className="giver-item__funding">
           <DotProgress label={`Funding for ${item.title}`} value={funding.value} valueText={funding.text} />
           <p className="giver-item__funding-line">
-            <span>{funding.covered}</span>
+            <span>{funding.percent}</span>
             <span>{funding.rest}</span>
           </p>
+          {funding.surplus ? <p className="giver-item__line">{funding.surplus}</p> : null}
         </div>
       ) : null}
 

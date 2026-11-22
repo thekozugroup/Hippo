@@ -175,7 +175,7 @@ test('a third person sees the claim, the pledge and the nickname', async ({ brow
   await card(page, 'Espresso machine').getByText('Maya chipped in $50.00').waitFor()
   await card(page, 'Espresso machine').getByText('$199.00 left').waitFor()
   const progress = card(page, 'Espresso machine').getByRole('progressbar')
-  assert.equal(await progress.getAttribute('aria-valuetext'), '$50.00 of $249.00 covered')
+  assert.equal(await progress.getAttribute('aria-valuetext'), '20% covered, $199.00 left')
   // An ordinary available wish carries no status pill, only its action.
   await card(page, 'Board game night').getByRole('button', { name: "I'll get this" }).waitFor()
   assert.equal(await card(page, 'Board game night').locator('.status-pill').count(), 0)

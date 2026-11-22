@@ -104,3 +104,47 @@ test('link lookup: while the setting is off no request ever goes to the preview 
     await u.context.close()
   }
 })
+
+test('setup: "Get started" works within 200 ms of the first step, while the large logo is still playing, and a press snaps the logo to its place', async ({ browser, relay, baseUrl, state }) => {
+  const u = await newUser(browser, relay, 'w-intro', state)
+  try {
+    const { page } = u
+    await page.goto(baseUrl + '#/welcome/start')
+    const start = page.getByRole('button', { name: 'Get started' })
+    await start.waitFor()
+    const t0 = Date.now()
+    assert.equal(await page.locator('.logo--intro').count(), 1, 'the intro is playing when the control appears')
+    await start.click({ timeout: 200 })
+    await page.getByRole('heading', { level: 1, name: /What should we\s*call you\?/ }).waitFor()
+    assert.ok(Date.now() - t0 < 1500, 'the step changed without waiting for the intro')
+    assert.equal(await page.locator('.logo--intro').count(), 0, 'the press ended the intro')
+    // One logo in the accessibility tree, always.
+    assert.equal(await page.getByText('Hippo', { exact: true }).count(), 1)
+    assertNoProblems(u.problems)
+  } finally {
+    await u.context.close()
+  }
+})
+
+test('setup: the logo intro plays once; going back to step 1 and reloading show the logo at rest', async ({ browser, relay, baseUrl, state }) => {
+  const u = await newUser(browser, relay, 'w-intro-once', state)
+  try {
+    const { page } = u
+    await page.goto(baseUrl + '#/welcome/start')
+    await page.getByRole('button', { name: 'Get started' }).waitFor()
+    assert.equal(await page.locator('.logo--intro').count(), 1)
+    await page.getByRole('button', { name: 'Get started' }).click()
+    await page.getByRole('heading', { level: 1, name: /What should we\s*call you\?/ }).waitFor()
+    await page.getByRole('button', { name: 'Back' }).click()
+    await page.getByRole('button', { name: 'Get started' }).waitFor()
+    await page.waitForTimeout(150)
+    assert.equal(await page.locator('.logo--intro').count(), 0, 'no intro on Back')
+    await page.reload()
+    await page.getByRole('button', { name: 'Get started' }).waitFor()
+    await page.waitForTimeout(150)
+    assert.equal(await page.locator('.logo--intro').count(), 0, 'no intro after a reload')
+    assertNoProblems(u.problems)
+  } finally {
+    await u.context.close()
+  }
+})

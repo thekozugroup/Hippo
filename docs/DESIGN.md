@@ -107,7 +107,7 @@ Numbers use `font-variant-numeric: tabular-nums`. Long strings wrap (`overflow-w
 
 ### 2a. Motion
 
-Motion says where something came from or where it went. It starts from its source, stays short and never delays input; if it explains nothing, it is cut. Only `transform` and `opacity` animate (no layout properties, no blur radius), nothing runs longer than `--dur-sheet`, routine actions never bounce, and nothing animates on first paint (enter effects wait for `html[data-booted]`, set 800ms after start).
+Motion says where something came from or where it went. It starts from its source, stays short and never delays input; if it explains nothing, it is cut. Only `transform` and `opacity` animate (no layout properties, no blur radius), nothing runs longer than `--dur-sheet` (one exception: the logo intro below), routine actions never bounce, and nothing animates on first paint (enter effects wait for `html[data-booted]`, set 800ms after start).
 
 | Token | Value | Use |
 |---|---|---|
@@ -116,6 +116,9 @@ Motion says where something came from or where it went. It starts from its sourc
 | `--dur-exit` | 160ms | What leaves goes a little faster than what arrives |
 | `--dur-page` | 280ms | Route transitions, the nav indicator, rows moving to a new place |
 | `--dur-sheet` | 320ms | Sheets and dialogs rising from the bottom |
+| `--dur-intro` | 2000ms | The logo intro on the first setup step, once per device: the one deliberate exception to the `--dur-sheet` limit, a brand moment |
+| `--dur-intro-travel` | 600ms | The last part of the intro: the logo shrinking and travelling to its place (`--ease-move`) |
+| `--dur-blink` | 1400ms | One pass of the blink pattern while the logo is large |
 | `--stagger` | 18ms | Delay between dots filling in sequence (a whole sequence is capped at 240ms) |
 | `--ease` | ease-out | Fades |
 | `--ease-in` | `cubic-bezier(.4,0,1,1)` | Exits off screen |
@@ -134,6 +137,7 @@ What moves, and what it explains (`src/ui/styles/motion.css`, driven by `src/app
 - Lists (`List`, on by default): rows that move after a reorder, a filter or a removal glide from their old place (FLIP, `--dur-page`); new rows rise 8px and fade in, a few at a time.
 - Giver card: when a claim lands, the funding dots fill column by column once (`DotProgress`), and a new status pill or "You are getting this" line rises in (`.motion-enter`).
 - Feedback: pressed states on buttons, chips, rows and nav items; toasts rise in and sink out; content replacing a loading placeholder cross-fades (`.motion-reveal`); skeletons pulse in opacity.
+- Logo intro (`LogoIntro`, first step of setup, `src/app/core/logoIntro.ts`): the logo starts large (up to 3.5 times its size, never wider than the viewport less a gutter) and centred in the upper part of the screen, blinks twice (a blink, a pause of about 600 ms, a quicker blink), then shrinks and travels to its place at the top start of the step header. It is one element at its normal place in the layout moved with `transform` only (FLIP between the two measured positions), so nothing shifts when it lands and assistive technology sees one logo, named "Hippo". It never delays input: the headline, dots and controls are there from the first frame, the logo ignores the pointer, and any press, key or scroll snaps it to its place. It plays once per device (a flag in local storage), never on Back, resume or for givers. After landing the logo stays still; a later second blink was tried in the design and left out because it pulls the eye away from the question. Reduced motion: no travel and no blink; the logo is at its place from the first frame.
 - Reduced motion: route transitions are not started, the nav indicator and list moves are skipped, sheets only fade, and every CSS transition and animation is instant (`base.css`).
 
 ## 3. Frost (translucent surfaces)
@@ -189,7 +193,8 @@ All components are React function components in `src/ui/components/`, each with 
 | `Toast` | `role="status"`, auto-dismiss (8 seconds by default; hover and focus pause it), pill shaped, with a dismiss button. Rises in and sinks out. |
 | `EmptyState` | Two-tone headline, one sentence, one action. No icon tile. Use it for an empty list, not under a page heading that already says what happened. |
 | `Skeleton` | Loading placeholder (opacity pulse). |
-| `Logo` | Hippo wordmark and a simple original hippo glyph (inline SVG). |
+| `Logo` | Hippo wordmark and a simple original hippo glyph (inline SVG). The eyes are separate shapes (holes in the glyph's mask), so `blink` can close them with `scaleY`; the still glyph is unchanged. |
+| `LogoIntro` | `Logo` with the one-time intro described in section 2a (`play` at mount, `onPlay` to remember it). Used by `StepScreen` (`logoIntro`, `onLogoIntro`) on the first setup step only. |
 
 Icons: `lucide-react`, 1.75px stroke, 24px. Icons sit plain beside a fact or on an action; no tinted tiles behind them. A letter thumbnail (`Thumb`) standing in for a missing product image is a recognition aid and stays.
 

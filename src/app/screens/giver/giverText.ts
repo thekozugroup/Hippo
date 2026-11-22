@@ -69,34 +69,45 @@ export function rowNeedsText(row: ClaimRow, item: ItemPayload, state: ItemState)
 }
 
 export interface Funding {
-  /** Share of the target that is covered, 0..1. */
+  /** Share of the target that is covered, 0..1 (drives the dots). */
   value: number
-  /** Text alternative for the progressbar: "$50.00 of $200.00 covered". */
+  /** Text alternative for the progressbar: "20% covered, $199.00 left". */
   text: string
-  /** Start of the line under the bar: "$50.00 of $200.00". */
-  covered: string
-  /** End of the line: what is left, or what was pledged beyond the price. */
+  /** Start of the line under the bar: a whole-number percentage such as "20%". */
+  percent: string
+  /** End of the line: "$199.00 left", or "Covered" when nothing is needed any more. */
   rest: string
+  /** Separate note for pledges beyond the price ("$50.00 more than needed"), else null. */
+  surplus: string | null
+}
+
+/**
+ * Whole-number percentage of `target` that `covered` makes up, for display. Rounds down, so
+ * 99.6% reads 99 and only a fully covered target reads 100; any amount above zero reads at
+ * least 1. An unusable target or a negative or non-finite amount reads 0.
+ */
+export function coveredPercent(covered: number, target: number): number {
+  if (!Number.isFinite(covered) || !Number.isFinite(target) || target <= 0 || covered <= 0) return 0
+  if (covered >= target) return 100
+  return Math.min(99, Math.max(1, Math.floor((covered / target) * 100)))
 }
 
 /** Funding progress for a wish, or null when funding is not shown. */
 export function fundingProgress(item: ItemPayload, state: ItemState): Funding | null {
   if (!state.target || state.target.amount <= 0) return null
   if (!item.allowContributions && state.pledgeCount === 0) return null
-  const remaining = state.remainingAmount ?? 0
+  const remaining = Math.max(0, state.remainingAmount ?? 0)
   const covered = Math.max(0, state.target.amount - remaining)
   const currency = state.target.currency
-  const coveredText = `${moneyText({ amount: covered, currency })} of ${moneyText(state.target)}`
+  const pct = coveredPercent(covered, state.target.amount)
+  const percent = `${pct}%`
+  const left = remaining > 0 ? `${moneyText({ amount: remaining, currency })} left` : null
   return {
     value: covered / state.target.amount,
-    text: `${coveredText} covered`,
-    covered: coveredText,
-    rest:
-      remaining > 0
-        ? `${moneyText({ amount: remaining, currency })} left`
-        : state.surplus > 0
-          ? `${moneyText({ amount: state.surplus, currency })} more than needed`
-          : 'Fully covered',
+    text: left ? `${percent} covered, ${left}` : `${percent} covered`,
+    percent,
+    rest: left ?? 'Covered',
+    surplus: remaining === 0 && state.surplus > 0 ? `${moneyText({ amount: state.surplus, currency })} more than needed` : null,
   }
 }
 
