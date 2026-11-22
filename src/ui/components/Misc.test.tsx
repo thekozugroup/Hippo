@@ -15,9 +15,10 @@ describe('small components', () => {
     expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
   })
 
-  it('StatusPill always carries a text label', () => {
-    render(<StatusPill status="partial" />)
-    expect(screen.getByText('Partly funded')).toBeInTheDocument()
+  it('StatusPill carries its status as a word, with no dot', () => {
+    const { container } = render(<StatusPill status="partial" />)
+    expect(screen.getByText('Partly covered')).toBeInTheDocument()
+    expect(container.querySelector('.status-pill')?.children).toHaveLength(0)
   })
 
   it('Chip toggles aria-pressed when selectable', async () => {

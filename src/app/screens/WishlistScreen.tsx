@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, SearchX, Tags } from 'lucide-react'
+import { Plus, Tags } from 'lucide-react'
 import {
   Button,
   Chip,
@@ -18,7 +18,7 @@ import {
 import { filterAndSortItems, IMPORTANCE_LEVELS, type Importance, type ItemSort } from '../../core/index.ts'
 import { useCategories, useItems } from '../core/data.ts'
 import { AppScreen } from '../layout/AppScreen.tsx'
-import { IMPORTANCE_LABEL, importanceLevel, plural, safeUrl } from '../lib/format.ts'
+import { IMPORTANCE_LABEL, importanceLevel, safeUrl } from '../lib/format.ts'
 import { CategoriesSheet } from './CategoriesSheet.tsx'
 import './WishlistScreen.css'
 
@@ -62,10 +62,11 @@ export function WishlistScreen() {
       nav="wishlist"
       title="Wishlist"
       busy={allItems === undefined}
-      intro={allItems ? <p>{showArchived ? `${plural(archivedCount, 'archived wish', 'archived wishes')}` : `${plural(activeCount, 'wish', 'wishes')}, private to you`}</p> : null}
-      actions={<IconLink href="#/item/new" variant="frost" aria-label="Add a wish" icon={<Plus />} />}
+      // While the wishlist is empty, the empty state offers the same action, so the icon is left out.
+      actions={activeCount > 0 ? <IconLink href="#/item/new" variant="frost" aria-label="Add a wish" icon={<Plus />} /> : undefined}
     >
-      <section className="app-stack" aria-label="Filter and sort">
+      {(allItems?.length ?? 0) > 0 ? (
+      <section className="app-stack app-stack--tight" aria-label="Filter and sort">
         <div className="app-chips" role="group" aria-label="Category">
           <Chip selected={validCategory === undefined} onClick={() => setCategoryId(undefined)}>
             All categories
@@ -106,6 +107,7 @@ export function WishlistScreen() {
           </div>
         ) : null}
       </section>
+      ) : null}
 
       <section aria-label={showArchived ? 'Archived wishes' : 'Wishes'} aria-live="polite">
         {allItems === undefined ? (
@@ -116,7 +118,6 @@ export function WishlistScreen() {
         ) : shown.length === 0 ? (
           filtered ? (
             <EmptyState
-              icon={<SearchX />}
               title={<TwoTone muted="No matches." bright="Try another filter." />}
               description="Nothing in your wishlist fits this category and importance together."
               action={
@@ -136,7 +137,6 @@ export function WishlistScreen() {
             <p className="app-note">Nothing is archived. Archived wishes stay here but are left off your shared lists.</p>
           ) : (
             <EmptyState
-              icon={<Plus />}
               title={<TwoTone muted="Your wishlist is empty." bright="Add something you would love." />}
               description="Paste a shop link or type a name. You can add details later."
               action={

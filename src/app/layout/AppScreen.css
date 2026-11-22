@@ -12,7 +12,7 @@
 .app-hero {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--space-related);
   color: var(--white);
 }
 
@@ -31,9 +31,9 @@
 .app-hero__intro {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
-  font-size: 15px;
-  line-height: 20px;
+  gap: var(--space-inline);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
   color: color-mix(in srgb, var(--white) 86%, transparent);
   overflow-wrap: anywhere;
 }
@@ -41,7 +41,7 @@
 .app-sheet {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-7);
+  gap: var(--space-section);
   min-width: 0;
 }
 
@@ -49,14 +49,14 @@
 .app-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--space-group);
   min-width: 0;
 }
 .app-stack--tight {
-  gap: var(--sp-2);
+  gap: var(--space-inline);
 }
 .app-stack--loose {
-  gap: var(--sp-6);
+  gap: var(--sp-7);
 }
 
 .app-row {
@@ -69,17 +69,18 @@
 .app-row--nowrap {
   flex-wrap: nowrap;
 }
+/* Paired buttons share the row, each at least as wide as its label; when both labels do not fit
+   (narrow screens, large text) they stack instead of cutting a label short. */
+.app-row--fill > *,
+.app-row--fill > .btn--full {
+  flex: 1 0 auto;
+  width: auto;
+}
 .app-row--end {
   justify-content: flex-end;
 }
 .app-row--between {
   justify-content: space-between;
-}
-
-.app-grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-3);
 }
 
 .app-muted {
@@ -88,22 +89,22 @@
 
 .app-note {
   margin: 0;
-  font-size: 15px;
-  line-height: 20px;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-body);
   color: var(--text-2);
 }
 
 /* Informational banner on the sheet (offline, unpublished, warnings) */
 .app-banner {
   display: flex;
-  gap: var(--sp-3);
+  gap: var(--space-related);
   align-items: flex-start;
-  padding: var(--sp-4);
+  padding: var(--sp-5);
   border-radius: var(--r-tile);
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--hairline);
-  font-size: 15px;
-  line-height: 20px;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-body);
 }
 .app-banner > svg {
   flex: none;
@@ -117,13 +118,13 @@
 .app-banner__body {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--space-inline);
   min-width: 0;
 }
 .app-banner__title {
   margin: 0;
-  font-size: 17px;
-  line-height: 24px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   font-weight: 500;
 }
 
@@ -143,46 +144,27 @@
   flex: none;
 }
 
-/* Numbered how-to steps */
+/* Plain ordered and bulleted lists in running text (how-to steps). */
 .app-steps {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
-  counter-reset: step;
+  gap: var(--space-inline);
+  padding-inline-start: var(--sp-5);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-body);
 }
-.app-steps > li {
-  display: grid;
-  grid-template-columns: 32px 1fr;
-  gap: var(--sp-3);
-  align-items: start;
-  counter-increment: step;
-  font-size: 15px;
-  line-height: 20px;
+ol.app-steps {
+  list-style: decimal;
 }
-.app-steps > li::before {
-  content: counter(step);
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--accent);
-  font-weight: 600;
+ul.app-steps {
+  list-style: disc;
+}
+.app-steps > li::marker {
+  color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
 .app-steps strong {
   font-weight: 600;
-}
-.app-steps--bullets > li {
-  grid-template-columns: 12px 1fr;
-}
-.app-steps--bullets > li::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  margin-top: 7px;
-  background: var(--accent);
 }
 
 /* Code blocks (capture tools) */
@@ -193,8 +175,8 @@
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--hairline);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-caption);
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 160px;
@@ -212,7 +194,7 @@
   border-radius: var(--r-pill);
 }
 .app-details[open] > summary {
-  margin-bottom: var(--sp-2);
+  margin-block-end: var(--space-inline);
 }
 
 .app-text-link {
@@ -224,8 +206,8 @@
 
 .app-section-title {
   margin: 0;
-  font-size: 22px;
-  line-height: 28px;
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
   font-weight: 500;
   letter-spacing: -0.02em;
 }
@@ -235,4 +217,29 @@
   border: 0;
   margin: 0;
   background: var(--hairline);
+}
+
+/* ScreenMessage: what to do after a heading that already says what happened. */
+.screen-message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-group);
+}
+.screen-message__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-related);
+  max-width: 40rem;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+}
+.screen-message__text p {
+  margin: 0;
+}
+.screen-message__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-related);
 }

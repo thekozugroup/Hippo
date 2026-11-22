@@ -8,9 +8,12 @@
   border: 0;
   border-radius: var(--r-pill);
   padding: 0 var(--sp-6);
+  flex-shrink: 0;
+  max-width: 100%;
   font-family: var(--font-sans);
   font-weight: 500;
-  white-space: nowrap;
+  /* One line normally; with large text or a narrow screen the label wraps instead of being cut. */
+  text-align: center;
   text-decoration: none;
   overflow: hidden;
   isolation: isolate;
@@ -56,16 +59,16 @@
 
 .btn__label {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding-block: var(--sp-2);
+  overflow-wrap: anywhere;
 }
 
 /* Primary: blue gradient pill, light glow only along the bottom edge (label stays on blue-600 or darker). */
 .btn--primary {
   color: var(--white);
   background:
-    radial-gradient(55% 38% at 28% 112%, var(--blue-400) 0%, transparent 100%),
-    linear-gradient(100deg, var(--blue-800) 0%, var(--blue-700) 45%, var(--blue-600) 100%);
+    radial-gradient(55% 38% at 28% 112%, var(--primary-glow) 0%, transparent 100%),
+    linear-gradient(100deg, var(--primary-from) 0%, var(--primary-mid) 45%, var(--primary-to) 100%);
 }
 
 .btn--secondary {

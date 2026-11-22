@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { CloudOff, Copy, EyeOff, Gift, Link2Off, LockKeyhole, Share2, UserRound } from 'lucide-react'
+import { CloudOff, Copy, LockKeyhole, Share2, UserRound } from 'lucide-react'
 import { useLocation } from 'wouter'
 import { BottomSheet, Button, Chip, EmptyState, LinkButton, SectionHeader, Skeleton, StatusPill, TwoTone } from '../../../ui/index.ts'
 import {
@@ -15,10 +15,11 @@ import { useCore } from '../../core/context.ts'
 import { useAddGuestLink, useGiverSession, useGiverView, type GiverProblem } from '../../core/giver.ts'
 import { useNotify } from '../../core/notify.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
+import { ScreenMessage } from '../../layout/ScreenMessage.tsx'
 import { appBaseUrl } from '../../lib/capture-tools.ts'
 import { formatEventDate, plural } from '../../lib/format.ts'
 import { ClaimSheet, type SheetRequest } from './ClaimSheet.tsx'
-import { GiverItemCard } from './GiverItemCard.tsx'
+import { GiverItemCard, MyGiftLine } from './GiverItemCard.tsx'
 import { actionErrorMessage, describeRow, itemHeadingId, OFFLINE_SAVED_NOTE, OWNER_HIDDEN_NOTE, requestItemId } from './giverText.ts'
 import './GiverScreen.css'
 
@@ -71,34 +72,34 @@ export function GiverRemovedSection({ view, onRequest }: { view: GiverListView; 
       <SectionHeader title={<span id="giver-removed">{stopped ? 'Your gifts from this list' : 'Taken off the list'}</span>} />
       <p className="app-note">
         {stopped
-          ? 'The owner is no longer sharing this list, or has sent a new link. Here is what you were getting or chipping in on, so you remember what you promised.'
-          : 'The owner took these off the list after you said you would get them or chip in. They are kept here so you remember what you promised.'}
+          ? 'The owner is no longer sharing this list, or has sent a new link. Here is what you promised.'
+          : 'The owner took these off the list after you said you would get them or chip in.'}
       </p>
-      {view.removedItemsWithMyClaims.map((r) => {
-        const title = r.title ?? (stopped ? 'A wish from this list' : 'A removed wish')
-        return (
-          <article key={r.itemId} className="giver-item" aria-labelledby={itemHeadingId(r.itemId)}>
-            <div className="app-row app-row--between">
-              <h3 id={itemHeadingId(r.itemId)} className="giver-item__title" tabIndex={-1}>
-                {title}
-              </h3>
-              <StatusPill status={stopped ? 'draft' : 'removed'} label={stopped ? 'No longer shared' : 'Taken off'} />
-            </div>
-            <ul className="giver-item__rows">
-              {r.myClaims.map((c) => (
-                <li key={c.id} className="giver-row giver-row--mine">
-                  <span className="giver-row__text">{describeRow(claimRowFor(c))}</span>
-                  <span className="giver-row__actions">
-                    <Button variant="ghost" size="md" aria-describedby={itemHeadingId(r.itemId)} onClick={() => onRequest({ mode: 'withdraw', title, claimId: c.id, itemId: r.itemId })}>
+      <div className="giver-items">
+        {view.removedItemsWithMyClaims.map((r) => {
+          const title = r.title ?? (stopped ? 'A wish from this list' : 'A removed wish')
+          const titleId = itemHeadingId(r.itemId)
+          return (
+            <article key={r.itemId} className="giver-item" aria-labelledby={titleId}>
+              <div className="giver-item__main">
+                <h3 id={titleId} className="giver-item__title" tabIndex={-1}>
+                  {title}
+                </h3>
+                <StatusPill status="removed" label={stopped ? 'No longer shared' : 'Taken off'} />
+              </div>
+              <ul className="giver-item__lines" aria-label={`What you did for ${title}`}>
+                {r.myClaims.map((c) => (
+                  <MyGiftLine key={c.id} text={describeRow(claimRowFor(c))}>
+                    <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onRequest({ mode: 'withdraw', title, claimId: c.id, itemId: r.itemId })}>
                       Take back
                     </Button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </article>
-        )
-      })}
+                  </MyGiftLine>
+                ))}
+              </ul>
+            </article>
+          )
+        })}
+      </div>
     </section>
   )
 }
@@ -138,14 +139,14 @@ function InviteOthers({ topic, listName }: { topic: string; listName: string }) 
   return (
     <section className="app-stack" aria-labelledby="giver-invite">
       <SectionHeader title={<span id="giver-invite">Invite others</span>} />
-      <p className="app-note">Send this list to other family and friends so they can help too. Anyone with the link can see the list and who is getting what.</p>
-      <div className="app-row app-row--nowrap">
+      <p className="app-note">Anyone with the link can see the list and who is getting what.</p>
+      <div className="app-row app-row--fill">
         <Button variant="secondary" size="md" fullWidth icon={<Copy />} onClick={() => void copy()}>
           Copy link
         </Button>
         {canShare ? (
           <Button variant="secondary" size="md" fullWidth icon={<Share2 />} onClick={() => void share()}>
-            Share
+            Share link
           </Button>
         ) : null}
       </div>
@@ -247,7 +248,6 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
 
       {view.status === 'live' && !meta ? (
         <EmptyState
-          icon={<Link2Off />}
           title={<TwoTone muted="Nothing here yet." bright="We could not find this list." />}
           description="It may not be shared yet, or the link was replaced with a new one. Ask the person who sent it for the latest link."
         />
@@ -255,7 +255,6 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
 
       {view.status === 'unpublished' ? (
         <EmptyState
-          icon={<EyeOff />}
           title={<TwoTone muted="Sharing stopped." bright="This list is no longer shared." />}
           description="The owner stopped sharing it or made a new link. If you still want to help, ask them for the new link."
         />
@@ -291,9 +290,9 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
 
       {meta && view.status !== 'unpublished' ? <InviteOthers topic={view.topic} listName={meta.name} /> : null}
 
-      <section className="app-stack giver-foot" aria-label="About this list">
+      <section className="app-stack app-stack--tight" aria-label="About this list">
         <p className="app-note giver-privacy">
-          <LockKeyhole aria-hidden="true" size={16} /> {`Who is getting what: ${OWNER_HIDDEN_NOTE}`}
+          <LockKeyhole aria-hidden="true" size={16} /> {OWNER_HIDDEN_NOTE}
         </p>
         <div>
           <Button variant="ghost" size="md" onClick={() => setConfirmForget(true)}>
@@ -311,7 +310,7 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
       >
         <div className="app-stack">
           {myActive.size > 0 ? (
-            <p className="app-banner app-banner--warn" role="note">
+            <p className="app-note" role="note">
               {`You are getting or chipping in on ${plural(myActive.size, 'wish', 'wishes')} here. Removing the list does not take ${myActive.size === 1 ? 'it' : 'them'} back: others will still see ${myActive.size === 1 ? 'it' : 'them'} as taken care of. To take something back, do it before you remove the list, or open the link again later.`}
             </p>
           ) : null}
@@ -348,11 +347,8 @@ function Problem({ problem }: { problem: GiverProblem }) {
   if (problem.kind === 'own-list') {
     return (
       <AppScreen title="This is your own list" compactTitle back="#/lists" backLabel="Lists">
-        <EmptyState
-          icon={<Gift />}
-          title={<TwoTone muted="No peeking!" bright="Hippo keeps gifts a surprise." />}
-          description="You made this list on this device, so Hippo will not show what friends are getting. Send the link to others; they can open it on their own phones."
-          action={
+        <ScreenMessage
+          actions={
             problem.listId ? (
               <LinkButton href={`#/list/${problem.listId}`} variant="primary">
                 Open list settings
@@ -363,7 +359,9 @@ function Problem({ problem }: { problem: GiverProblem }) {
               </LinkButton>
             )
           }
-        />
+        >
+          <p>You made this list on this device, so Hippo will not show what friends are getting. That keeps your gifts a surprise.</p>
+        </ScreenMessage>
       </AppScreen>
     )
   }
@@ -371,36 +369,34 @@ function Problem({ problem }: { problem: GiverProblem }) {
   if (problem.kind === 'invalid-link') {
     return (
       <AppScreen title="This link does not work" compactTitle back="#/" backLabel="Home">
-        <EmptyState
-          icon={<Link2Off />}
-          title={<TwoTone muted="Sorry." bright="This link looks incomplete." />}
-          description="Part of it may have been cut off when it was copied. Ask the person who sent it to send the whole link again."
-          action={
+        <ScreenMessage
+          actions={
             <LinkButton href="#/" variant="secondary">
-              Go to Hippo home
+              Go to home
             </LinkButton>
           }
-        />
+        >
+          <p>Part of it may have been cut off when it was copied. Ask the person who sent it to send the whole link again.</p>
+        </ScreenMessage>
       </AppScreen>
     )
   }
 
   return (
     <AppScreen title="List not available" compactTitle back="#/lists" backLabel="Lists">
-      <EmptyState
-        icon={<Link2Off />}
-        title={<TwoTone muted="Sorry." bright="This list could not be opened." />}
-        description={
-          problem.kind === 'not-found'
-            ? 'It is no longer saved on this device. Open the link you were sent to add it again.'
-            : 'Something went wrong while opening it. Reload the page to try again.'
-        }
-        action={
+      <ScreenMessage
+        actions={
           <LinkButton href="#/lists" variant="secondary">
             Go to lists
           </LinkButton>
         }
-      />
+      >
+        <p>
+          {problem.kind === 'not-found'
+            ? 'It is no longer saved on this device. Open the link you were sent to add it again.'
+            : 'Something went wrong while opening it. Reload the page to try again.'}
+        </p>
+      </ScreenMessage>
     </AppScreen>
   )
 }

@@ -8,7 +8,7 @@ import { moneyText } from '../../lib/format.ts'
 import type { SheetRequest } from './ClaimSheet.tsx'
 
 /** Shown wherever the app talks about what the list owner can see. Hiding is done by the app, not by encryption (PRD 4.5). */
-export const OWNER_HIDDEN_NOTE = 'Hippo hides this from the list owner. Other friends with the link can see it.'
+export const OWNER_HIDDEN_NOTE = 'Hippo hides who is getting what from the list owner. Friends with the link can see it.'
 
 export const OFFLINE_SAVED_NOTE = 'Saved on this device. Hippo keeps trying to send it while this list is open.'
 
@@ -32,36 +32,71 @@ export interface PillState {
   label: string
 }
 
-/** Status pill for a wish card, in the giver vocabulary. */
-export function giverPill(item: ItemPayload, state: ItemState): PillState {
-  const myRows = state.rows.filter((r) => r.mine)
-  if (myRows.some((r) => r.conflict)) return { status: 'conflict', label: 'Not counted' }
+/**
+ * The status pill for a wish card, or null when the wish is still open to givers (available or
+ * partly covered): an ordinary state carries no pill. Names the giver when one person is behind
+ * the state, so a single "is getting this" claim needs no extra line.
+ */
+export function giverStatus(item: ItemPayload, state: ItemState): PillState | null {
+  if (state.rows.some((r) => r.mine && r.conflict)) return { status: 'conflict', label: 'Not counted' }
+  const these = item.quantity > 1 ? 'these' : 'this'
+  const granted = state.rows.filter((r) => r.kind === 'full' && !r.conflict)
+  const allMine = granted.length > 0 && granted.every((r) => r.mine)
+  const one = allMine ? granted[0] : granted.length === 1 ? granted[0] : undefined
   switch (state.status) {
     case 'available':
-      return { status: 'available', label: 'Available' }
     case 'partial':
-      return { status: 'partial', label: state.pledgeCount > 0 ? 'Partly covered' : `${state.remainingQuantity} still wanted` }
+      return null
     case 'funded':
       return { status: 'funded', label: 'Covered' }
     case 'purchased':
-      return { status: 'purchased', label: 'Bought' }
-    case 'claimed': {
-      const granted = state.rows.filter((r) => r.kind === 'full' && !r.conflict)
-      const allMine = granted.length > 0 && granted.every((r) => r.mine)
-      return { status: 'claimed', label: allMine ? (item.quantity > 1 ? "You're getting these" : "You're getting this") : 'Someone is getting this' }
-    }
+      return { status: 'purchased', label: one ? `${whoName(one)} bought ${these}` : 'Bought' }
+    case 'claimed':
+      if (!one) return { status: 'claimed', label: 'All taken care of' }
+      return { status: 'claimed', label: one.mine ? `You're getting ${these}` : `${whoName(one)} is getting ${these}` }
   }
 }
 
-/** Share of the target that is covered, 0..1, or null when funding is not shown. */
-export function fundingProgress(item: ItemPayload, state: ItemState): { value: number; text: string } | null {
+/**
+ * Whether a claim row needs its own line of text. A single full claim is already named by the
+ * status pill, so only pledges (an amount), claims for several, conflicts and claims outside
+ * the counted ones get a line.
+ */
+export function rowNeedsText(row: ClaimRow, item: ItemPayload, state: ItemState): boolean {
+  if (row.kind === 'pledge' || row.conflict || row.currencyMismatch) return true
+  const granted = state.rows.filter((r) => r.kind === 'full' && !r.conflict)
+  return item.quantity > 1 || granted.length > 1
+}
+
+export interface Funding {
+  /** Share of the target that is covered, 0..1. */
+  value: number
+  /** Text alternative for the progressbar: "$50.00 of $200.00 covered". */
+  text: string
+  /** Start of the line under the bar: "$50.00 of $200.00". */
+  covered: string
+  /** End of the line: what is left, or what was pledged beyond the price. */
+  rest: string
+}
+
+/** Funding progress for a wish, or null when funding is not shown. */
+export function fundingProgress(item: ItemPayload, state: ItemState): Funding | null {
   if (!state.target || state.target.amount <= 0) return null
   if (!item.allowContributions && state.pledgeCount === 0) return null
   const remaining = state.remainingAmount ?? 0
   const covered = Math.max(0, state.target.amount - remaining)
+  const currency = state.target.currency
+  const coveredText = `${moneyText({ amount: covered, currency })} of ${moneyText(state.target)}`
   return {
     value: covered / state.target.amount,
-    text: `${moneyText({ amount: covered, currency: state.target.currency })} of ${moneyText(state.target)} covered`,
+    text: `${coveredText} covered`,
+    covered: coveredText,
+    rest:
+      remaining > 0
+        ? `${moneyText({ amount: remaining, currency })} left`
+        : state.surplus > 0
+          ? `${moneyText({ amount: state.surplus, currency })} more than needed`
+          : 'Fully covered',
   }
 }
 

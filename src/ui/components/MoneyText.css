@@ -1,3 +1,5 @@
 .money {
   font-variant-numeric: tabular-nums;
+  /* A long amount wraps (320px, large text) instead of running out of its box. */
+  overflow-wrap: anywhere;
 }

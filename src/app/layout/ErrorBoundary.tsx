@@ -1,11 +1,12 @@
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from 'react'
 import { Download, RotateCw } from 'lucide-react'
-import { Button, EmptyState, TwoTone } from '../../ui/index.ts'
+import { Button } from '../../ui/index.ts'
 import { useCore } from '../core/context.ts'
 import { isStorageError } from '../core/storage.ts'
 import { downloadBackup } from '../lib/backup-file.ts'
 import { StorageUnavailableScreen } from '../screens/StorageUnavailableScreen.tsx'
 import { AppScreen } from './AppScreen.tsx'
+import { ScreenMessage } from './ScreenMessage.tsx'
 import { pageTitle } from './titles.ts'
 
 /** Shown when a screen fails to render: reload, or save a backup first. */
@@ -33,11 +34,9 @@ export function RecoveryScreen({ onRetry }: { onRetry?: () => void }) {
 
   return (
     <AppScreen title="Something went wrong">
-      <EmptyState
-        title={<TwoTone muted="Sorry." bright="This screen stopped working." />}
-        description="Your wishes and lists are still saved on this device. Reload Hippo to carry on. If it keeps happening, save a backup first."
-        action={
-          <div className="app-stack">
+      <ScreenMessage
+        actions={
+          <>
             <Button variant="primary" icon={<RotateCw />} onClick={() => window.location.reload()}>
               Reload Hippo
             </Button>
@@ -49,9 +48,11 @@ export function RecoveryScreen({ onRetry }: { onRetry?: () => void }) {
                 Try again
               </Button>
             ) : null}
-          </div>
+          </>
         }
-      />
+      >
+        <p>Your wishes and lists are still saved on this device. Reload Hippo to carry on. If it keeps happening, save a backup first.</p>
+      </ScreenMessage>
       <p className="app-note" role="status">
         {status ?? ''}
       </p>

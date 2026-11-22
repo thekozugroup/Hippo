@@ -19,7 +19,6 @@ import { applyTheme } from '../../core/theme.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { downloadBackup } from '../../lib/backup-file.ts'
 import { appBaseUrl, bookmarkletCode, shortcutScript } from '../../lib/capture-tools.ts'
-import { BackupReminder } from '../BackupReminder.tsx'
 import { plural } from '../../lib/format.ts'
 import { CategoriesSheet } from '../CategoriesSheet.tsx'
 import './SettingsScreen.css'
@@ -143,19 +142,18 @@ function BackupSection() {
         Backup
       </h2>
       <p className="app-note">
-        Everything lives on this device only. Save a backup file to move to a new phone or to restore after losing one.
+        Hippo has no server copy of your wishes. Save a backup file to move to a new phone or to restore after losing one.
         {last ? ` Last backup: ${new Date(last).toLocaleDateString()}.` : ' You have not made a backup yet.'}
       </p>
       <p className="app-note">
         <strong>Keep the file private.</strong> It contains the keys to your shared lists.
       </p>
-      <BackupReminder lastExportAt={last} onSettings />
-      <div className="app-row app-row--nowrap">
+      <div className="app-row app-row--fill">
         <Button variant="secondary" size="md" fullWidth icon={<Download />} loading={exporting} onClick={() => void doExport()}>
-          Export
+          Export backup
         </Button>
         <Button variant="secondary" size="md" fullWidth icon={<Upload />} disabled={busy} onClick={() => fileInput.current?.click()}>
-          Import
+          Import backup
         </Button>
       </div>
       <input
@@ -219,7 +217,7 @@ function CaptureSection() {
         On Android and in Chrome or Edge on a computer, install Hippo (Add to Home screen or Install app), then use the Share button in any shop or browser and pick Hippo.
       </p>
 
-      <div className="app-stack settings-card">
+      <div className="app-stack app-stack--tight">
         <SectionHeader title="Bookmarklet for computers" level={3} />
         <p className="app-note">Drag this button to your bookmarks bar. On a shop page, click the bookmark to open Hippo with the page filled in.</p>
         <div className="app-row">
@@ -243,7 +241,7 @@ function CaptureSection() {
         </p>
       </div>
 
-      <div className="app-stack settings-card">
+      <div className="app-stack app-stack--tight">
         <SectionHeader title="Shortcut for iPhone and iPad" level={3} />
         <ol className="app-steps">
           <li>
@@ -275,7 +273,7 @@ function CaptureSection() {
         <pre className="app-code" tabIndex={0} role="region" aria-label="Shortcut script">
           {script}
         </pre>
-        <div>
+        <div className="settings-after">
           <Button
             variant="secondary"
             size="md"
@@ -350,7 +348,7 @@ function RelaySection() {
         Relays
       </h2>
       <p className="app-note">
-        Shared lists travel through public Nostr relays as encrypted data. Relays cannot read your lists. Changes here apply to lists you create from now on; existing links keep their relays.
+        Shared lists travel as encrypted data through public Nostr relays, which cannot read them. Changes apply to lists you create from now on; existing links keep their relays.
       </p>
       {core.forcedRelays ? (
         <p className="app-banner" role="note">
@@ -367,12 +365,12 @@ function RelaySection() {
         onChange={(e) => setText(e.target.value)}
         {...(error ? { error } : {})}
       />
-      <div className="app-row app-row--nowrap">
+      <div className="app-row app-row--fill">
         <Button variant="secondary" size="md" fullWidth onClick={() => void save()} loading={saving} disabled={text === null}>
           Save relays
         </Button>
         <Button variant="ghost" size="md" fullWidth onClick={() => void reset()} disabled={!settings?.relays && text === null}>
-          Reset
+          Reset to defaults
         </Button>
       </div>
     </section>
@@ -387,22 +385,18 @@ function AboutSection() {
       </h2>
       <ul className="settings-facts">
         <li>No accounts, no tracking, no ads. Hippo is a free, open-source app (MIT licence).</li>
-        <li>Your wishlist is stored only on this device until you share a list.</li>
         <li>Shared lists, and who is getting or chipping in on what, are end-to-end encrypted. The key is in the link, which is never sent to any server.</li>
-        <li>Friends with the link see who is getting what and each other&apos;s nicknames. Hippo hides this from you, the owner, so gifts stay a surprise.</li>
+        <li>Hiding gifts from you, the owner, is done by the Hippo app, not by encryption: Hippo cannot stop you from opening your own link in another browser. Please do not peek.</li>
         <li>Chipping in is a promise between friends. Hippo never handles money.</li>
         <li>The only other requests Hippo makes are for pictures you attach to wishes.</li>
       </ul>
-      <p className="app-note">
-        Hiding gifts from the owner is done by the Hippo app, not by encryption: Hippo cannot stop you from opening your own link in another browser. Please do not peek.
-      </p>
       <div className="app-row">
         <a className="btn btn--secondary btn--md" href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
           <span className="btn__icon" aria-hidden="true">
             <ExternalLink />
           </span>
           <span className="btn__label">
-            Source code<span className="sr-only"> (opens in a new tab)</span>
+            View source code<span className="sr-only"> (opens in a new tab)</span>
           </span>
         </a>
       </div>

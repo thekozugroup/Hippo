@@ -19,9 +19,6 @@
 .section-header__title {
   color: var(--text-2);
 }
-.section-header__title.is-strong {
-  color: var(--text);
-}
 
 .section-header__action {
   display: inline-flex;

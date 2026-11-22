@@ -1,22 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import {
-  ArrowLeft,
-  Bell,
-  Cake,
-  Coffee,
-  Gift,
-  House,
-  ListChecks,
-  Menu,
-  Package,
-  Plus,
-  Search,
-  Settings,
-  Share2,
-  Sparkles,
-  Users,
-} from 'lucide-react'
+import { ArrowLeft, Bell, Gift, House, ListChecks, Menu, Plus, Search, Settings, Share2, Sparkles } from 'lucide-react'
 import { BigValue } from './components/BigValue.tsx'
 import { BottomNav } from './components/BottomNav.tsx'
 import { BottomSheet } from './components/BottomSheet.tsx'
@@ -39,7 +23,6 @@ import { SegmentedControl } from './components/SegmentedControl.tsx'
 import { Select } from './components/Select.tsx'
 import { Sheet } from './components/Sheet.tsx'
 import { Skeleton } from './components/Skeleton.tsx'
-import { StatCard } from './components/StatCard.tsx'
 import { StatusPill } from './components/StatusPill.tsx'
 import type { Status } from './components/StatusPill.tsx'
 import { Switch } from './components/Switch.tsx'
@@ -55,9 +38,6 @@ type Theme = 'light' | 'dark'
 type Show = 'both' | Theme
 
 const STATUSES: ReadonlyArray<Status> = ['available', 'partial', 'funded', 'claimed', 'purchased', 'removed', 'conflict', 'draft', 'published']
-
-const BARS = [0.3, 0.2, 0.45, 0.25, 0.6, 0.35, 0.8, 0.5, 0.9, 0.7, 0.4, 0.55, 0.3, 0.65, 0.45, 0.25, 0.5, 0.35]
-const BARS_2 = [0.2, 0.35, 0.25, 0.5, 0.3, 0.7, 0.45, 0.95, 0.8, 0.9, 0.4, 0.3, 0.55, 0.35, 0.25, 0.45, 0.2, 0.3]
 
 const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: <House /> },
@@ -99,7 +79,6 @@ function ThemeFrame({ theme, children }: { theme: Theme; children: ReactNode }) 
 }
 
 function HomeDemo({ theme, full = false }: { theme: Theme; full?: boolean }) {
-  const dark = theme === 'dark'
   return (
     <Screen
       contained={!full}
@@ -110,7 +89,7 @@ function HomeDemo({ theme, full = false }: { theme: Theme; full?: boolean }) {
           start={<IconButton variant="frost" aria-label="Open menu" icon={<Menu />} />}
           end={
             <>
-              <Chip tone="frost" dot avatar={<Thumb name="Alex" size="xs" shape="round" />} onClick={() => undefined}>
+              <Chip tone="frost" avatar={<Thumb name="Alex" size="xs" shape="round" />} onClick={() => undefined}>
                 Alex M.
               </Chip>
               <IconButton variant="frost" aria-label="Notifications" icon={<Bell />} />
@@ -120,19 +99,18 @@ function HomeDemo({ theme, full = false }: { theme: Theme; full?: boolean }) {
       }
       nav={<BottomNav items={NAV_ITEMS} activeId="home" label={`Main (${theme})`} />}
     >
-      <p className="t-label t-muted">Wishlist</p>
-      <BigValue value="24" secondary=" gifts" />
+      <SectionHeader title="Wishlist" action={{ label: 'See all', href: '#/design' }} />
+      <BigValue value="24" secondary=" wishes" />
       <div className="gx-row gx-row--gap gx-mt">
         <Button variant="primary" icon={<Plus />} fullWidth>
-          Add
+          Add a wish
         </Button>
         <Button variant="secondary" icon={<Share2 />} fullWidth>
-          Share
+          Share a list
         </Button>
       </div>
-      <div className="gx-mt-lg">
-        <SectionHeader title="Recent items" strong action={{ label: 'See all', href: '#/design' }} />
-        <List>
+      <div className="gx-mt">
+        <List aria-label="Recent wishes">
           <ListRow
             leading={<Thumb name="Espresso machine" size="sm" />}
             title="Espresso machine"
@@ -149,58 +127,52 @@ function HomeDemo({ theme, full = false }: { theme: Theme; full?: boolean }) {
           />
         </List>
       </div>
-      <div className="gx-grid-2 gx-mt-lg">
-        <StatCard
-          panel={dark}
-          label="Shared lists"
-          action={<Users />}
-          bars={BARS}
-          highlight={[3, 5]}
-          value="3"
-          caption="2 with claims"
-        />
-        <StatCard
-          panel={dark}
-          label="Funded"
-          action={<Gift />}
-          bars={BARS_2}
-          highlight={[7, 9]}
-          value={<MoneyText money={{ amount: 17320, currency: 'USD' }} muteFraction />}
-          caption="62% of goal"
-        />
-      </div>
     </Screen>
   )
 }
 
+/** A giver's wish cards on the dark field: one surface per wish, a pill only for exceptions, full-width dot progress. */
 function ActivityPanel() {
   const rows = [
-    { icon: <Coffee />, name: 'Espresso machine', status: 'partial' as const, value: 0.6, muted: 'is being funded by 3 friends', bright: 'Maya, Leo and Sam' },
-    { icon: <Package />, name: 'Trail running shoes', status: 'claimed' as const, value: 1, muted: 'claimed by', bright: 'Jordan' },
-    { icon: <Cake />, name: 'Birthday dinner voucher', status: 'available' as const, value: 0.15, muted: 'waiting for', bright: 'a first pledge' },
+    { name: 'Espresso machine', price: 24900, status: null, value: 0.6, covered: '$149.40 of $249.00', rest: '$99.60 left', action: 'Cover the rest' },
+    { name: 'Trail running shoes', price: 13050, status: { status: 'claimed' as const, label: 'Jordan is getting this' }, value: null, covered: '', rest: '', action: null },
+    { name: 'Birthday dinner voucher', price: 8000, status: null, value: null, covered: '', rest: '', action: "I'll get this" },
   ]
   return (
     <div className="gx-dash frost frost--panel">
-      <div className="gx-dash__head">
-        <p className="t-label t-muted">Birthday list</p>
-        <StatusPill status="published" />
-      </div>
+      <SectionHeader title="Birthday list" level={4} />
       <div className="gx-dash__cards">
         {rows.map((r) => (
           <article key={r.name} className="gx-dash__card">
-            <span className="gx-dash__tile" aria-hidden="true">
-              {r.icon}
-            </span>
-            <div className="gx-dash__body">
-              <div className="gx-dash__line">
+            <div className="gx-dash__head">
+              <Thumb name={r.name} size="md" />
+              <div className="gx-dash__body">
                 <h4 className="gx-dash__name">{r.name}</h4>
-                <StatusPill status={r.status} />
+                <p className="t-secondary">
+                  <MoneyText money={{ amount: r.price, currency: 'USD' }} />
+                </p>
+                {r.status ? <StatusPill status={r.status.status} label={r.status.label} /> : null}
               </div>
-              <p className="gx-dash__task">
-                <TwoTone bright={r.bright} muted={r.muted} />
-              </p>
-              <DotProgress label={`Funding for ${r.name}`} value={r.value} columns={14} showValue />
             </div>
+            {r.value !== null ? (
+              <div className="gx-dash__funding">
+                <DotProgress label={`Funding for ${r.name}`} value={r.value} valueText={`${r.covered} covered`} />
+                <p className="gx-dash__line t-secondary t-muted">
+                  <span>{r.covered}</span>
+                  <span>{r.rest}</span>
+                </p>
+              </div>
+            ) : null}
+            {r.action ? (
+              <div className="gx-row">
+                <Button variant="primary" size="md">
+                  {r.action}
+                </Button>
+                <Button variant="ghost" size="md">
+                  Chip in
+                </Button>
+              </div>
+            ) : null}
           </article>
         ))}
       </div>
@@ -225,7 +197,7 @@ function Showcase({ theme }: { theme: Theme }) {
         <HomeDemo theme={theme} />
       </Section>
 
-      <Section title="Dark dashboard panel" note="Always dark. Frost panel with nested cards, status pills, dot progress and two-tone lines.">
+      <Section title="Wish cards on the dark field" note="Always dark. Frost panel holding wish cards: a status pill only for exceptions, full-width dot progress with one line under it.">
         <div className="gx-on-field" data-theme="dark">
           <HeroBackground variant="dark" />
           <div className="gx-on-field__inner">
@@ -372,7 +344,6 @@ function Showcase({ theme }: { theme: Theme }) {
         </div>
         <div className="gx-row">
           <Chip avatar="🎂">Birthday</Chip>
-          <Chip dot>Updates</Chip>
           <Chip avatar={<Thumb name="Maya" size="xs" shape="round" />}>Maya</Chip>
           <Chip href="#/design">Link chip</Chip>
         </div>
@@ -381,12 +352,12 @@ function Showcase({ theme }: { theme: Theme }) {
           <div className="gx-on-hero__inner gx-row">
             <Chip tone="frost" selected onClick={() => undefined}>Selected</Chip>
             <Chip tone="frost" selected={false} onClick={() => undefined}>Idle</Chip>
-            <Chip tone="frost" dot avatar={<Thumb name="Alex" size="xs" shape="round" />}>Alex M.</Chip>
+            <Chip tone="frost" avatar={<Thumb name="Alex" size="xs" shape="round" />}>Alex M.</Chip>
           </div>
         </div>
       </Section>
 
-      <Section title="Status pills" note="Always a text label; the dot shape adds a second cue.">
+      <Section title="Status pills" note="Exceptions only: the word carries the status, the tint is a second cue. An ordinary state shows no pill.">
         <div className="gx-row">
           {STATUSES.map((s) => (
             <StatusPill key={s} status={s} />
@@ -407,13 +378,13 @@ function Showcase({ theme }: { theme: Theme }) {
       </Section>
 
       <Section title="Section header, list rows, thumbs">
-        <SectionHeader title="Transactions" strong action={{ label: 'See all', href: '#/design' }} />
+        <SectionHeader title="Wishes" action={{ label: 'See all', href: '#/design' }} />
         <List>
           <ListRow
             leading={<Thumb name="Espresso machine" />}
             title="Espresso machine"
             secondary={<ImportanceMark level={3} />}
-            trailing={<StatusPill status="available" />}
+            trailing={<MoneyText money={{ amount: 24900, currency: 'USD' }} />}
             href="#/design"
           />
           <ListRow
@@ -426,8 +397,8 @@ function Showcase({ theme }: { theme: Theme }) {
           <ListRow
             leading={<Thumb name="Cast iron pan" shape="round" />}
             title="Cast iron pan"
-            secondary="Claimed by a friend"
-            trailing={<StatusPill status="claimed" />}
+            secondary="Sat, 14 Mar 2027"
+            trailing={<StatusPill status="draft" />}
           />
         </List>
         <div className="gx-row">
@@ -448,17 +419,15 @@ function Showcase({ theme }: { theme: Theme }) {
           <MoneyText money={{ amount: 4900, currency: 'USD' }} compact /> and <MoneyText money={{ amount: 123456, currency: 'JPY' }} /> and{' '}
           <MoneyText money={{ amount: 2550, currency: 'EUR' }} locale="de-DE" />
         </p>
-        <div className="gx-grid-2">
-          <StatCard label="Lists" action={<Users />} bars={BARS} highlight={[2, 4]} value="4" caption="1 draft" />
-          <StatCard label="Pledged" action={<Gift />} bars={BARS_2} highlight={[8, 11]} value={<MoneyText money={{ amount: 31250, currency: 'USD' }} muteFraction />} caption="44.6%" />
-        </div>
       </Section>
 
-      <Section title="Dot progress, importance">
-        <DotProgress label="Funding for Espresso machine" value={0} showValue />
-        <DotProgress label="Funding for Cast iron pan" value={0.35} valueText="$70 of $200" showValue />
-        <DotProgress label="Funding for Camera" value={0.72} showValue />
-        <DotProgress label="Funding for Trail shoes" value={1} showValue />
+      <Section title="Dot progress, importance" note="Dot progress spans its container edge to edge; the screen puts the amounts on one line under it.">
+        <DotProgress label="Funding for Espresso machine" value={0} />
+        <DotProgress label="Funding for Cast iron pan" value={0.35} valueText="$70 of $200" />
+        <div className="gx-narrow">
+          <DotProgress label="Funding for Camera (narrow)" value={0.72} />
+        </div>
+        <DotProgress label="Funding for Trail shoes" value={1} />
         <div className="gx-row">
           <ImportanceMark level={1} />
           <ImportanceMark level={2} />
@@ -532,10 +501,9 @@ function Showcase({ theme }: { theme: Theme }) {
       <Section title="Empty state, skeleton, logo">
         <Sheet className="gx-sheet-sample">
           <EmptyState
-            icon={<Gift />}
-            title={<TwoTone muted="No gifts yet." bright="Add the first thing you would love." />}
-            description="Wishes stay private until you share the list."
-            action={<Button variant="primary" icon={<Plus />}>Add item</Button>}
+            title={<TwoTone muted="No lists yet." bright="Make one for your next occasion." />}
+            description="Pick wishes for a birthday, a wedding or the holidays, then send the link."
+            action={<Button variant="primary" icon={<Plus />}>Make a list</Button>}
           />
         </Sheet>
         <div className="gx-skeletons" aria-busy="true">

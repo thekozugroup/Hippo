@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react'
 import { ExternalLink, TriangleAlert } from 'lucide-react'
 import { Button, DotProgress, ImportanceMark, MoneyText, StatusPill, Thumb } from '../../../ui/index.ts'
 import type { ClaimRow, GiverItemView } from '../../../core/index.ts'
-import { importanceLevel, moneyText, safeUrl } from '../../lib/format.ts'
+import { importanceLevel, safeUrl } from '../../lib/format.ts'
 import type { SheetRequest } from './ClaimSheet.tsx'
-import { describeRow, fundingProgress, giverPill, itemHeadingId } from './giverText.ts'
+import { describeRow, fundingProgress, giverStatus, itemHeadingId, rowNeedsText } from './giverText.ts'
 
 export interface GiverItemCardProps {
   view: GiverItemView
@@ -12,12 +13,36 @@ export interface GiverItemCardProps {
   onMarkPurchased: (row: ClaimRow, purchased: boolean) => void
 }
 
+/**
+ * One of my gifts on a wish: a plain line with its quiet actions, never a box. `text` is null
+ * when the status pill already says the same thing.
+ */
+export function MyGiftLine({ text, pending, children }: { text: string | null; pending?: boolean; children: ReactNode }) {
+  return (
+    <li className="giver-line giver-line--mine">
+      {text ? (
+        <span className="giver-line__text">
+          {text}
+          {pending ? <span className="app-muted"> · not sent yet</span> : null}
+        </span>
+      ) : pending ? (
+        <span className="giver-line__text app-muted">Not sent yet</span>
+      ) : (
+        <span className="sr-only">Your gift</span>
+      )}
+      <span className="giver-line__actions">{children}</span>
+    </li>
+  )
+}
+
+/** A giver's card for one wish: what it is, how much, whether it is still open, then the action. */
 export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchased }: GiverItemCardProps) {
   const { item, state } = view
   const href = safeUrl(item.url)
   const myRows = state.rows.filter((r) => r.mine)
+  const otherRows = state.rows.filter((r) => !r.mine && rowNeedsText(r, item, state))
   const myConflict = myRows.some((r) => r.conflict)
-  const pill = giverPill(item, state)
+  const status = giverStatus(item, state)
   const funding = fundingProgress(item, state)
   const remainingAmount = state.remainingAmount ?? 0
   const contributionsOpen = item.allowContributions && item.price !== undefined
@@ -26,116 +51,127 @@ export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchase
   // "Cover the rest" is a pledge too, so it closes with contributions (the owner switched them off).
   const canCover = contributionsOpen && state.pledgeCount > 0 && remainingAmount > 0
   const closedWithPledges = !item.allowContributions && state.pledgeCount > 0
+  const myPledge = myRows.some((r) => r.kind === 'pledge')
   const titleId = itemHeadingId(item.id)
+  const main = canClaim ? 'claim' : canCover ? 'cover' : canPledge ? 'pledge' : null
 
   return (
     <article className="giver-item" aria-labelledby={titleId}>
       <div className="giver-item__head">
-        <Thumb name={item.title} src={safeUrl(item.imageUrl)} size="lg" />
+        <Thumb name={item.title} src={safeUrl(item.imageUrl)} size="md" />
         <div className="giver-item__main">
           <h3 id={titleId} className="giver-item__title" tabIndex={-1}>
             {item.title}
           </h3>
-          <div className="giver-item__meta">
-            <ImportanceMark level={importanceLevel(item.importance)} />
+          <p className="giver-item__meta">
             {item.price ? (
               <span className="giver-item__price">
                 <MoneyText money={item.price} />
                 {item.quantity > 1 ? <span className="app-muted"> each</span> : null}
               </span>
             ) : null}
-          </div>
+            <ImportanceMark level={importanceLevel(item.importance)} />
+          </p>
+          {status ? <StatusPill status={status.status} label={status.label} className="giver-item__status" /> : null}
         </div>
-        <StatusPill status={pill.status} label={pill.label} className="giver-item__status" />
       </div>
 
-      {item.notes ? <p className="giver-item__notes">{item.notes}</p> : null}
-
-      {href ? (
-        <a className="giver-item__link" href={href} target="_blank" rel="noopener noreferrer">
-          <ExternalLink aria-hidden="true" size={18} />
-          <span>
-            See it at {new URL(href).hostname.replace(/^www\./, '')}
-            <span className="sr-only"> (opens in a new tab)</span>
-          </span>
-        </a>
-      ) : null}
-
-      {item.quantity > 1 ? (
-        <p className="app-note">{state.remainingQuantity === 0 ? `All ${item.quantity} are taken care of.` : `${state.remainingQuantity} of ${item.quantity} still wanted.`}</p>
+      {item.quantity > 1 && state.remainingQuantity > 0 && state.remainingQuantity < item.quantity ? (
+        <p className="giver-item__line">{`${state.remainingQuantity} of ${item.quantity} still wanted`}</p>
       ) : null}
 
       {funding ? (
         <div className="giver-item__funding">
-          <DotProgress label={`Funding for ${item.title}`} value={funding.value} valueText={funding.text} columns={16} showValue />
-          <p className="app-note">{funding.text}</p>
-          {state.surplus > 0 && state.target ? (
-            <p className="app-note">{`${moneyText({ amount: state.surplus, currency: state.target.currency })} more than needed has been pledged.`}</p>
-          ) : null}
-          {closedWithPledges ? (
-            <p className="app-note">
-              {remainingAmount > 0
-                ? 'The list owner has closed this wish to new contributions. If you chipped in, you can still lower your amount or take it back.'
-                : 'This wish is closed to new contributions.'}
-            </p>
-          ) : null}
+          <DotProgress label={`Funding for ${item.title}`} value={funding.value} valueText={funding.text} />
+          <p className="giver-item__funding-line">
+            <span>{funding.covered}</span>
+            <span>{funding.rest}</span>
+          </p>
         </div>
       ) : null}
 
-      {myConflict ? (
-        <div className="app-banner app-banner--warn" role="note">
-          <TriangleAlert aria-hidden="true" />
-          <p>Someone else said they would get this first (or has already bought it), so yours is not counted. No harm done: take yours back and pick something else.</p>
-        </div>
-      ) : null}
-
-      {state.rows.length > 0 ? (
-        <ul className="giver-item__rows" aria-label={`Who is helping with ${item.title}`}>
-          {state.rows.map((row) => (
-            <li key={row.claimId} className={row.mine ? 'giver-row giver-row--mine' : 'giver-row'}>
-              <span className="giver-row__text">
+      {otherRows.length > 0 ? (
+        <ul className="giver-item__lines" aria-label={`Who is helping with ${item.title}`}>
+          {otherRows.map((row) => (
+            <li key={row.claimId} className="giver-line">
+              <span className="giver-line__text">
                 {describeRow(row)}
-                {row.currencyMismatch ? <span className="app-muted"> (different currency, not counted)</span> : null}
-                {row.conflict && !row.mine ? <span className="app-muted"> (too late, not counted)</span> : null}
-                {row.mine && pendingClaimIds.includes(row.claimId) ? <span className="app-muted"> · not sent yet</span> : null}
+                {row.currencyMismatch ? ' (different currency, not counted)' : null}
+                {row.conflict ? ' (too late, not counted)' : null}
               </span>
-              {row.mine ? (
-                <span className="giver-row__actions">
-                  {!row.conflict ? (
-                    <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onMarkPurchased(row, row.status !== 'purchased')}>
-                      {row.status === 'purchased' ? 'Not bought yet' : 'Mark bought'}
-                    </Button>
-                  ) : null}
-                  {!row.conflict ? (
-                    <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onRequest({ mode: 'edit', view, row })}>
-                      Change
-                    </Button>
-                  ) : null}
-                  <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onRequest({ mode: 'withdraw', title: item.title, claimId: row.claimId, itemId: item.id })}>
-                    Take back
-                  </Button>
-                </span>
-              ) : null}
             </li>
           ))}
         </ul>
       ) : null}
 
-      {canClaim || canPledge || canCover ? (
-        <div className="app-row app-row--nowrap giver-item__actions">
-          {canClaim ? (
-            <Button variant="primary" size="md" fullWidth aria-describedby={titleId} onClick={() => onRequest({ mode: 'claim', view })}>
-              I&apos;ll get this
-            </Button>
-          ) : canCover ? (
-            <Button variant="primary" size="md" fullWidth aria-describedby={titleId} onClick={() => onRequest({ mode: 'cover', view })}>
-              Cover the rest
-            </Button>
-          ) : null}
-          {canPledge ? (
-            <Button variant="secondary" size="md" fullWidth aria-describedby={titleId} onClick={() => onRequest({ mode: 'pledge', view })}>
+      {closedWithPledges ? (
+        <p className="giver-item__line">
+          {remainingAmount > 0 && myPledge ? 'Closed to new contributions. You can still lower your amount or take it back.' : 'Closed to new contributions.'}
+        </p>
+      ) : null}
+
+      {myConflict ? (
+        <p className="giver-item__warn" role="note">
+          <TriangleAlert aria-hidden="true" size={18} />
+          <span>Someone else said they would get this first, so yours is not counted. Take yours back and pick something else.</span>
+        </p>
+      ) : null}
+
+      {myRows.length > 0 ? (
+        <ul className="giver-item__lines giver-item__mine" aria-label={`What you did for ${item.title}`}>
+          {myRows.map((row) => (
+            <MyGiftLine
+              key={row.claimId}
+              text={rowNeedsText(row, item, state) ? `${describeRow(row)}${row.conflict ? ' (not counted)' : ''}` : null}
+              pending={pendingClaimIds.includes(row.claimId)}
+            >
+              {!row.conflict ? (
+                <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onMarkPurchased(row, row.status !== 'purchased')}>
+                  {row.status === 'purchased' ? 'Not bought yet' : 'Mark bought'}
+                </Button>
+              ) : null}
+              {!row.conflict ? (
+                <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onRequest({ mode: 'edit', view, row })}>
+                  Change
+                </Button>
+              ) : null}
+              <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onRequest({ mode: 'withdraw', title: item.title, claimId: row.claimId, itemId: item.id })}>
+                Take back
+              </Button>
+            </MyGiftLine>
+          ))}
+        </ul>
+      ) : null}
+
+      {main ? (
+        <div className="giver-item__actions">
+          <Button
+            variant="primary"
+            size="md"
+            aria-describedby={titleId}
+            onClick={() => onRequest({ mode: main, view })}
+          >
+            {main === 'claim' ? "I'll get this" : main === 'cover' ? 'Cover the rest' : 'Chip in'}
+          </Button>
+          {main !== 'pledge' && canPledge ? (
+            <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onRequest({ mode: 'pledge', view })}>
               Chip in
             </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {item.notes || href ? (
+        <div className="giver-item__extra">
+          {item.notes ? <p className="giver-item__notes">{item.notes}</p> : null}
+          {href ? (
+            <a className="giver-item__link" href={href} target="_blank" rel="noopener noreferrer">
+              <ExternalLink aria-hidden="true" size={16} />
+              <span>
+                See it at {new URL(href).hostname.replace(/^www\./, '')}
+                <span className="sr-only"> (opens in a new tab)</span>
+              </span>
+            </a>
           ) : null}
         </div>
       ) : null}

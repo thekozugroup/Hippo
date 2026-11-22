@@ -15,10 +15,10 @@ describe('App shell', () => {
   it('shows the first-run home and adds an item through the form', async () => {
     const user = userEvent.setup()
     render(<App core={testCore()} />)
-    expect(await screen.findByText('Nothing here yet.')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'How it works' })).toBeInTheDocument()
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
 
-    await user.click(screen.getByRole('link', { name: 'Add' }))
+    await user.click(screen.getByRole('link', { name: 'Add a wish' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Add a wish' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add to wishlist' }))
     expect(await screen.findByText('Give this wish a name.')).toBeInTheDocument()

@@ -39,20 +39,15 @@
   line-height: 1;
 }
 
-.chip__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
 .chip--neutral {
   background: var(--surface-2);
   color: var(--text);
 }
 .chip--neutral.is-selected {
-  background: var(--surface-inverse);
-  color: var(--text-inverse);
+  /* Quiet but unmistakable: blue tone plus a ring, so the state is not carried by colour alone. */
+  background: var(--tone-blue-bg);
+  color: var(--tone-blue-fg);
+  box-shadow: inset 0 0 0 1.5px var(--tone-blue-fg);
 }
 
 .chip--frost {
@@ -61,7 +56,7 @@
 }
 .chip--frost.is-selected {
   background: var(--white);
-  color: var(--blue-950);
+  color: var(--ink-on-white);
 }
 
 @media (forced-colors: active) {

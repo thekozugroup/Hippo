@@ -7,8 +7,6 @@ interface ChipCommon {
   children: ReactNode
   /** Avatar or emoji shown before the label (decorative). */
   avatar?: ReactNode
-  /** Show a small trailing dot (for example, "has updates"). */
-  dot?: boolean
   /** `frost` sits on the hero, `neutral` on the sheet. */
   tone?: 'frost' | 'neutral'
 }
@@ -22,7 +20,7 @@ export type ChipProps = ChipCommon &
 
 /** Pill chip: static label, link, button, or selectable filter. Native props and `ref` reach the element. */
 export function Chip(props: ChipProps) {
-  const { children, avatar, dot, tone = 'neutral', className, ...rest } = props
+  const { children, avatar, tone = 'neutral', className, ...rest } = props
   const interactive = Boolean(rest.href || rest.onClick || (!rest.href && rest.selected !== undefined))
   const cls = cx(
     'chip',
@@ -40,7 +38,6 @@ export function Chip(props: ChipProps) {
         </span>
       ) : null}
       <span className="chip__label">{children}</span>
-      {dot ? <span className="chip__dot" aria-hidden="true" /> : null}
     </>
   )
   if (rest.href !== undefined) {

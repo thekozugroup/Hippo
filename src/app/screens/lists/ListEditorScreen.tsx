@@ -38,7 +38,6 @@ import { requestPersistentStorage } from '../../core/storage.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { appBaseUrl } from '../../lib/capture-tools.ts'
 import { formatEventDate, plural, summariseSync, type SyncSummary } from '../../lib/format.ts'
-import { ListStatusPill } from './ListStatusPill.tsx'
 import { SyncFeedback } from './SyncFeedback.tsx'
 import './ListEditorScreen.css'
 
@@ -93,11 +92,9 @@ function DetailsFields({ value, onChange, errors }: { value: DetailsState; onCha
 function ItemPicker({ items, selected, onToggle }: { items: Item[]; selected: readonly string[]; onToggle: (id: string, on: boolean) => void }) {
   if (items.length === 0) {
     return (
-      <div className="app-banner">
-        <p>
-          Your wishlist is empty. <a className="app-text-link" href="#/item/new">Add a wish</a> first, then come back to put it on this list.
-        </p>
-      </div>
+      <p className="app-note">
+        Your wishlist is empty. <a className="app-text-link" href="#/item/new">Add a wish</a> first, then come back to put it on this list.
+      </p>
     )
   }
   return (
@@ -197,13 +194,13 @@ function ShareLinkBox({ list }: { list: SharedList }) {
         hint="Anyone with this link can see the list, say they will get a wish or chip in. Send it only to people you trust."
         data-testid="share-link"
       />
-      <div className="app-row app-row--nowrap">
+      <div className="app-row app-row--fill">
         <Button variant="primary" size="md" fullWidth icon={<Copy />} onClick={() => void copy()}>
           Copy link
         </Button>
         {canShare ? (
           <Button variant="secondary" size="md" fullWidth icon={<Share2 />} onClick={() => void share()}>
-            Share
+            Share link
           </Button>
         ) : null}
       </div>
@@ -346,18 +343,15 @@ function ListEditor({ list }: { list: SharedList }) {
   return (
     <div className="app-sheet list-editor">
       <section className="app-stack" aria-labelledby="share-title">
-        <div className="app-row app-row--between">
-          <h2 id="share-title" className="app-section-title">
-            Sharing
-          </h2>
-          <ListStatusPill list={list} />
-        </div>
+        <h2 id="share-title" className="app-section-title">
+          Sharing
+        </h2>
         {list.status === 'draft' ? (
           <>
             <p className="app-note">
               {liveCount === 0
-                ? 'Add some wishes below, then share. Friends get a private link; no account needed.'
-                : `Ready to share ${plural(liveCount, 'wish', 'wishes')}. Friends get a private link; no account needed.`}
+                ? 'Not shared yet. Add some wishes below, then share. Friends get a private link and need no account.'
+                : `Not shared yet. Friends get a private link to ${plural(liveCount, 'wish', 'wishes')} and need no account.`}
             </p>
             <Button variant="primary" fullWidth icon={<Send />} loading={busy === 'publish'} onClick={() => void publish()}>
               Share list
@@ -518,7 +512,7 @@ export function ListEditorScreen({ id }: { id?: string }) {
     <AppScreen
       title={list ? list.name : 'List'}
       compactTitle
-      intro={list ? <p>{[list.eventDate ? formatEventDate(list.eventDate) : null, 'Only you see this page'].filter(Boolean).join(' · ')}</p> : null}
+      intro={list?.eventDate ? <p>{formatEventDate(list.eventDate)}</p> : null}
       back="#/lists"
       backLabel="Back to lists"
       busy={list === undefined}

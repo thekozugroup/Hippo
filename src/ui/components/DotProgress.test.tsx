@@ -31,9 +31,16 @@ describe('DotProgress', () => {
     expect(container.querySelectorAll('.dot-progress__dot.is-on')).toHaveLength(10)
   })
 
-  it('hides the dots and the visual percentage from assistive tech', () => {
-    const { container } = render(<DotProgress label="p" value={0.5} showValue />)
+  it('hides the dots from assistive tech and shows no percentage beside the bar', () => {
+    const { container } = render(<DotProgress label="p" value={0.5} />)
     expect(container.querySelector('.dot-progress__dot')).toHaveAttribute('aria-hidden', 'true')
-    expect(container.querySelector('.dot-progress__value')).toHaveAttribute('aria-hidden', 'true')
+    expect(container.textContent).toBe('')
+  })
+
+  it('never shows a nearly complete bar as full, or a small start as empty', () => {
+    const { container, rerender } = render(<DotProgress label="p" value={0.99} columns={10} />)
+    expect(container.querySelectorAll('.dot-progress__dot.is-on')).toHaveLength(18)
+    rerender(<DotProgress label="p" value={0.01} columns={10} />)
+    expect(container.querySelectorAll('.dot-progress__dot.is-on')).toHaveLength(2)
   })
 })

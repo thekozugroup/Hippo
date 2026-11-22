@@ -362,9 +362,7 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
               )
             })}
           </div>
-        ) : (
-          <p className="app-note">No categories yet. Add one below.</p>
-        )}
+        ) : null}
         <div className="item-form__newcat">
           <TextField
             label="New category"
@@ -381,7 +379,7 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
             {...(newCatError ? { error: newCatError } : {})}
           />
           <Button variant="secondary" size="md" icon={<Plus />} loading={addingCat} onClick={() => void addCategory()}>
-            Add
+            Add category
           </Button>
         </div>
       </fieldset>
@@ -421,7 +419,7 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
           value={f.imageUrl}
           maxLength={LIMITS.url}
           onChange={(e) => set('imageUrl', e.target.value)}
-          hint="Optional. A link to a product photo."
+          hint="Optional. Shown instead of the letter tile."
           {...err('imageUrl')}
         />
         <Thumb name={f.title || '?'} src={safeUrl(f.imageUrl.trim())} size="lg" />
@@ -438,7 +436,7 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
           {item ? 'Save changes' : 'Add to wishlist'}
         </Button>
         {item ? (
-          <div className="app-row app-row--nowrap">
+          <div className="app-row app-row--fill">
             <Button
               variant="secondary"
               size="md"
@@ -448,10 +446,10 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
               disabled={busy === 'delete'}
               onClick={() => void toggleArchive()}
             >
-              {item.archivedAt === undefined ? 'Archive' : 'Unarchive'}
+              {item.archivedAt === undefined ? 'Archive wish' : 'Unarchive wish'}
             </Button>
             <Button variant="danger" size="md" fullWidth icon={<Trash2 />} disabled={busy !== null} onClick={() => setConfirmDelete(true)}>
-              Delete
+              Delete wish
             </Button>
           </div>
         ) : null}
@@ -466,7 +464,7 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
         >
           <div className="app-stack">
             <Button variant="danger" fullWidth loading={busy === 'delete'} onClick={() => void remove()}>
-              Delete
+              Delete wish
             </Button>
             <Button variant="secondary" fullWidth onClick={() => setConfirmDelete(false)}>
               Keep it

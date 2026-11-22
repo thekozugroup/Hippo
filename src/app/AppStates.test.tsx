@@ -42,8 +42,8 @@ describe('owner list editor sharing state', () => {
     window.location.hash = `#/list/${list.id}`
     render(<App core={core} />)
     expect(await screen.findByRole('textbox', { name: 'Share link' })).toBeInTheDocument()
-    expect(screen.getByText('Shared')).toBeInTheDocument()
-    expect(screen.queryByText('Not shared yet')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeInTheDocument()
+    expect(screen.queryByText('Not shared yet', { exact: false })).toBeNull()
   })
 })
 

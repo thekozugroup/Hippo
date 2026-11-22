@@ -20,9 +20,10 @@ try {
   ;({ chromium } = require('playwright-core'))
 }
 
-const BLUE_600 = '#2A5BD0'
-const BLUE_700 = '#1B3FA8'
-const BLUE_800 = '#12297A'
+// Tailwind blue-700, blue-800 and blue-900, as in src/ui/styles/tokens.css.
+const BLUE_700 = '#1D4ED8'
+const BLUE_800 = '#1E40AF'
+const BLUE_900 = '#1E3A8A'
 
 /** The 48x48 glyph: white head with eyes and nostrils in the hero blue. */
 const GLYPH = `
@@ -33,7 +34,7 @@ const GLYPH = `
     <circle cx="32.5" cy="14.5" r="6.2"/>
     <path d="M5 28c0-8 8-14 19-14s19 6 19 14v4c0 7-8 11-19 11S5 39 5 32z"/>
   </g>
-  <g fill="${BLUE_700}">
+  <g fill="${BLUE_800}">
     <circle cx="15.5" cy="14.5" r="2.4"/>
     <circle cx="32.5" cy="14.5" r="2.4"/>
     <ellipse cx="17.5" cy="31" rx="2.6" ry="3.2"/>
@@ -53,8 +54,8 @@ function svg(size, o) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${size}" height="${size}">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="${BLUE_600}"/>
-      <stop offset="1" stop-color="${BLUE_800}"/>
+      <stop offset="0" stop-color="${BLUE_700}"/>
+      <stop offset="1" stop-color="${BLUE_900}"/>
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="${o.radius * 64}" fill="url(#bg)"/>

@@ -15,28 +15,30 @@ export type Status =
 
 const LABELS: Record<Status, string> = {
   available: 'Available',
-  partial: 'Partly funded',
-  funded: 'Funded',
-  claimed: 'Claimed',
-  purchased: 'Purchased',
+  partial: 'Partly covered',
+  funded: 'Covered',
+  claimed: 'Someone is getting this',
+  purchased: 'Bought',
   removed: 'Removed',
-  conflict: 'Conflict',
-  draft: 'Draft',
-  published: 'Published',
+  conflict: 'Not counted',
+  draft: 'Not shared yet',
+  published: 'Shared',
 }
 
 export interface StatusPillProps extends Omit<ComponentPropsWithRef<'span'>, 'children'> {
-  /** Which state to show. */
+  /** Which state to show; picks the tint. */
   status: Status
-  /** Overrides the default text label (colour is never the only signal). */
+  /** Overrides the default text label. The word carries the status; the tint is a second cue. */
   label?: string
 }
 
-/** Small status pill with a dot glyph and a text label. */
+/**
+ * Small tinted pill with a status word. Use it for exceptions only: an ordinary state is plain
+ * text or nothing at all.
+ */
 export function StatusPill({ status, label, className, ...rest }: StatusPillProps) {
   return (
     <span {...rest} className={cx('status-pill', `status-pill--${status}`, className)}>
-      <span className="status-pill__dot" aria-hidden="true" />
       {label ?? LABELS[status]}
     </span>
   )

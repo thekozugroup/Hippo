@@ -8,7 +8,7 @@
 .item-form__group {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--space-related);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -16,7 +16,7 @@
 }
 .item-form__group > legend {
   padding: 0;
-  margin-bottom: var(--sp-3);
+  margin-block-end: var(--space-related);
 }
 
 .item-form__newcat {
@@ -26,8 +26,8 @@
   align-items: start;
 }
 .item-form__newcat > .btn {
-  /* Line up with the 56px field under its 24px label row. */
-  margin-top: calc(16px + var(--sp-2) + 4px);
+  /* Line up the 48px button with the 56px field under its label row. */
+  margin-block-start: calc(var(--lh-label) + var(--sp-2) + var(--sp-1));
 }
 
 .item-form__image {
@@ -37,11 +37,11 @@
   align-items: start;
 }
 .item-form__image > .thumb {
-  margin-top: calc(16px + var(--sp-2));
+  margin-block-start: calc(var(--lh-label) + var(--sp-2));
 }
 
 .item-form__actions {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--space-group);
 }

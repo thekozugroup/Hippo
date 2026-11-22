@@ -40,7 +40,7 @@ function sheetDescription(r: SheetRequest): string {
     case 'withdraw':
       return `${r.title}. Others will see it as available again.`
     case 'nickname':
-      return 'Other friends with the link see it next to the wishes you are getting or chipping in on. Hippo hides it from the list owner.'
+      return 'Friends with the link see it next to the wishes you are getting or chipping in on.'
   }
 }
 
@@ -150,9 +150,7 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
             hint={`${maxQty} still wanted.`}
             {...(error ? { error } : {})}
           />
-        ) : (
-          <p className="app-note">Other friends with the link will see that you are getting this. Hippo hides it from the list owner.</p>
-        )
+        ) : null
       ) : null}
 
       {request.mode === 'pledge' && price ? (
@@ -169,7 +167,7 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
 
       {request.mode === 'cover' && state?.remainingAmount !== undefined && price ? (
         <p className="app-note">
-          {`Others have already chipped in. You will cover the remaining ${moneyText({ amount: state.remainingAmount, currency: price.currency })}.`}
+          {`You will cover the remaining ${moneyText({ amount: state.remainingAmount, currency: price.currency })}.`}
         </p>
       ) : null}
 

@@ -95,13 +95,8 @@
 .gx-mt {
   margin-top: var(--sp-5);
 }
-.gx-mt-lg {
-  margin-top: var(--sp-7);
-}
-.gx-grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-3);
+.gx-narrow {
+  max-width: 200px;
 }
 
 .gx-swatches {
@@ -231,68 +226,57 @@
   gap: var(--sp-2);
 }
 
-/* Dark dashboard panel (reference: nested cards inside a large frosted panel) */
+/* Wish cards on the dark field: one frost panel, one surface per wish, plain lines inside. */
 .gx-dash {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
-  padding: var(--sp-4);
+  gap: var(--space-group);
+  padding: var(--space-card);
   border-radius: var(--r-sheet);
   color: var(--text);
-}
-.gx-dash__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--sp-2) var(--sp-2) 0;
 }
 .gx-dash__cards {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--space-card);
 }
 .gx-dash__card {
   display: flex;
-  gap: var(--sp-3);
-  padding: var(--sp-4);
+  flex-direction: column;
+  gap: var(--space-group);
+  padding: var(--space-card);
   border-radius: var(--r-card);
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--hairline);
 }
-.gx-dash__tile {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--r-thumb);
-  background: var(--surface-3);
-  color: var(--text);
+.gx-dash__head {
+  display: flex;
+  gap: var(--sp-4);
 }
 .gx-dash__body {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  align-items: flex-start;
+  gap: var(--sp-1);
   flex: 1;
   min-width: 0;
+}
+.gx-dash__funding {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-related);
 }
 .gx-dash__line {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   justify-content: space-between;
-  gap: var(--sp-2);
+  gap: 0 var(--space-related);
 }
 .gx-dash__name {
   margin: 0;
-  font-size: 17px;
-  line-height: 24px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   font-weight: 500;
   letter-spacing: -0.01em;
   min-width: 0;
-}
-.gx-dash__task {
-  margin: 0;
-  font-size: 15px;
-  line-height: 20px;
 }

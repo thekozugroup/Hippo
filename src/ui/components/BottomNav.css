@@ -53,7 +53,7 @@
   height: var(--h-md);
   border-radius: 50%;
   background: var(--white);
-  color: var(--blue-950);
+  color: var(--ink-on-white);
   box-shadow: 0 0 0 1px var(--hairline);
 }
 

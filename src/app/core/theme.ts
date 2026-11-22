@@ -7,7 +7,7 @@ import type { Theme } from '../../core/index.ts'
 const STORAGE_KEY = 'hippo:theme'
 
 /** Hero-top colours, used for the browser UI colour. */
-const THEME_COLOR = { light: '#12297a', dark: '#060a18' } as const
+const THEME_COLOR = { light: '#1e3a8a', dark: '#020617' } as const
 
 export function readStoredTheme(): Theme {
   try {

@@ -9,15 +9,16 @@
 .giver-items {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--space-card);
 }
 
+/* One surface per wish: everything inside is plain lines separated by space or a hairline. */
 .giver-item {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--space-group);
   min-width: 0;
-  padding: var(--sp-4);
+  padding: var(--space-card);
   border-radius: var(--r-card);
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--hairline);
@@ -26,32 +27,21 @@
 .giver-item__head {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas:
-    'thumb main'
-    'thumb status';
-  column-gap: var(--sp-3);
-  row-gap: var(--sp-2);
+  column-gap: var(--sp-4);
   align-items: start;
 }
-.giver-item__head > .thumb {
-  grid-area: thumb;
-}
 .giver-item__main {
-  grid-area: main;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--sp-1);
   min-width: 0;
-}
-.giver-item__status {
-  grid-area: status;
-  justify-self: start;
 }
 
 .giver-item__title {
   margin: 0;
-  font-size: 17px;
-  line-height: 24px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   font-weight: 500;
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
@@ -62,23 +52,119 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-1) var(--sp-3);
-  font-size: 15px;
-  line-height: 20px;
+  margin: 0;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-body);
 }
 .giver-item__price {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
+.giver-item__status {
+  margin-block-start: var(--sp-1);
+}
 
+.giver-item__line,
+.giver-item__funding-line {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.giver-item__funding {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-related);
+}
+/* Covered amount at the start, what is left at the end. */
+.giver-item__funding-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 var(--space-related);
+}
+
+.giver-item__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.giver-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--sp-2);
+  min-height: var(--h-min);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+}
+.giver-line__text {
+  flex: 1 1 10rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.giver-line--mine {
+  color: var(--text);
+}
+.giver-line__actions {
+  display: flex;
+  flex-wrap: wrap;
+  /* Ghost buttons line their text up with the card edge. */
+  margin-inline: calc(-1 * var(--sp-3));
+}
+.giver-line__actions .btn {
+  padding-inline: var(--sp-3);
+}
+
+/* What I did: set apart from the rest of the card by a hairline, not a box. */
+.giver-item__mine {
+  padding-block-start: var(--space-related);
+  border-block-start: 1px solid var(--hairline);
+}
+
+.giver-item__warn {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+  margin: 0;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-body);
+}
+.giver-item__warn svg {
+  flex: none;
+  margin-block-start: var(--sp-1);
+  color: var(--tone-amber-fg);
+}
+
+.giver-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.giver-item__actions > .btn--primary {
+  flex: 1;
+}
+
+.giver-item__extra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
 .giver-item__notes {
   margin: 0;
-  font-size: 15px;
-  line-height: 20px;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-body);
   color: var(--text-2);
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
-
 .giver-item__link {
   display: inline-flex;
   align-items: center;
@@ -87,62 +173,14 @@
   min-height: var(--h-min);
   color: var(--accent);
   font-weight: 500;
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   overflow-wrap: anywhere;
 }
 .giver-item__link svg {
   flex: none;
 }
 
-.giver-item__funding {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-
-.giver-item__rows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.giver-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-1) var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-tile);
-  background: var(--surface);
-  font-size: 15px;
-  line-height: 20px;
-}
-.giver-row--mine {
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-.giver-row__text {
-  flex: 1 1 160px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.giver-row__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  margin-inline: calc(-1 * var(--sp-3));
-}
-.giver-row__actions .btn {
-  padding-inline: var(--sp-3);
-}
-
-.giver-item__actions {
-  margin-top: var(--sp-1);
-}
-
-.giver-foot {
-  gap: var(--sp-2);
-}
+/* Footer: one fact and one quiet action. */
 .giver-privacy {
   display: flex;
   gap: var(--sp-2);
@@ -150,7 +188,7 @@
 }
 .giver-privacy svg {
   flex: none;
-  margin-top: 2px;
+  margin-block-start: var(--sp-1);
 }
 
 .giver-item__title:focus,

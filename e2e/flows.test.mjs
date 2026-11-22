@@ -52,7 +52,7 @@ export async function addItem(page, baseUrl, { title, price, qty, love, contrib,
   if (love) await page.getByRole('radio', { name: 'Would love' }).check()
   if (newCategory) {
     await page.getByRole('textbox', { name: 'New category' }).fill(newCategory)
-    await page.getByRole('button', { name: 'Add', exact: true }).click()
+    await page.getByRole('button', { name: 'Add category', exact: true }).click()
     await page.getByRole('button', { name: newCategory, pressed: true }).waitFor()
   }
   if (contrib) await page.getByRole('switch', { name: 'Let friends chip in' }).check()
@@ -68,8 +68,8 @@ test('first run: empty home explains what to do, with the strict CSP in place', 
   const { page } = owner
   await page.goto(baseUrl)
   await page.getByRole('heading', { level: 1 }).waitFor()
-  await page.getByText('Nothing here yet.').waitFor()
-  await page.getByRole('heading', { name: 'How Hippo works' }).waitFor()
+  await page.getByRole('heading', { name: 'How it works' }).waitFor()
+  await page.getByRole('link', { name: 'Add a wish' }).waitFor()
   const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
   assert.match(csp ?? '', /script-src 'self';/)
   assert.doesNotMatch(csp ?? '', /unsafe-inline|unsafe-eval/)
@@ -86,7 +86,7 @@ test('add categories and items; filter and sort the wishlist', async ({ baseUrl,
   await page.getByRole('button', { name: 'Edit categories' }).click()
   const sheet = page.getByRole('dialog', { name: 'Categories' })
   await sheet.getByRole('textbox', { name: 'New category' }).fill('Games')
-  await sheet.getByRole('button', { name: 'Add', exact: true }).click()
+  await sheet.getByRole('button', { name: 'Add category', exact: true }).click()
   await sheet.getByRole('textbox', { name: 'Category 2' }).waitFor()
   await sheet.getByRole('button', { name: 'Close' }).click()
   await sheet.waitFor({ state: 'hidden' })
@@ -156,12 +156,14 @@ test('a third person sees the claim, the pledge and the nickname', async ({ brow
   const { page } = third
   await page.goto(state.link)
   await card(page, 'Wool socks').getByText('Maya is getting 2 of these').waitFor()
-  await card(page, 'Wool socks').getByText('1 of 3 still wanted.').waitFor()
+  await card(page, 'Wool socks').getByText('1 of 3 still wanted').waitFor()
   await card(page, 'Espresso machine').getByText('Maya chipped in $50.00').waitFor()
-  await card(page, 'Espresso machine').getByText('Partly covered').waitFor()
+  await card(page, 'Espresso machine').getByText('$199.00 left').waitFor()
   const progress = card(page, 'Espresso machine').getByRole('progressbar')
   assert.equal(await progress.getAttribute('aria-valuetext'), '$50.00 of $249.00 covered')
-  await card(page, 'Board game night').getByText('Available').waitFor()
+  // An ordinary available wish carries no status pill, only its action.
+  await card(page, 'Board game night').getByRole('button', { name: "I'll get this" }).waitFor()
+  assert.equal(await card(page, 'Board game night').locator('.status-pill').count(), 0)
   // Lists shared with me (FR-24)
   await page.goto(state.link.replace(/#.*$/, '#/lists'))
   await page.getByRole('link', { name: /Birthday 2027/ }).waitFor()
@@ -327,7 +329,7 @@ test('share target and deep link prefill the Add form; hostile values are droppe
 
   // FR-7: pasting a link suggests a name.
   await page.goto(baseUrl + '#/')
-  await page.getByRole('link', { name: 'Add', exact: true }).click()
+  await page.getByRole('link', { name: 'Add a wish', exact: true }).click()
   await page.getByRole('textbox', { name: 'Shop link' }).fill('https://shop.example/products/linen-duvet-cover')
   await page.getByRole('textbox', { name: 'Shop link' }).blur()
   assert.equal(await page.getByRole('textbox', { name: 'Name' }).inputValue(), 'Linen duvet cover')

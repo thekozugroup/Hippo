@@ -1,25 +1,47 @@
-/* Hippo design tokens. Components use these only; no raw colours in component CSS. */
+/* Hippo design tokens. Components use the semantic tokens only; no raw colours in component CSS.
+   Primitive colours are taken from the Tailwind CSS colour scales (v3 hex values), named after
+   their scale and step. Only the steps Hippo uses are declared. */
 
 :root {
-  /* Blue ramp */
-  --blue-950: #060a18;
-  --blue-900: #0a1230;
-  --blue-800: #12297a;
-  --blue-700: #1b3fa8;
-  --blue-600: #2a5bd0;
-  --blue-500: #3f7be0;
-  --blue-400: #6ba3ec;
-  --blue-300: #9cc3f5;
-  --blue-100: #dcebfc;
+  /* Tailwind blue */
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-300: #93c5fd;
+  --blue-400: #60a5fa;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+  --blue-800: #1e40af;
+  --blue-900: #1e3a8a;
+  --blue-950: #172554;
+
+  /* Tailwind slate (cool neutral that sits with blue) */
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-900: #0f172a;
+  --slate-950: #020617;
+
+  /* Tailwind emerald, amber, rose: only for success, attention and destructive states */
+  --emerald-100: #d1fae5;
+  --emerald-200: #a7f3d0;
+  --emerald-300: #6ee7b7;
+  --emerald-400: #34d399;
+  --emerald-700: #047857;
+  --emerald-800: #065f46;
+  --amber-100: #fef3c7;
+  --amber-200: #fde68a;
+  --amber-400: #fbbf24;
+  --amber-800: #92400e;
+  --rose-300: #fda4af;
+  --rose-700: #be123c;
 
   --white: #ffffff;
   --black: #000000;
-
-  /* Status hues (light-dark() picks the foreground per scheme below) */
-  --amber-700: #8a5a00;
-  --amber-300: #f5c26b;
-  --violet-700: #5b3fb0;
-  --violet-300: #c7b6ff;
 
   /* Type: family and the rem scale. Every role steps down one level below 360px (end of file). */
   --font-sans: 'Inter Variable', system-ui, sans-serif;
@@ -60,6 +82,13 @@
   --sp-8: 40px;
   --sp-9: 56px;
 
+  /* Spacing roles: the same gap means the same thing on every screen. */
+  --space-inline: var(--sp-2); /* inside one line: icon and text, a label and its value */
+  --space-related: var(--sp-3); /* lines that belong to one thing: a title and its meta */
+  --space-group: var(--sp-5); /* items in a group: fields in a form, parts of a card */
+  --space-card: var(--sp-6); /* padding inside a card or banner, and between cards */
+  --space-section: var(--sp-8); /* between sections of a screen */
+
   --gutter: 24px;
   --col-max: 480px;
 
@@ -75,8 +104,8 @@
   --ease-sheet: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* Elevation */
-  --shadow-sheet: 0 -8px 40px color-mix(in srgb, var(--blue-950) 18%, transparent);
-  --shadow-nav: 0 8px 30px color-mix(in srgb, var(--blue-950) 12%, transparent);
+  --shadow-sheet: 0 -8px 40px color-mix(in srgb, var(--slate-950) 18%, transparent);
+  --shadow-nav: 0 8px 30px color-mix(in srgb, var(--slate-950) 12%, transparent);
 
   /* Film grain: inline SVG turbulence, no bitmap file */
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -85,76 +114,85 @@
   /* Hero field. One gradient serves both themes: light-dark() picks the stops from the
      element's colour scheme, so `.hero-bg--dark` (color-scheme: dark) and a pinned
      data-theme both work without a second copy.
-     Light: a diagonal from deep navy (top right) to blue-500 (bottom left). The light end
-     sits well below the text zone, so white text keeps 4.5:1 wherever it lands. A vertical
-     layer then fades every column to the flat fill, so the bottom edge is uniform and
-     there is no seam on wide screens. Dark: flat blue-950 with a soft blue-700 glow. */
-  --hero-fill: light-dark(var(--blue-500), var(--blue-950));
-  --hero-fill-dark: var(--blue-950);
+     Light: a diagonal from blue-900 (top right) through blue-800 and blue-700 to blue-600
+     (bottom left). Every stop keeps white text at 5.1:1 or better. A vertical layer then
+     fades every column to the flat fill, so there is no seam on wide screens.
+     Dark: flat slate-950 with a soft blue-800 glow. */
+  --hero-fill: light-dark(var(--blue-600), var(--slate-950));
+  --hero-fill-dark: var(--slate-950);
   --hero-bg:
-    radial-gradient(ellipse 100% 55% at 30% 30%, light-dark(transparent, color-mix(in srgb, var(--blue-700) 75%, transparent)) 0%, transparent 100%),
+    radial-gradient(ellipse 100% 55% at 30% 30%, light-dark(transparent, color-mix(in srgb, var(--blue-800) 70%, transparent)) 0%, transparent 100%),
     linear-gradient(to bottom, transparent 55%, var(--hero-fill) 100%),
     linear-gradient(
       205deg,
-      light-dark(var(--blue-800), var(--blue-950)) 0%,
-      light-dark(var(--blue-700), var(--blue-950)) 42%,
-      light-dark(var(--blue-600), var(--blue-950)) 76%,
+      light-dark(var(--blue-900), var(--slate-950)) 0%,
+      light-dark(var(--blue-800), var(--slate-950)) 42%,
+      light-dark(var(--blue-700), var(--slate-950)) 76%,
       var(--hero-fill) 100%
     );
 
+  /* Primary button: blue gradient, light glow along the bottom edge (label stays on blue-600 or darker). */
+  --primary-from: var(--blue-800);
+  --primary-mid: var(--blue-700);
+  --primary-to: var(--blue-600);
+  --primary-glow: var(--blue-400);
+  /* Dark ink on a white control placed over the hero (selected frost chip, active nav circle). */
+  --ink-on-white: var(--blue-950);
+
   /* Frost, constant parts. Tints are fixed so text contrast holds on the backdrops
      frost is allowed on (DESIGN.md section 3). */
-  --frost-hero-tint: rgba(8, 16, 48, 0.36);
+  --frost-hero-tint: color-mix(in srgb, var(--blue-950) 36%, transparent);
   --frost-hero-filter: blur(24px) saturate(1.4);
-  --frost-hero-line: rgba(255, 255, 255, 0.14);
-  --frost-hero-solid: var(--blue-800);
+  --frost-hero-line: color-mix(in srgb, var(--white) 14%, transparent);
+  --frost-hero-solid: var(--blue-900);
   --frost-panel-filter: blur(28px) saturate(1.3);
   --frost-bar-filter: blur(28px) saturate(1.5);
-  --frost-scrim-tint: rgba(6, 10, 24, 0.36);
+  --frost-scrim-tint: color-mix(in srgb, var(--slate-950) 36%, transparent);
   --frost-scrim-filter: blur(12px);
-  --frost-scrim-solid: color-mix(in srgb, var(--blue-950) 80%, transparent);
+  --frost-scrim-solid: color-mix(in srgb, var(--slate-950) 80%, transparent);
 
   /* Semantic colours. light-dark() reads the used color-scheme, so this one block serves
      the system theme (color-scheme: light dark) and the data-theme override. */
-  --bg: light-dark(#f7f7f8, var(--blue-950));
-  --surface: light-dark(#ffffff, #0c1226);
-  --surface-2: light-dark(#f6f6f7, rgba(255, 255, 255, 0.05));
-  --surface-3: light-dark(#eeeef0, rgba(255, 255, 255, 0.09));
-  --text: light-dark(#0b0d14, #f4f6fb);
-  --text-2: light-dark(#5f626c, rgba(244, 246, 251, 0.72)); /* AA on surface, surface-2, surface-3 */
-  --text-3: light-dark(#6a6d77, rgba(244, 246, 251, 0.58)); /* AA on surface and surface-2 */
-  --hairline: light-dark(rgba(11, 13, 20, 0.07), rgba(255, 255, 255, 0.09));
-  --control-border: light-dark(#8a8d96, rgba(255, 255, 255, 0.42)); /* 3:1 non-text boundary on surface and surface-2 */
+  --bg: light-dark(var(--slate-50), var(--slate-950));
+  --surface: light-dark(var(--white), var(--slate-900));
+  --surface-2: light-dark(var(--slate-50), color-mix(in srgb, var(--slate-50) 5%, transparent));
+  --surface-3: light-dark(var(--slate-100), color-mix(in srgb, var(--slate-50) 9%, transparent));
+  --text: light-dark(var(--slate-900), var(--slate-50));
+  --text-2: light-dark(var(--slate-600), var(--slate-300)); /* AA on surface, surface-2, surface-3 */
+  --text-3: light-dark(var(--slate-500), var(--slate-400)); /* AA on surface and surface-2 */
+  --hairline: light-dark(color-mix(in srgb, var(--slate-900) 9%, transparent), color-mix(in srgb, var(--slate-50) 10%, transparent));
+  --control-border: light-dark(var(--slate-500), var(--slate-500)); /* 3:1 non-text boundary on surface and surface-2 */
   --accent: light-dark(var(--blue-600), var(--blue-300));
-  --on-accent: light-dark(var(--white), var(--blue-950));
-  --danger: light-dark(#c4314b, #ff8fa3);
-  --success: light-dark(#1e7f5c, #7fe0b8);
+  --on-accent: light-dark(var(--white), var(--slate-950));
+  --danger: light-dark(var(--rose-700), var(--rose-300));
+  --success: light-dark(var(--emerald-700), var(--emerald-300));
   --dot-dim: color-mix(in srgb, var(--text) 17%, transparent);
-  --text-inverse: light-dark(var(--white), var(--blue-950));
+  --text-inverse: light-dark(var(--white), var(--slate-950));
   --surface-inverse: var(--text);
   --overlay-hover: color-mix(in srgb, var(--text) 6%, transparent);
   --focus-ring: var(--accent);
   /* The toast is an inverse surface, so its focus ring is the inverse of the page's. */
   --toast-ring: light-dark(var(--blue-300), var(--blue-700));
 
-  --frost-panel-tint: light-dark(color-mix(in srgb, var(--surface) 90%, transparent), rgba(16, 24, 52, 0.55));
-  --frost-panel-line: light-dark(var(--hairline), rgba(255, 255, 255, 0.14));
-  --frost-panel-solid: light-dark(var(--surface), var(--blue-900));
+  --frost-panel-tint: light-dark(color-mix(in srgb, var(--surface) 90%, transparent), color-mix(in srgb, var(--slate-900) 55%, transparent));
+  --frost-panel-line: light-dark(var(--hairline), color-mix(in srgb, var(--white) 14%, transparent));
+  --frost-panel-solid: light-dark(var(--surface), var(--slate-900));
   --frost-bar-tint: color-mix(in srgb, var(--surface) 72%, transparent);
-  --frost-bar-line: light-dark(var(--hairline), rgba(255, 255, 255, 0.14));
+  --frost-bar-line: light-dark(var(--hairline), color-mix(in srgb, var(--white) 14%, transparent));
   --frost-bar-solid: var(--surface);
   --frost-solid-line: var(--text-2);
 
-  --pill-available: light-dark(#17694a, #7fe0b8);
-  --pill-partial: light-dark(var(--blue-700), var(--blue-300));
-  --pill-funded: light-dark(#14634a, #7fe0b8);
-  --pill-claimed: light-dark(var(--amber-700), var(--amber-300));
-  --pill-purchased: light-dark(var(--violet-700), var(--violet-300));
-  --pill-removed: var(--text-2);
-  --pill-conflict: light-dark(#b02a42, #ff8fa3);
-  --pill-draft: var(--text-2);
-  --pill-published: light-dark(var(--blue-600), var(--blue-300));
-  --pill-tint: 14%;
+  /* Status tones. One recipe per scale: light = scale-100 fill with scale-800 text;
+     dark = scale-400 at 16% over the surface with scale-200 text. Blue and slate carry
+     ordinary information; emerald, amber and rose only success, attention and errors. */
+  --tone-slate-fg: light-dark(var(--slate-700), var(--slate-200));
+  --tone-slate-bg: light-dark(var(--slate-100), color-mix(in srgb, var(--slate-400) 16%, transparent));
+  --tone-blue-fg: light-dark(var(--blue-800), var(--blue-200));
+  --tone-blue-bg: light-dark(var(--blue-100), color-mix(in srgb, var(--blue-400) 16%, transparent));
+  --tone-emerald-fg: light-dark(var(--emerald-800), var(--emerald-200));
+  --tone-emerald-bg: light-dark(var(--emerald-100), color-mix(in srgb, var(--emerald-400) 16%, transparent));
+  --tone-amber-fg: light-dark(var(--amber-800), var(--amber-200));
+  --tone-amber-bg: light-dark(var(--amber-100), color-mix(in srgb, var(--amber-400) 16%, transparent));
 
   /* Follows the system by default; data-theme pins one scheme. */
   color-scheme: light dark;

@@ -9,16 +9,14 @@ export interface SectionHeaderProps extends Omit<ComponentPropsWithRef<'div'>, '
   action?: { label: string; href?: string; onClick?: () => void }
   /** Heading level for the title (default 2). */
   level?: 2 | 3 | 4
-  /** Use the bright text colour instead of the quiet grey label. */
-  strong?: boolean
 }
 
 /** Uppercase label on the left, optional quiet action on the right. */
-export function SectionHeader({ title, action, level = 2, strong, className, ...rest }: SectionHeaderProps) {
+export function SectionHeader({ title, action, level = 2, className, ...rest }: SectionHeaderProps) {
   const Heading = `h${level}` as const
   return (
     <div {...rest} className={cx('section-header', className)}>
-      <Heading className={cx('section-header__title', strong && 'is-strong')}>{title}</Heading>
+      <Heading className="section-header__title">{title}</Heading>
       {action ? (
         action.href ? (
           <a className="section-header__action" href={action.href} onClick={action.onClick}>

@@ -73,7 +73,7 @@ test('keyboard-only: claim a wish and land on its card', async ({ state }) => {
   const submit = dialog.getByRole('button', { name: "I'll get this" })
   assert.ok(await submit.evaluate((el) => el === document.activeElement), 'focus did not move into the sheet')
   await page.keyboard.press('Enter')
-  await card(page, 'Kite').getByText('You are getting this').waitFor()
+  await card(page, 'Kite').getByText("You're getting this").waitFor()
   await page.waitForFunction(() => document.activeElement?.textContent === 'Kite' && document.activeElement.tagName === 'H3')
   await page.getByRole('status').filter({ hasText: 'Thank you!' }).waitFor()
   assertNoProblems(problems)
@@ -143,7 +143,7 @@ test('contributions switched off after a pledge: no new pledges, mine can only g
 
   const { page, problems } = state.r.ann
   const lamp = card(page, 'Reading lamp')
-  await lamp.getByText(/closed this wish to new contributions/).waitFor({ timeout: 15_000 })
+  await lamp.getByText(/Closed to new contributions/).waitFor({ timeout: 15_000 })
   assert.equal(await lamp.getByRole('button', { name: 'Chip in' }).count(), 0)
   assert.equal(await lamp.getByRole('button', { name: 'Cover the rest' }).count(), 0)
   await lamp.getByRole('button', { name: 'Change' }).click()
@@ -189,7 +189,7 @@ test('an owner edit made while the relay is down reaches givers once it is back,
 test('removing a list from this device and opening the link again keeps my gifts mine', async ({ state }) => {
   const { page, problems } = state.r.ann
   await openGiver(page, state.r.link)
-  await card(page, 'Stunt kite').getByText('You are getting this').waitFor()
+  await card(page, 'Stunt kite').getByText("You're getting this").waitFor()
   await page.getByRole('button', { name: 'Remove from this device' }).click()
   const sheet = page.getByRole('dialog', { name: 'Remove this list from this device?' })
   await sheet.getByText(/You are getting or chipping in on 2 wishes here/).waitFor()
@@ -199,7 +199,7 @@ test('removing a list from this device and opening the link again keeps my gifts
 
   await openGiver(page, state.r.link)
   const kite = card(page, 'Stunt kite')
-  await kite.getByText('You are getting this').waitFor()
+  await kite.getByText("You're getting this").waitFor()
   await kite.getByRole('button', { name: 'Take back' }).waitFor()
   await card(page, 'Reading lamp').getByText('You chipped in $10.00').waitFor()
   assertNoProblems(problems.filter(relayNoise))
@@ -224,8 +224,11 @@ test('a new link cuts off the old one and starts clean', async ({ state }) => {
   assert.equal(await page.getByText(/Removed by the owner|A removed wish/).count(), 0)
 
   await openGiver(page, fresh)
-  for (const t of ['Stunt kite', 'Reading lamp', 'Mug']) await card(page, t).getByText('Available').waitFor()
-  assert.equal(await page.getByText('You are getting this').count(), 0)
+  for (const t of ['Stunt kite', 'Reading lamp', 'Mug']) {
+    await card(page, t).getByRole('button', { name: "I'll get this" }).waitFor()
+    assert.equal(await card(page, t).locator('.status-pill, .giver-line').count(), 0, `${t} should start clean`)
+  }
+  assert.equal(await page.getByText(/You are getting this|You're getting this/).count(), 0)
   assertNoProblems(problems.filter(relayNoise))
 })
 

@@ -4,7 +4,7 @@ import { defineConfig, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // Hero-top blue from the design tokens (--blue-800); also the splash colour.
-const THEME_COLOR = '#12297a'
+const THEME_COLOR = '#1e3a8a'
 
 /**
  * Strict Content-Security-Policy for the built app. Only what Hippo needs:

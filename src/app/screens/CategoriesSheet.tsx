@@ -141,7 +141,7 @@ export function CategoriesSheet({ open, onClose }: { open: boolean; onClose: () 
           {...(error ? { error } : {})}
         />
         <Button type="submit" variant="secondary" size="md" loading={adding}>
-          Add
+          Add category
         </Button>
       </form>
       {categories.length === 0 ? (

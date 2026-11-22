@@ -1,14 +1,12 @@
+/* Two rows of 6px dots spanning the full width: the column count fits the width (DotProgress.tsx)
+   and space-between puts the first and last dots on the edges, so there is no trailing gap. */
 .dot-progress {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.dot-progress__dots {
   display: grid;
-  grid-auto-flow: column;
   grid-template-rows: repeat(2, 6px);
-  gap: var(--sp-1);
+  justify-content: space-between;
+  row-gap: var(--sp-1);
+  width: 100%;
+  min-width: 0;
 }
 
 .dot-progress__dot {
@@ -22,13 +20,10 @@
   background: var(--text);
 }
 
-.dot-progress__value {
-  font-size: var(--fs-label);
-  line-height: var(--lh-label);
-  font-weight: 500;
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-  min-width: 3ch;
+@media (prefers-reduced-motion: reduce) {
+  .dot-progress__dot {
+    transition: none;
+  }
 }
 
 @media (forced-colors: active) {
