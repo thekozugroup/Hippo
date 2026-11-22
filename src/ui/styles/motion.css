@@ -14,7 +14,7 @@
    hippo-sheet     the sheet surface: its top edge glides to the new hero height
    hippo-headline  the hero title: slides with the page
    hippo-page      the sheet's content: slides in the direction of travel
-   hippo-nav       the bottom navigation: stays; its indicator moves (BottomNav)
+   hippo-nav       the bottom navigation: stays; its items grow and shrink live (BottomNav)
    hippo-step*     the setup flow: content slides, dots and actions stay */
 
 /* Taps go straight to the new screen while it animates in. */
@@ -93,8 +93,8 @@
   animation: vt-sink var(--dur-exit) var(--ease-in) both;
 }
 
-/* Bottom navigation: between destinations it stays put and BottomNav moves its indicator
-   (the new image is live). It slides away when a screen has no navigation, and back. */
+/* Bottom navigation: between destinations it stays put and BottomNav grows the new item while
+   it shrinks the previous one (the new image is live, so those animations play on the real nav). It slides away when a screen has no navigation, and back. */
 ::view-transition-group(hippo-nav) {
   animation: none;
 }

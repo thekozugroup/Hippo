@@ -102,7 +102,7 @@
   --dur-press: 100ms; /* pressed states */
   --dur: 180ms; /* state changes: a pill appears, a label fades in, a toast leaves */
   --dur-exit: 160ms; /* what leaves goes a little faster than what arrives */
-  --dur-page: 280ms; /* route transitions, the nav indicator, rows moving to a new place */
+  --dur-page: 280ms; /* route transitions, the nav switch, rows moving to a new place */
   --dur-sheet: 320ms; /* sheets and dialogs rising from the bottom */
   --stagger: 18ms; /* delay between dots filling in sequence */
   /* The logo intro on the first setup step: a one-time brand moment, the one exception to the

@@ -13,7 +13,7 @@ export interface DotProgressProps extends Omit<ComponentPropsWithRef<'div'>, 'ch
   value: number
   /** Accessible name, for example "Funding for Espresso machine". */
   label: string
-  /** Text alternative for the value, for example "$120 of $200". Defaults to the percentage. */
+  /** Text alternative for the value, for example "20% covered, $199.00 left". Defaults to the percentage. */
   valueText?: string
   /**
    * Dots per row. By default the bar fits as many columns as its width allows (at least a 4px gap),
