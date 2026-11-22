@@ -9,7 +9,7 @@
   gap: var(--sp-3);
   width: 100%;
   min-height: 64px;
-  padding: var(--sp-2) 0;
+  padding-block: var(--sp-2);
   text-align: start;
   color: inherit;
 }
@@ -35,23 +35,38 @@
   min-width: 0;
 }
 
+/* Wrap to at most --lines lines, then clip; overflow-wrap keeps long unbroken strings inside. */
+.list-row__title,
+.list-row__secondary {
+  --lines: 2;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines);
+  line-clamp: var(--lines);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.list-row[data-lines='1'] .list-row__title,
+.list-row[data-lines='1'] .list-row__secondary {
+  --lines: 1;
+}
+.list-row[data-lines='full'] .list-row__title,
+.list-row[data-lines='full'] .list-row__secondary {
+  display: block;
+  overflow: visible;
+}
+
 .list-row__title {
-  font-size: 17px;
-  line-height: 24px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   font-weight: 500;
   letter-spacing: -0.01em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .list-row__secondary {
-  font-size: 15px;
-  line-height: 20px;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
   color: var(--text-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .list-row__trailing {
@@ -59,7 +74,8 @@
   flex: none;
   align-items: center;
   gap: var(--sp-2);
-  font-size: 17px;
+  max-width: 45%;
+  font-size: var(--fs-body);
   font-weight: 500;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;

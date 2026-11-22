@@ -1,11 +1,11 @@
 .toast-region {
   position: fixed;
   inset-inline: 0;
-  bottom: calc(var(--h-lg) + var(--sp-9) + env(safe-area-inset-bottom));
+  inset-block-end: calc(var(--h-lg) + var(--sp-9) + env(safe-area-inset-bottom));
   z-index: 50;
   display: flex;
   justify-content: center;
-  padding: 0 var(--sp-4);
+  padding-inline: var(--sp-4);
   pointer-events: none;
 }
 
@@ -17,25 +17,23 @@
 }
 
 .toast {
-  --focus-ring: var(--blue-300);
+  --focus-ring: var(--toast-ring);
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
   max-width: min(100%, 420px);
   min-height: var(--h-md);
-  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-5);
+  padding: var(--sp-1);
+  padding-inline-start: var(--sp-5);
   border-radius: var(--r-pill);
   background: var(--surface-inverse);
   color: var(--text-inverse);
   box-shadow: var(--shadow-nav);
-  font-size: 15px;
-  line-height: 20px;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
   font-weight: 500;
   pointer-events: auto;
   animation: toast-in var(--dur-sheet) var(--ease-sheet);
-}
-[data-theme='dark'] .toast {
-  --focus-ring: var(--blue-700);
 }
 
 .toast__message {

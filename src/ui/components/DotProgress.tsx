@@ -1,7 +1,8 @@
+import type { ComponentPropsWithRef } from 'react'
 import { cx } from '../cx.ts'
 import './DotProgress.css'
 
-export interface DotProgressProps {
+export interface DotProgressProps extends Omit<ComponentPropsWithRef<'div'>, 'children' | 'role' | 'aria-label'> {
   /** Progress from 0 to 1. */
   value: number
   /** Accessible name, for example "Funding for Espresso machine". */
@@ -12,21 +13,21 @@ export interface DotProgressProps {
   columns?: number
   /** Show the percentage next to the dots. */
   showValue?: boolean
-  className?: string
 }
 
 /** Two-row dot matrix progress indicator exposed as a progressbar. */
-export function DotProgress({ value, label, valueText, columns = 12, showValue = false, className }: DotProgressProps) {
+export function DotProgress({ value, label, valueText, columns = 12, showValue = false, className, ...rest }: DotProgressProps) {
+  const cols = Number.isInteger(columns) && columns >= 1 ? Math.min(columns, 40) : 12
   const clamped = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0
   const percent = Math.round(clamped * 100)
-  const total = columns * 2
+  const total = cols * 2
   const filled = Math.round(clamped * total)
   const dots = Array.from({ length: total }, (_, i) => {
     // Fill column by column so both rows advance together.
     return { key: i, on: i < filled, col: Math.floor(i / 2), row: i % 2 }
   })
   return (
-    <div className={cx('dot-progress', className)}>
+    <div {...rest} className={cx('dot-progress', className)}>
       <div
         className="dot-progress__dots"
         role="progressbar"
@@ -35,7 +36,7 @@ export function DotProgress({ value, label, valueText, columns = 12, showValue =
         aria-valuemax={100}
         aria-valuenow={percent}
         aria-valuetext={valueText ?? `${percent}%`}
-        style={{ gridTemplateColumns: `repeat(${columns}, 6px)` }}
+        style={{ gridTemplateColumns: `repeat(${cols}, 6px)` }}
       >
         {dots.map((d) => (
           <span

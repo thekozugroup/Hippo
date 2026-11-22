@@ -1,0 +1,56 @@
+/* Print: browsers drop backgrounds by default, so everything that is white-on-blue on screen
+   becomes dark-on-white, and fixed or floating chrome is removed. Selectors carry an `html`
+   prefix so they win over component CSS that loads after this file. */
+
+@media print {
+  :root,
+  [data-theme] {
+    color-scheme: light;
+  }
+
+  html .hero-bg,
+  html .screen__nav,
+  html .toast-region {
+    display: none !important;
+  }
+
+  html .screen {
+    min-height: 0;
+    background: none;
+  }
+
+  html .screen__top,
+  html .top-bar,
+  html .screen__headline,
+  html .btn--primary,
+  html .btn--frost,
+  html .icon-btn--frost,
+  html .chip--frost {
+    color: var(--black);
+  }
+
+  html .frost,
+  html .btn--primary {
+    background: none;
+    box-shadow: inset 0 0 0 1px var(--black);
+  }
+
+  html .two-tone--on-hero .two-tone__muted {
+    color: var(--text-2);
+  }
+  html .two-tone--on-hero .two-tone__bright,
+  html .big-value--on-hero {
+    color: var(--black);
+  }
+
+  html .sheet,
+  html .bottom-sheet {
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  html .list-row,
+  html .stat-card {
+    break-inside: avoid;
+  }
+}

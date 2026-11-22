@@ -1,8 +1,8 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import './TopBar.css'
 
-export interface TopBarProps extends Omit<ComponentPropsWithoutRef<'div'>, 'children'> {
+export interface TopBarProps extends Omit<ComponentPropsWithRef<'div'>, 'children'> {
   /** Leading slot, usually an `IconButton` (menu or back). */
   start?: ReactNode
   /** Trailing slot: profile chip, actions. */

@@ -1,8 +1,8 @@
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { cx } from '../cx.ts'
 import './ListRow.css'
 
-/** Unstyled-list wrapper for `ListRow`s. */
-export function List({ className, ...rest }: ComponentPropsWithoutRef<'ul'>) {
-  return <ul {...rest} className={cx('list', className)} />
+/** Unstyled-list wrapper for `ListRow`s. `role="list"` keeps list semantics where `list-style: none` removes them (Safari). */
+export function List({ className, ...rest }: ComponentPropsWithRef<'ul'>) {
+  return <ul role="list" {...rest} className={cx('list', className)} />
 }

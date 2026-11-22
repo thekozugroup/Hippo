@@ -12,14 +12,26 @@ html {
   background: var(--bg);
 }
 
+/* The floating bottom nav must not hide a focused control (WCAG 2.4.11): leave room for it
+   when the browser scrolls focus into view. */
+html:has(.screen--has-nav) {
+  scroll-padding-block-end: calc(var(--h-lg) + var(--sp-9) + env(safe-area-inset-bottom));
+}
+
+/* Modal bottom sheet open: the page behind does not scroll. */
+body:has(dialog.bottom-sheet[open]) {
+  overflow: hidden;
+}
+
 body {
   margin: 0;
+  min-height: 100vh; /* fallback */
   min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: 17px;
-  line-height: 24px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

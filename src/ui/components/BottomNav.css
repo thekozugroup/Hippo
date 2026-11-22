@@ -1,13 +1,11 @@
 .bottom-nav {
+  --frost-elev: var(--shadow-nav);
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
   max-width: calc(100% - 2 * var(--sp-4));
   padding: var(--sp-2);
   border-radius: var(--r-pill);
-  box-shadow:
-    var(--shadow-nav),
-    inset 0 0 0 1px var(--frost-line);
   color: var(--text);
 }
 
@@ -16,7 +14,9 @@
   align-items: center;
   justify-content: center;
   gap: var(--sp-3);
-  flex: none;
+  /* Items may shrink (never below a circle) so four destinations fit at 320px. */
+  flex: 0 1 auto;
+  min-width: var(--h-md);
   width: var(--h-md);
   height: var(--h-md);
   border-radius: var(--r-pill);
@@ -31,21 +31,24 @@
 .bottom-nav__icon,
 .bottom-nav__icon svg {
   display: inline-flex;
+  flex: none;
   width: 24px;
   height: 24px;
 }
 
 .bottom-nav__item.is-active {
   width: auto;
-  min-width: 132px;
+  min-width: 0;
   justify-content: flex-start;
-  padding: 0 var(--sp-5) 0 0;
+  padding-inline-end: var(--sp-5);
   background: transparent;
+  overflow: hidden;
 }
 
 .bottom-nav__item.is-active .bottom-nav__icon {
   display: inline-grid;
   place-items: center;
+  flex: none;
   width: var(--h-md);
   height: var(--h-md);
   border-radius: 50%;
@@ -55,17 +58,35 @@
 }
 
 .bottom-nav__label {
-  font-size: 15px;
-  line-height: 20px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
   font-weight: 500;
 }
 
 .bottom-nav__dot {
+  flex: none;
   width: 6px;
   height: 6px;
   margin-inline-start: auto;
   border-radius: 50%;
   background: currentColor;
+}
+
+/* Narrow phones: the dot goes, so all four destinations fit in 320px. */
+@media (max-width: 359px) {
+  .bottom-nav {
+    gap: var(--sp-1);
+  }
+  .bottom-nav__dot {
+    display: none;
+  }
+  .bottom-nav__item.is-active {
+    padding-inline-end: var(--sp-3);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

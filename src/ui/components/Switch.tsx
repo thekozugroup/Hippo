@@ -1,9 +1,9 @@
 import { useId } from 'react'
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { cx } from '../cx.ts'
 import './Switch.css'
 
-export interface SwitchProps extends Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'role' | 'id'> {
+export interface SwitchProps extends Omit<ComponentPropsWithRef<'input'>, 'type' | 'role' | 'id'> {
   /** Visible label. */
   label: string
   /** Secondary description under the label. */

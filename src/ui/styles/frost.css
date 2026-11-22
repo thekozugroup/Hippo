@@ -2,13 +2,19 @@
  * Frost ("Android 17 style"): a uniform blur plus a flat, theme-derived tint,
  * one inside hairline. No refraction, no specular highlight, no gradient border.
  * Do not stack frost on frost. Do not animate blur radius.
+ *
+ * Components that add elevation set --frost-elev (a box-shadow) instead of redeclaring
+ * box-shadow, so the hairline and its high-contrast replacement are never lost.
+ * Components must not set their own background on a .frost element.
  */
 
 .frost {
   background-color: var(--frost-tint);
   -webkit-backdrop-filter: var(--frost-filter);
   backdrop-filter: var(--frost-filter);
-  box-shadow: inset 0 0 0 1px var(--frost-line);
+  box-shadow:
+    var(--frost-elev, 0 0 0 0 transparent),
+    inset 0 0 0 var(--frost-line-w, 1px) var(--frost-line);
 }
 
 .frost--on-hero {
@@ -25,6 +31,7 @@
   --frost-filter: var(--frost-panel-filter);
   --frost-line: var(--frost-panel-line);
   --frost-solid: var(--frost-panel-solid);
+  color: var(--text);
 }
 
 .frost--bar {
@@ -41,11 +48,18 @@
   backdrop-filter: var(--frost-scrim-filter);
 }
 
-/* No backdrop-filter support: opaque nearest solid, stronger border. */
+/* On the hero the replacement border is white, on the solid blue-800. */
+.frost--on-hero {
+  --frost-solid-line: var(--white);
+}
+
+/* No backdrop-filter support, reduced transparency, or more contrast: the surface becomes
+   opaque (nearest solid colour) with a stronger 1.5px border on every frost variant. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .frost {
-    background-color: var(--frost-solid);
-    box-shadow: inset 0 0 0 1.5px var(--frost-solid-line);
+    --frost-tint: var(--frost-solid);
+    --frost-line: var(--frost-solid-line);
+    --frost-line-w: 1.5px;
   }
   .frost--scrim,
   .frost-backdrop::backdrop {
@@ -55,13 +69,11 @@
 
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .frost {
-    background-color: var(--frost-solid);
+    --frost-tint: var(--frost-solid);
+    --frost-line: var(--frost-solid-line);
+    --frost-line-w: 1.5px;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-    box-shadow: inset 0 0 0 1.5px var(--frost-solid-line);
-  }
-  .frost--on-hero {
-    --frost-solid-line: var(--white);
   }
   .frost--scrim,
   .frost-backdrop::backdrop {

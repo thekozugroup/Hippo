@@ -1,20 +1,13 @@
 .thumb {
   --thumb-size: 56px;
+  position: relative;
+  display: grid;
+  place-items: center;
   flex: none;
   width: var(--thumb-size);
   height: var(--thumb-size);
-  border-radius: var(--r-thumb);
-  object-fit: cover;
-  background: var(--surface-3);
-}
-.thumb--xs { --thumb-size: 28px; border-radius: 9px; }
-.thumb--sm { --thumb-size: 40px; border-radius: 12px; }
-.thumb--lg { --thumb-size: 72px; border-radius: 18px; }
-.thumb--round { border-radius: 50%; }
-
-.thumb--fallback {
-  display: grid;
-  place-items: center;
+  overflow: hidden;
+  border-radius: calc(var(--thumb-size) * 0.25); /* 14px at the default 56px: --r-thumb */
   background: color-mix(in srgb, var(--accent) 14%, var(--surface));
   color: var(--accent);
   font-size: calc(var(--thumb-size) * 0.4);
@@ -22,4 +15,30 @@
   font-weight: 500;
   letter-spacing: -0.02em;
   user-select: none;
+}
+.thumb--xs { --thumb-size: 28px; }
+.thumb--sm { --thumb-size: 40px; }
+.thumb--lg { --thumb-size: 72px; }
+.thumb--round { border-radius: 50%; }
+
+.thumb__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--surface-3);
+}
+/* Until the image loads, it is transparent so the letter tile shows. */
+.thumb:not(.is-loaded) .thumb__img {
+  opacity: 0;
+}
+.thumb.is-loaded .thumb__letter {
+  visibility: hidden;
+}
+
+@media (forced-colors: active) {
+  .thumb {
+    border: 1px solid CanvasText;
+  }
 }

@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { cx } from '../cx.ts'
 import './SegmentedControl.css'
 
@@ -9,7 +10,7 @@ export interface SegmentedOption<T extends string> {
   label: string
 }
 
-export interface SegmentedControlProps<T extends string> {
+export interface SegmentedControlProps<T extends string> extends Omit<ComponentPropsWithRef<'div'>, 'onChange' | 'children' | 'role' | 'aria-label'> {
   /** Accessible name of the group. */
   label: string
   /** The choices (two to four work best). */
@@ -18,14 +19,13 @@ export interface SegmentedControlProps<T extends string> {
   value: T
   /** Called with the newly selected value. */
   onChange: (value: T) => void
-  className?: string
 }
 
 /** Pill segmented control built on native radio inputs (arrow keys move the selection). */
-export function SegmentedControl<T extends string>({ label, options, value, onChange, className }: SegmentedControlProps<T>) {
+export function SegmentedControl<T extends string>({ label, options, value, onChange, className, ...rest }: SegmentedControlProps<T>) {
   const name = useId()
   return (
-    <div role="radiogroup" aria-label={label} className={cx('segmented', className)}>
+    <div {...rest} role="radiogroup" aria-label={label} className={cx('segmented', className)}>
       {options.map((opt) => (
         <label key={opt.value} className="segmented__option">
           <input

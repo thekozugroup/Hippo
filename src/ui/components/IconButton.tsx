@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import './IconButton.css'
 
@@ -15,9 +15,9 @@ interface IconButtonCommon {
 
 export interface IconButtonProps
   extends IconButtonCommon,
-    Omit<ComponentPropsWithoutRef<'button'>, 'children' | 'aria-label'> {}
+    Omit<ComponentPropsWithRef<'button'>, 'children' | 'aria-label'> {}
 
-export interface IconLinkProps extends IconButtonCommon, Omit<ComponentPropsWithoutRef<'a'>, 'children' | 'aria-label'> {
+export interface IconLinkProps extends IconButtonCommon, Omit<ComponentPropsWithRef<'a'>, 'children' | 'aria-label'> {
   /** Destination; use for navigation (for example a back link). */
   href: string
 }

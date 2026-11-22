@@ -1,8 +1,8 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import './TwoTone.css'
 
-export interface TwoToneProps extends Omit<ComponentPropsWithoutRef<'span'>, 'children'> {
+export interface TwoToneProps extends Omit<ComponentPropsWithRef<'span'>, 'children'> {
   /** Muted words (the setup of the sentence). */
   muted?: ReactNode
   /** Bright words (the emphasis). */

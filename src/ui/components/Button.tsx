@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, MouseEvent, ReactNode } from 'react'
+import type { ComponentPropsWithRef, MouseEvent, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import './Button.css'
 
@@ -20,11 +20,11 @@ interface ButtonCommon {
 
 export interface ButtonProps
   extends ButtonCommon,
-    Omit<ComponentPropsWithoutRef<'button'>, 'children'> {}
+    Omit<ComponentPropsWithRef<'button'>, 'children'> {}
 
 export interface LinkButtonProps
   extends ButtonCommon,
-    Omit<ComponentPropsWithoutRef<'a'>, 'children'> {
+    Omit<ComponentPropsWithRef<'a'>, 'children'> {
   /** Destination. */
   href: string
 }
@@ -86,10 +86,24 @@ export function Button({
   )
 }
 
-/** A link styled as a `Button`. */
-export function LinkButton({ variant, size, icon, loading, fullWidth, children, className, ...rest }: LinkButtonProps) {
+/** A link styled as a `Button`; `loading` behaves as it does on `Button`. */
+export function LinkButton({ variant, size, icon, loading, fullWidth, children, className, onClick, ...rest }: LinkButtonProps) {
+  const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    // Like Button: loading ignores activation but keeps the link focusable.
+    if (loading) {
+      e.preventDefault()
+      return
+    }
+    onClick?.(e)
+  }
   return (
-    <a {...rest} className={classes({ variant, size, loading, fullWidth, children }, className)}>
+    <a
+      {...rest}
+      className={classes({ variant, size, loading, fullWidth, children }, className)}
+      aria-busy={loading || undefined}
+      aria-disabled={loading || undefined}
+      onClick={handleClick}
+    >
       <Inner icon={icon} loading={loading}>
         {children}
       </Inner>

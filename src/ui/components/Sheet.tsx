@@ -1,8 +1,8 @@
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { cx } from '../cx.ts'
 import './Sheet.css'
 
-export interface SheetProps extends ComponentPropsWithoutRef<'div'> {
+export interface SheetProps extends ComponentPropsWithRef<'div'> {
   /** Element to render; use `main` for the page's primary content. */
   as?: 'div' | 'main' | 'section'
 }

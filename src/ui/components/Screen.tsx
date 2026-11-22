@@ -1,13 +1,13 @@
-import type { ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import { HeroBackground } from './HeroBackground.tsx'
 import { Sheet } from './Sheet.tsx'
 import './Screen.css'
 
-export interface ScreenProps {
+export interface ScreenProps extends Omit<ComponentPropsWithRef<'div'>, 'children'> {
   /** Top bar and any hero content; sits on the hero. */
   hero?: ReactNode
-  /** Optional hero headline (use `TwoTone`); keep it short so it stays in the hero's upper region. */
+  /** Optional hero headline (use `TwoTone`); any length is safe: the hero gradient's light end sits below the text zone. */
   headline?: ReactNode
   /** Sheet content. */
   children?: ReactNode
@@ -19,7 +19,6 @@ export interface ScreenProps {
   sheetAs?: 'main' | 'div' | 'section'
   /** Fit its content instead of filling the viewport (used for previews). */
   contained?: boolean
-  className?: string
 }
 
 /** Page layout: hero area on top, sheet rising over it, optional floating nav. */
@@ -32,9 +31,10 @@ export function Screen({
   sheetAs = 'main',
   contained = false,
   className,
+  ...rest
 }: ScreenProps) {
   return (
-    <div className={cx('screen', contained && 'screen--contained', variant === 'dark' && 'screen--dark', nav ? 'screen--has-nav' : false, className)}>
+    <div {...rest} className={cx('screen', contained && 'screen--contained', variant === 'dark' && 'screen--dark', nav ? 'screen--has-nav' : false, className)}>
       <div className="screen__top">
         <HeroBackground variant={variant} />
         <div className="screen__col screen__hero">

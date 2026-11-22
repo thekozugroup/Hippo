@@ -1,8 +1,8 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import './SectionHeader.css'
 
-export interface SectionHeaderProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title'> {
+export interface SectionHeaderProps extends Omit<ComponentPropsWithRef<'div'>, 'title'> {
   /** Uppercase section label. */
   title: ReactNode
   /** Optional right-hand action, for example "See all". */

@@ -6,8 +6,8 @@
 }
 
 .field__label {
-  font-size: 13px;
-  line-height: 16px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   font-weight: 500;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -43,8 +43,8 @@
   border: 0;
   outline: 0;
   background: transparent;
-  font-size: 17px;
-  line-height: 24px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   letter-spacing: -0.01em;
   color: inherit;
 }
@@ -95,11 +95,15 @@ select.field__input {
   height: 20px;
 }
 
+.field__live:empty {
+  display: none;
+}
+
 .field__hint,
 .field__error {
   margin: 0;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-caption);
 }
 .field__hint {
   color: var(--text-2);

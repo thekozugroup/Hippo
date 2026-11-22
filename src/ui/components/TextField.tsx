@@ -1,10 +1,10 @@
 import { useId } from 'react'
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { cx } from '../cx.ts'
 import { FieldShell } from './Field.tsx'
-import { describedBy } from './describedBy.ts'
+import { describedBy, invalidState } from './describedBy.ts'
 
-export interface TextFieldProps extends Omit<ComponentPropsWithoutRef<'input'>, 'id'> {
+export interface TextFieldProps extends Omit<ComponentPropsWithRef<'input'>, 'id'> {
   /** Visible label above the field. */
   label: string
   /** Helper text under the field. */
@@ -15,7 +15,7 @@ export interface TextFieldProps extends Omit<ComponentPropsWithoutRef<'input'>, 
   id?: string
 }
 
-/** Single-line text field with label, hint and error. */
+/** Single-line text field with label, hint and error. `ref` reaches the input (React 19). */
 export function TextField({ label, hint, error, id, className, ...rest }: TextFieldProps) {
   const auto = useId()
   const fid = id ?? auto
@@ -26,8 +26,8 @@ export function TextField({ label, hint, error, id, className, ...rest }: TextFi
           {...rest}
           id={fid}
           className={cx('field__input')}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(fid, hint, error)}
+          aria-invalid={invalidState(error, rest['aria-invalid'])}
+          aria-describedby={describedBy(fid, hint, error, rest['aria-describedby'])}
         />
       </div>
     </FieldShell>

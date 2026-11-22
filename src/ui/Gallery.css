@@ -206,9 +206,6 @@
 .gx-panel-sample.gx-row {
   padding: var(--sp-4);
 }
-.frost--panel {
-  color: var(--text);
-}
 
 .gx-nav-demo {
   display: flex;

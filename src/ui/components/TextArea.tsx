@@ -1,9 +1,9 @@
 import { useId } from 'react'
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { FieldShell } from './Field.tsx'
-import { describedBy } from './describedBy.ts'
+import { describedBy, invalidState } from './describedBy.ts'
 
-export interface TextAreaProps extends Omit<ComponentPropsWithoutRef<'textarea'>, 'id'> {
+export interface TextAreaProps extends Omit<ComponentPropsWithRef<'textarea'>, 'id'> {
   /** Visible label above the field. */
   label: string
   /** Helper text under the field. */
@@ -14,7 +14,7 @@ export interface TextAreaProps extends Omit<ComponentPropsWithoutRef<'textarea'>
   id?: string
 }
 
-/** Multi-line text field with label, hint and error. */
+/** Multi-line text field with label, hint and error. `ref` reaches the textarea (React 19). */
 export function TextArea({ label, hint, error, id, className, rows = 4, ...rest }: TextAreaProps) {
   const auto = useId()
   const fid = id ?? auto
@@ -26,8 +26,8 @@ export function TextArea({ label, hint, error, id, className, rows = 4, ...rest 
           id={fid}
           rows={rows}
           className="field__input"
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(fid, hint, error)}
+          aria-invalid={invalidState(error, rest['aria-invalid'])}
+          aria-describedby={describedBy(fid, hint, error, rest['aria-describedby'])}
         />
       </div>
     </FieldShell>

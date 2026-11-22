@@ -1,7 +1,11 @@
 .big-value {
   color: var(--text);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  /* Never overflows: shrinks on narrow screens and wraps rather than clipping. */
+  overflow-wrap: anywhere;
+}
+.big-value.t-display {
+  font-size: min(var(--fs-display), 13vw);
 }
 
 .big-value__secondary,

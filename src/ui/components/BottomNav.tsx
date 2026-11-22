@@ -1,4 +1,4 @@
-import type { MouseEventHandler, ReactNode } from 'react'
+import type { ComponentPropsWithRef, MouseEventHandler, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import './BottomNav.css'
 
@@ -15,20 +15,19 @@ export interface BottomNavItem {
   onClick?: MouseEventHandler<HTMLElement>
 }
 
-export interface BottomNavProps {
+export interface BottomNavProps extends Omit<ComponentPropsWithRef<'nav'>, 'children' | 'aria-label'> {
   /** Destinations in order. */
   items: ReadonlyArray<BottomNavItem>
   /** Id of the current destination. */
   activeId: string
   /** Accessible name of the navigation landmark. */
   label?: string
-  className?: string
 }
 
 /** Floating pill navigation: the active item expands with its label. */
-export function BottomNav({ items, activeId, label = 'Main', className }: BottomNavProps) {
+export function BottomNav({ items, activeId, label = 'Main', className, ...rest }: BottomNavProps) {
   return (
-    <nav aria-label={label} className={cx('bottom-nav', 'frost', 'frost--bar', className)}>
+    <nav {...rest} aria-label={label} className={cx('bottom-nav', 'frost', 'frost--bar', className)}>
       {items.map((item) => {
         const active = item.id === activeId
         const content = (

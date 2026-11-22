@@ -24,11 +24,14 @@ export function FieldShell({ id, label, hint, error, children, className }: Fiel
         {label}
       </label>
       {children}
-      {error ? (
-        <p className="field__error" id={`${id}-error`}>
-          {error}
-        </p>
-      ) : null}
+      {/* Always-mounted polite live region, so an error that appears is announced (WCAG 4.1.3). */}
+      <div aria-live="polite" className="field__live">
+        {error ? (
+          <p className="field__error" id={`${id}-error`}>
+            {error}
+          </p>
+        ) : null}
+      </div>
       {hint ? (
         <p className="field__hint" id={`${id}-hint`}>
           {hint}

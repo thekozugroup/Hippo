@@ -7,8 +7,8 @@
   border: 0;
   border-radius: var(--r-pill);
   padding: 0 var(--sp-4);
-  font-size: 13px;
-  line-height: 16px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   font-weight: 500;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -35,7 +35,7 @@
   margin-inline-start: -10px;
   overflow: hidden;
   border-radius: 50%;
-  font-size: 16px;
+  font-size: var(--fs-body);
   line-height: 1;
 }
 
@@ -62,7 +62,6 @@
 .chip--frost.is-selected {
   background: var(--white);
   color: var(--blue-950);
-  box-shadow: none;
 }
 
 @media (forced-colors: active) {

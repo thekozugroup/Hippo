@@ -1,10 +1,10 @@
 import { useId } from 'react'
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { FieldShell } from './Field.tsx'
-import { describedBy } from './describedBy.ts'
+import { describedBy, invalidState } from './describedBy.ts'
 
-export interface SelectProps extends Omit<ComponentPropsWithoutRef<'select'>, 'id'> {
+export interface SelectProps extends Omit<ComponentPropsWithRef<'select'>, 'id'> {
   /** Visible label above the field. */
   label: string
   /** Helper text under the field. */
@@ -15,7 +15,7 @@ export interface SelectProps extends Omit<ComponentPropsWithoutRef<'select'>, 'i
   id?: string
 }
 
-/** Native select styled as a field. Pass `<option>` children. */
+/** Native select with label, hint and error. `ref` reaches the select (React 19). */
 export function Select({ label, hint, error, id, className, children, ...rest }: SelectProps) {
   const auto = useId()
   const fid = id ?? auto
@@ -26,8 +26,8 @@ export function Select({ label, hint, error, id, className, children, ...rest }:
           {...rest}
           id={fid}
           className="field__input"
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(fid, hint, error)}
+          aria-invalid={invalidState(error, rest['aria-invalid'])}
+          aria-describedby={describedBy(fid, hint, error, rest['aria-describedby'])}
         >
           {children}
         </select>

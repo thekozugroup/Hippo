@@ -1,10 +1,10 @@
 import { useId } from 'react'
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { Check } from 'lucide-react'
 import { cx } from '../cx.ts'
 import './Checkbox.css'
 
-export interface CheckboxProps extends Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'id'> {
+export interface CheckboxProps extends Omit<ComponentPropsWithRef<'input'>, 'type' | 'id'> {
   /** Visible label. */
   label: string
   /** Optional id; generated when omitted. */

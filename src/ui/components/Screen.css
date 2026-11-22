@@ -1,10 +1,15 @@
 .screen {
   --hero-h: clamp(200px, 30dvh, 300px);
+  /* How far the hero gradient runs below the hero band, behind the sheet. */
+  --hero-run: 360px;
   position: relative;
   display: flex;
   flex-direction: column;
+  min-height: 100vh; /* fallback */
   min-height: 100dvh;
   background: var(--hero-fill);
+  /* clip, not hidden: no scroll container, so the sticky nav keeps working. */
+  overflow: clip;
 }
 
 .screen--contained {
@@ -14,7 +19,8 @@
   border-radius: var(--r-card);
 }
 
-/* Full-width hero band; its gradient runs 48px under the sheet so the sheet's rounded corners reveal blue. */
+/* Full-width hero band. Its gradient continues --hero-run below the band (behind the sheet) and
+   fades to the flat --hero-fill, so the sheet's rounded corners reveal blue and wide screens show no seam. */
 .screen__top {
   --focus-ring: var(--white);
   position: relative;
@@ -24,10 +30,8 @@
   color: var(--white);
 }
 .screen__top > .hero-bg {
-  bottom: -48px;
-  /* Fade into the fill colour so wide screens show no seam. */
-  -webkit-mask-image: linear-gradient(to bottom, var(--black) calc(100% - 56px), transparent);
-  mask-image: linear-gradient(to bottom, var(--black) calc(100% - 56px), transparent);
+  inset-block: 0 auto;
+  height: calc(100% + var(--hero-run));
 }
 
 .screen__body {
@@ -71,7 +75,7 @@
 /* Floating nav: a zero-height sticky rail; the nav floats up from the bottom edge. */
 .screen__nav {
   position: sticky;
-  bottom: 0;
+  inset-block-end: 0;
   z-index: 2;
   height: 0;
   pointer-events: none;
@@ -80,7 +84,7 @@
 .screen__nav-inner {
   position: absolute;
   inset-inline: 0;
-  bottom: calc(var(--sp-3) + env(safe-area-inset-bottom));
+  inset-block-end: calc(var(--sp-3) + env(safe-area-inset-bottom));
   display: flex;
   justify-content: center;
 }
@@ -94,9 +98,15 @@
 }
 
 .screen--has-nav .screen__sheet {
-  padding-bottom: calc(var(--h-lg) + var(--sp-9) + env(safe-area-inset-bottom));
+  padding-block-end: calc(var(--h-lg) + var(--sp-9) + env(safe-area-inset-bottom));
 }
 
 .screen--dark {
-  --hero-fill: var(--hero-fill-dark);
+  background: var(--hero-fill-dark);
+}
+
+/* Contained previews: the screen's own background must not peek through the sheet's rounded corners. */
+.screen--contained,
+.screen--contained.screen--dark {
+  background: var(--surface);
 }

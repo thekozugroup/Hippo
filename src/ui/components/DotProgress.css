@@ -8,7 +8,7 @@
   display: grid;
   grid-auto-flow: column;
   grid-template-rows: repeat(2, 6px);
-  gap: 5px;
+  gap: var(--sp-1);
 }
 
 .dot-progress__dot {
@@ -23,8 +23,8 @@
 }
 
 .dot-progress__value {
-  font-size: 13px;
-  line-height: 16px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   font-weight: 500;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;

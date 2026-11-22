@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import './StatCard.css'
 
-export interface StatCardProps {
+export interface StatCardProps extends Omit<ComponentPropsWithRef<'article'>, 'children'> {
   /** Quiet uppercase label. */
   label: string
   /** Small trailing slot, usually a decorative icon or an `IconButton`. */
@@ -17,15 +17,17 @@ export interface StatCardProps {
   caption?: ReactNode
   /** Panel look: frosted card for the dark theme. */
   panel?: boolean
-  className?: string
+  /** Heading level of the label (default 3). */
+  headingLevel?: 2 | 3 | 4
 }
 
 /** Tile with a label, a mini bar graphic, a value and a caption. */
-export function StatCard({ label, action, bars, highlight, value, caption, panel, className }: StatCardProps) {
+export function StatCard({ label, action, bars, highlight, value, caption, panel, headingLevel = 3, className, ...rest }: StatCardProps) {
+  const Heading = `h${headingLevel}` as const
   return (
-    <article className={cx('stat-card', panel && 'frost frost--panel', className)}>
+    <article {...rest} className={cx('stat-card', panel && 'frost frost--panel', className)}>
       <header className="stat-card__head">
-        <h3 className="stat-card__label">{label}</h3>
+        <Heading className="stat-card__label">{label}</Heading>
         {action ? <div className="stat-card__action">{action}</div> : null}
       </header>
       {bars ? (

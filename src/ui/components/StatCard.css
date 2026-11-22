@@ -5,8 +5,11 @@
   min-width: 0;
   padding: var(--sp-4);
   border-radius: var(--r-card);
-  background: var(--surface-2);
   color: var(--text);
+}
+/* A .frost card takes its background from the frost rules (tint, or the opaque fallback). */
+.stat-card:not(.frost) {
+  background: var(--surface-2);
 }
 
 .stat-card__head {
@@ -19,8 +22,8 @@
 
 .stat-card__label {
   margin: 0;
-  font-size: 13px;
-  line-height: 16px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   font-weight: 500;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -46,20 +49,21 @@
   width: auto;
   height: auto;
   background: none;
-  margin: -8px -8px -8px 0;
+  margin-block: calc(-1 * var(--sp-2));
+  margin-inline: calc(-1 * var(--sp-2)) 0;
 }
 
 .stat-card__bars {
   display: flex;
   align-items: flex-end;
-  gap: 3px;
-  height: 44px;
+  gap: var(--sp-1);
+  height: var(--h-min);
 }
 
 .stat-card__bar {
   flex: 1;
   min-width: 2px;
-  max-width: 3px;
+  max-width: var(--sp-1);
   border-radius: var(--r-pill);
   background: var(--dot-dim);
 }
@@ -68,8 +72,9 @@
 }
 
 .stat-card__value {
-  font-size: 28px;
-  line-height: 32px;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-value);
+  line-height: var(--lh-value);
   font-weight: 500;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
@@ -79,12 +84,15 @@
 }
 
 .stat-card__caption {
-  margin: calc(-1 * var(--sp-1)) 0 0;
-  font-size: 13px;
-  line-height: 16px;
+  margin: 0;
+  margin-block-start: calc(-1 * var(--sp-1));
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   color: var(--text-2);
 }
 
-.stat-card.frost--panel {
-  background-color: var(--frost-tint);
+@media (forced-colors: active) {
+  .stat-card {
+    border: 1px solid CanvasText;
+  }
 }

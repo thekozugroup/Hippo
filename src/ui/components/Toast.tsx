@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { cx } from '../cx.ts'
 import './Toast.css'
 
-export interface ToastProps {
+export interface ToastProps extends Omit<ComponentPropsWithRef<'div'>, 'children' | 'role'> {
   /** Whether the toast is visible. The live region itself is always mounted. */
   open: boolean
   /** Message text. */
   message: ReactNode
   /** Called when the toast times out or is dismissed. */
   onDismiss: () => void
-  /** Milliseconds before auto-dismiss; 0 keeps it until dismissed. Default 5000. */
+  /** Milliseconds before auto-dismiss; 0 keeps it until dismissed. Default 8000 (WCAG 2.2.1: long enough to read; hover and focus pause it). */
   duration?: number
   /** Label for the dismiss button. */
   dismissLabel?: string
@@ -19,7 +20,7 @@ export interface ToastProps {
 }
 
 /** Pill-shaped status message. Auto-dismisses, pauses on hover and focus, and can be dismissed by keyboard. */
-export function Toast({ open, message, onDismiss, duration = 5000, dismissLabel = 'Dismiss', inline = false }: ToastProps) {
+export function Toast({ open, message, onDismiss, duration = 8000, dismissLabel = 'Dismiss', inline = false, className, ...rest }: ToastProps) {
   const [paused, setPaused] = useState(false)
   const dismiss = useRef(onDismiss)
   useEffect(() => {
@@ -33,7 +34,7 @@ export function Toast({ open, message, onDismiss, duration = 5000, dismissLabel 
   }, [open, paused, duration, message])
 
   return (
-    <div className={inline ? 'toast-region toast-region--inline' : 'toast-region'} role="status" aria-live="polite">
+    <div {...rest} className={cx('toast-region', inline && 'toast-region--inline', className)} role="status">
       {open ? (
         <div className="toast" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
           <span className="toast__message">{message}</span>

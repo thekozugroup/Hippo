@@ -1,12 +1,13 @@
 import { useId } from 'react'
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { FieldShell } from './Field.tsx'
-import { describedBy } from './describedBy.ts'
+import { describedBy, invalidState } from './describedBy.ts'
+import { currencyName, currencySymbol } from './money.ts'
 
-export interface MoneyFieldProps extends Omit<ComponentPropsWithoutRef<'input'>, 'id' | 'type' | 'inputMode'> {
+export interface MoneyFieldProps extends Omit<ComponentPropsWithRef<'input'>, 'id' | 'type' | 'inputMode'> {
   /** Visible label above the field. */
   label: string
-  /** ISO 4217 code; its symbol is shown as a prefix. */
+  /** ISO 4217 code; its symbol is shown as a prefix and its name is announced as a description. */
   currency: string
   /** BCP 47 locale for the symbol. */
   locale?: string
@@ -18,22 +19,19 @@ export interface MoneyFieldProps extends Omit<ComponentPropsWithoutRef<'input'>,
   id?: string
 }
 
-function symbolFor(currency: string, locale?: string): string {
-  const part = new Intl.NumberFormat(locale, { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
-    .formatToParts(0)
-    .find((p) => p.type === 'currency')
-  return part?.value ?? currency
-}
-
-/** Decimal text field with a currency symbol prefix; the value stays a string for the caller to parse. */
+/** Amount field with a currency prefix. An unknown code is shown as text instead of throwing. */
 export function MoneyField({ label, currency, locale, hint, error, id, className, ...rest }: MoneyFieldProps) {
   const auto = useId()
   const fid = id ?? auto
+  const curId = `${fid}-currency`
   return (
     <FieldShell id={fid} label={label} hint={hint} error={error} className={className}>
       <div className="field__control">
         <span className="field__prefix" aria-hidden="true">
-          {symbolFor(currency, locale)}
+          {currencySymbol(currency, locale)}
+        </span>
+        <span className="sr-only" id={curId}>
+          {currencyName(currency, locale)}
         </span>
         <input
           {...rest}
@@ -42,8 +40,8 @@ export function MoneyField({ label, currency, locale, hint, error, id, className
           inputMode="decimal"
           autoComplete="off"
           className="field__input"
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(fid, hint, error)}
+          aria-invalid={invalidState(error, rest['aria-invalid'])}
+          aria-describedby={describedBy(fid, hint, error, [curId, rest['aria-describedby']].filter(Boolean).join(' '))}
         />
       </div>
     </FieldShell>

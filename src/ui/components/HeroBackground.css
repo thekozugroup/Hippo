@@ -9,12 +9,13 @@
   pointer-events: none;
 }
 
+/* The dark field in either theme: light-dark() inside the tokens resolves to the dark stops. */
 .hero-bg--dark {
-  background-color: var(--hero-fill-dark);
-  background-image: var(--hero-bg-dark);
+  color-scheme: dark;
 }
 
-/* Film grain: inline SVG turbulence blended over the gradient. */
+/* Film grain: inline SVG turbulence blended over the gradient. It also dithers the
+   gradient, which hides 8-bit banding. */
 .hero-bg::after {
   content: '';
   position: absolute;
@@ -23,6 +24,9 @@
   background-size: 240px 240px;
   mix-blend-mode: overlay;
   opacity: var(--grain-opacity);
+  /* Fade the grain out with the gradient's own fade, so the flat fill below has no seam. */
+  -webkit-mask-image: linear-gradient(to bottom, var(--black) 50%, transparent 100%);
+  mask-image: linear-gradient(to bottom, var(--black) 50%, transparent 100%);
 }
 
 @media (forced-colors: active) {

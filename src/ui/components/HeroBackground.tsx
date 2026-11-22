@@ -1,8 +1,8 @@
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { cx } from '../cx.ts'
 import './HeroBackground.css'
 
-export interface HeroBackgroundProps extends ComponentPropsWithoutRef<'div'> {
+export interface HeroBackgroundProps extends ComponentPropsWithRef<'div'> {
   /** `blue` follows the theme (blue in light, deep glow in dark); `dark` is always dark. */
   variant?: 'blue' | 'dark'
 }

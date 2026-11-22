@@ -1,25 +1,26 @@
-import type { MouseEventHandler, ReactNode } from 'react'
+import type { ComponentPropsWithRef, MouseEventHandler, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import './ListRow.css'
 
-export interface ListRowProps {
-  /** Leading element, usually a `Thumb`. */
+export interface ListRowProps extends Omit<ComponentPropsWithRef<'li'>, 'title' | 'onClick' | 'children'> {
+  /** Leading visual, usually a `Thumb`. */
   leading?: ReactNode
   /** Primary text. */
   title: ReactNode
-  /** Secondary line under the title. */
+  /** Secondary line. */
   secondary?: ReactNode
-  /** Trailing value or control. Do not put controls here when the row is also a link or button. */
+  /** Trailing value or status. */
   trailing?: ReactNode
-  /** Makes the whole row a link. */
+  /** Makes the row a link. */
   href?: string
-  /** Makes the whole row a button (or fires on a link). */
+  /** Makes the row a button (or adds a handler to the link). */
   onClick?: MouseEventHandler<HTMLElement>
-  className?: string
+  /** Maximum lines for the title and secondary text before they are clipped; the full text stays in the DOM. Default 2. */
+  lines?: 1 | 2 | 'full'
 }
 
-/** One list row (render inside a `List`): thumb, two text lines, trailing value. */
-export function ListRow({ leading, title, secondary, trailing, href, onClick, className }: ListRowProps) {
+/** One row of a `List`: leading visual, title, secondary line and trailing value. */
+export function ListRow({ leading, title, secondary, trailing, href, onClick, lines = 2, className, ...rest }: ListRowProps) {
   const body = (
     <>
       {leading ? <span className="list-row__leading">{leading}</span> : null}
@@ -31,7 +32,7 @@ export function ListRow({ leading, title, secondary, trailing, href, onClick, cl
     </>
   )
   return (
-    <li className={cx('list-row', className)}>
+    <li {...rest} className={cx('list-row', className)} data-lines={lines}>
       {href ? (
         <a className="list-row__inner list-row__inner--action" href={href} onClick={onClick}>
           {body}

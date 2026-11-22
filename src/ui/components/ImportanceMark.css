@@ -6,7 +6,7 @@
 
 .importance__dots {
   display: inline-flex;
-  gap: 3px;
+  gap: var(--sp-1);
 }
 
 .importance__dot {
@@ -20,8 +20,8 @@
 }
 
 .importance__label {
-  font-size: 13px;
-  line-height: 16px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   color: var(--text-2);
 }
 

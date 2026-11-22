@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef } from 'react'
+import type { ComponentPropsWithRef } from 'react'
 import { cx } from '../cx.ts'
 import './StatusPill.css'
 
@@ -25,7 +25,7 @@ const LABELS: Record<Status, string> = {
   published: 'Published',
 }
 
-export interface StatusPillProps extends Omit<ComponentPropsWithoutRef<'span'>, 'children'> {
+export interface StatusPillProps extends Omit<ComponentPropsWithRef<'span'>, 'children'> {
   /** Which state to show. */
   status: Status
   /** Overrides the default text label (colour is never the only signal). */

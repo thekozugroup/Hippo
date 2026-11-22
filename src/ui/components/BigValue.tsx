@@ -1,8 +1,8 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 import { cx } from '../cx.ts'
 import './BigValue.css'
 
-export interface BigValueProps extends Omit<ComponentPropsWithoutRef<'p'>, 'children'> {
+export interface BigValueProps extends Omit<ComponentPropsWithRef<'p'>, 'children'> {
   /** Main part of the value, in the strong colour. */
   value?: ReactNode
   /** Muted secondary part, for example the decimals or a unit. */

@@ -22,17 +22,17 @@
 }
 
 .btn--lg {
-  height: var(--h-lg);
-  font-size: 13px;
-  line-height: 16px;
+  min-height: var(--h-lg);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .btn--md {
-  height: var(--h-md);
-  font-size: 15px;
-  line-height: 20px;
+  min-height: var(--h-md);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
   letter-spacing: 0;
   padding: 0 var(--sp-5);
 }
@@ -124,7 +124,7 @@
   .btn__spinner {
     animation: none;
     border-top-color: color-mix(in srgb, currentColor 30%, transparent);
-    border-right-color: currentColor;
+    border-inline-end-color: currentColor;
   }
 }
 
