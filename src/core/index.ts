@@ -12,7 +12,18 @@ export { createCore, applyRelayOverrideFromUrl, readRelayOverride, type Core, ty
 export type { CoreDeps } from './services/deps.ts'
 
 export { HippoDb, openDb, DB_NAME, type CachedEvent } from './db/schema.ts'
-export { getSettings, setRelayOverride, setTheme, type Settings, type Theme } from './db/settings.ts'
+export {
+  getSettings,
+  setRelayOverride,
+  setTheme,
+  setOwnerName,
+  setOnboarding,
+  markSeen,
+  type Settings,
+  type Theme,
+  type OnboardingState,
+  type SeenFlag,
+} from './db/settings.ts'
 
 export {
   createItem,
@@ -102,3 +113,29 @@ export type { Transport, TransportProvider, PublishResult, RelayResult, EoseInfo
 export { staticTransport } from './transport/types.ts'
 export { MemoryTransport, MemoryNetwork } from './transport/memory.ts'
 export { NostrTransport, createNostrTransportProvider } from './transport/nostr.ts'
+
+export { isFramed, blockIfFramed, FRAME_BLOCK_MESSAGE, FRAME_BLOCK_LINK_TEXT, type FrameWindowLike } from './services/frame-guard.ts'
+export {
+  checkDeployment,
+  browserDeploymentEnv,
+  type DeploymentCheck,
+  type DeploymentCheckId,
+  type DeploymentEnv,
+  type CheckStatus,
+  type ProbeSocket,
+} from './services/deployment.ts'
+export {
+  lookupLinkPreview,
+  fillEmptyFields,
+  getLinkPreviewEnabled,
+  setLinkPreviewEnabled,
+  LINK_PREVIEW_SETTING_KEY,
+  LINK_PREVIEW_HOST,
+  LINK_PREVIEW_SERVICE_NAME,
+  LINK_PREVIEW_DISCLOSURE,
+  type LinkPreviewResult,
+  type LinkPreviewPatch,
+  type LinkPreviewFailure,
+  type LinkPreviewDeps,
+  type LinkPreviewCurrent,
+} from './services/link-preview.ts'

@@ -19,7 +19,7 @@ Status: v1 in development. License: MIT.
 - Accounts, email, passwords, notifications by email or push.
 - Price tracking, affiliate links, store integrations.
 - Native apps. Hippo is an installable PWA.
-- Automatic fetching of product pages (not possible from a static app because of CORS).
+- Automatic fetching of product pages by the app itself (not possible from a static app because of CORS). The only automatic lookup is the opt-in link preview in FR-10a, which asks a third-party service.
 
 ## 3. Personas
 
@@ -46,6 +46,7 @@ Status: v1 in development. License: MIT.
 - FR-8 Share target (Android, desktop Chromium, installed PWA): Hippo appears in the system share sheet and opens the Add Item form prefilled from the shared `title`, `text` and `url`.
 - FR-9 Deep link: `/?title=&text=&url=&image=&price=&currency=` opens the same prefilled form. This is the entry point for the iOS Shortcut and the bookmarklet, which read the page's metadata themselves and pass it along. They send the page's canonical link when it has one (else the address without its fragment), and well-known tracking parameters (`utm_*`, `fbclid`, `gclid` and similar) are removed from captured links, since a published wish shows its link to givers.
 - FR-10 Settings shows install instructions for the bookmarklet and the iOS Shortcut recipe.
+- FR-10a Link preview (opt-in, off by default). For a wish added by pasting a link or through the Android share sheet, Hippo can ask one third-party service (Microlink, `api.microlink.io`) for the page's title and picture. It runs only after the user turns it on in Settings, sends only the link (tracking parameters and fragment removed, https only), times out after a few seconds, and fills only fields the user has left empty. Answers are validated like any other untrusted input. The bookmarklet and Shortcut read the page themselves and need no third party; they remain the recommended method.
 
 ### 4.3 Shared lists (owner)
 
@@ -72,7 +73,9 @@ Status: v1 in development. License: MIT.
 
 - FR-26 List content and claims are end-to-end encrypted. The decryption key travels only in the URL fragment of the share link. Relays store ciphertext.
 - FR-27 Only the owner's key can publish or change list content. Only a claim's author can change or withdraw that claim.
-- FR-28 The app makes no requests to third parties except the configured relays, and item images that the owner chose to attach (loaded with `referrerpolicy="no-referrer"`).
+- FR-28 The app makes no requests to third parties except the configured relays, item images that the owner chose to attach (loaded with `referrerpolicy="no-referrer"`), and, only after the owner opts in (FR-10a), the link preview service.
+- FR-29 Hippo refuses to run inside another site's frame (GitHub Pages cannot send `frame-ancestors`): before the app starts it shows a message with a link that opens Hippo in its own tab.
+- FR-30 Settings can show deployment checks: HTTPS, an origin of its own, not framed, service worker, storage, persistent storage and relay reachability, each with a plain-language finding and fix.
 
 Threat model:
 
@@ -130,4 +133,5 @@ Code layout:
 | M2 | Shared lists: publish, link, giver view | In progress |
 | M3 | Claims, pledges, conflicts, owner-side hiding | In progress |
 | M4 | Share target, deep link, bookmarklet, iOS Shortcut recipe | In progress |
-| M5 | Recovery code, multi-device sync, relay retention monitoring, optional self-hosted relay | Planned |
+| M5 | Recovery code, multi-device sync, optional self-hosted relay | Planned |
+| M5a | Weekly relay health check (`relay-health` workflow) with 1, 4 and 12 week retention probes | Done; needs several months of runs before retention numbers mean anything |

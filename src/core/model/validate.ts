@@ -71,6 +71,7 @@ export function parseListMetaPayload(value: unknown): ListMetaPayload {
   }
   assign(out, 'message', readOptionalString(o.message, 'meta.message', LIMITS.message))
   assign(out, 'eventDate', readOptionalDate(o.eventDate, 'meta.eventDate'))
+  assign(out, 'ownerName', readOptionalString(o.ownerName, 'meta.ownerName', LIMITS.ownerName))
   return out
 }
 

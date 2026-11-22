@@ -193,7 +193,7 @@ export function itemPayloadFor(item: Item, list: Pick<SharedList, 'showPrices' |
 }
 
 /** `sharedItemIds` are the live items' shared ids, in list order. */
-export function metaPayloadFor(list: SharedList, sharedItemIds: string[]): ListMetaPayload {
+export function metaPayloadFor(list: SharedList, sharedItemIds: string[], ownerName?: string): ListMetaPayload {
   const p: ListMetaPayload = {
     v: 1,
     name: list.name,
@@ -205,6 +205,7 @@ export function metaPayloadFor(list: SharedList, sharedItemIds: string[]): ListM
   }
   if (list.message) p.message = list.message
   if (list.eventDate) p.eventDate = list.eventDate
+  if (ownerName) p.ownerName = ownerName
   return p
 }
 
@@ -292,7 +293,8 @@ async function syncPublished(deps: CoreDeps, ctx: OwnerContext, list: SharedList
     sharedIds.push(sharedId)
     await publishIfChanged(itemSlot(topic, sharedId), itemPayloadFor(item, list, sharedId), 'item')
   }
-  await publishIfChanged(metaSlot(topic), metaPayloadFor(list, sharedIds), 'meta')
+  const { ownerName } = await getSettings(deps.db)
+  await publishIfChanged(metaSlot(topic), metaPayloadFor(list, sharedIds, ownerName), 'meta')
   return out
 }
 

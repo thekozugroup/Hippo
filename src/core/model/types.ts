@@ -90,6 +90,8 @@ export interface ListMetaPayload {
   name: string
   message?: string
   eventDate?: string
+  /** The owner's first name or nickname, shown to givers ("Ann's list"). Max 40 characters. */
+  ownerName?: string
   itemIds: string[]
   showPrices: boolean
   showNotes: boolean

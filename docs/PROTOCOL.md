@@ -232,6 +232,8 @@ Default relays (config constant, overridable in settings): `wss://relay.primal.n
 
 Developer override (end-to-end tests): `?relays=<comma-separated URLs>` in the page URL, copied into sessionStorage `hippo:relays`, forces every transport onto those relays. Only loopback `ws://` or `wss://` URLs are honoured; it lasts for the browser tab, and `core.forcedRelays` tells the UI to show a notice.
 
+Relay canaries (maintenance only, never sent by the app): `scripts/relay-health.mjs` publishes one kind `30078` event per week to each default relay and looks for the ones from 1, 4 and 12 weeks ago. The author key is `sha256("hippo-relay-canary-v1:<ISO week>:0")` (for example week `2026-W47`), so any run can recompute earlier keys. Tags: `["d", "hippo:hippo-canary-<week>:item:probe"]`, `["t", "hippo-canary-<week>"]` and a NIP-40 `expiration` 100 days after creation. Real topics are 64 hex characters and canary topics are not, so a canary can never match a real list, and apps that follow section 5 reject it anyway. Content is random base64 of about the size of an item.
+
 ## 8. Repair
 
 Relays may drop events. On opening a list the client compares what the relays return with its local cache and republishes its own events that are missing: the owner republishes meta and items; a giver republishes their own claims. Clients may also republish other authors' cached, verified events unchanged (events are self-authenticating). Expired events are never republished.

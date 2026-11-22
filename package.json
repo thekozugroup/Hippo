@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && node e2e/run.mjs",
     "icons": "node scripts/generate-icons.mjs",
+    "relay-health": "node scripts/relay-health.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {

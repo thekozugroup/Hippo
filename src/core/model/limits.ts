@@ -6,6 +6,8 @@ export const LIMITS = {
   notes: 2000,
   url: 2000,
   nickname: 40,
+  /** The list owner's display name in list meta. */
+  ownerName: 40,
   name: 100,
   message: 1000,
   categoryName: 60,

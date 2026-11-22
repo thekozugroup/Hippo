@@ -36,6 +36,18 @@ After any item change, call `syncListsForItem(core, itemId)` to republish lists 
 | `findFirstHttpUrl`, `guessTitleFromUrl`, `parsePrice(str, currency?)`, `currencyDigits(code)` | The pieces. `parsePrice` returns minor units or `undefined` when ambiguous. |
 | `stripTrackingParams(url)`, `isTrackingParam(name)`, `TRACKING_PARAMS` | Remove well-known tracking parameters (`utm_*`, `fbclid`, `gclid`, ...) and text fragments from a captured link; other parameters are kept. `draftFromCapture` applies it. |
 
+### Link preview (opt-in)
+
+For wishes added from a pasted link or the share sheet. Off by default; see the README security notes.
+
+| Function | What it does |
+|---|---|
+| `getLinkPreviewEnabled(db)`, `setLinkPreviewEnabled(db, enabled)` | The opt-in. Stored in the `settings` table under key `LINK_PREVIEW_SETTING_KEY` (`'linkPreview'`); only the boolean `true` means on. |
+| `lookupLinkPreview(url, { db, fetch?, timeoutMs? })` | Never throws. Returns `{ kind: 'found', patch: { title?, imageUrl?, price? } }`, `{ kind: 'nothing-found' }`, `{ kind: 'failed', reason: 'timeout' \| 'network' \| 'rate-limited' \| 'service-error' \| 'bad-response' }`, `{ kind: 'disabled' }` (setting off, nothing sent) or `{ kind: 'invalid-url' }` (not https or not a public host, nothing sent). Sends one GET with only the cleaned link (tracking parameters and fragment removed) to `LINK_PREVIEW_HOST` (`api.microlink.io`). Default timeout 6 s. |
+| `fillEmptyFields(current, patch)` | Returns the part of the patch that fills fields the user left empty. Pass a blank `title` when the current title is only a guess from the URL (`draftFromCapture`). |
+
+The UI toggle must show this sentence, unchanged (`LINK_PREVIEW_DISCLOSURE`): "Hippo will send each link you add to Microlink (api.microlink.io), a third-party service, so it can look up the page's title and picture. Nothing else is sent." Call `lookupLinkPreview` only for a link the user just added, never for links read from lists. A price is returned only if the service supplies one; Microlink usually does not.
+
 ## Shared lists I own (`core` as deps)
 
 | Function | What it does |
@@ -80,6 +92,27 @@ Claim actions return `{ claim, result: PublishResult }`. They update the view im
 `removedItemsWithMyClaims[].title` is the item's last known title (remembered for items I claimed), so it can still be shown after a tombstone or after the owner stops sharing (`status === 'unpublished'`).
 
 `state` (from `resolveItemState`): `status` (`available`, `partial`, `funded`, `claimed`, `purchased`), `grantedQuantity`, `remainingQuantity`, `pledged`, `target?`, `remainingAmount?`, `surplus`, and `rows[]` with `mine`, `nickname`, `conflict`, `currencyMismatch`. Show "Someone" when `nickname` is missing. Purchased claims are counted before reserved ones, so `conflict` on my row means another claim was counted first or someone already bought it; word it kindly.
+
+## Deployment checks and frame guard
+
+| Function | What it does |
+|---|---|
+| `isFramed(window)` | True when `window.top !== window.self` (or reading it throws). |
+| `blockIfFramed(window, document, location.href)` | Used by `src/main.tsx` before anything starts. When framed, replaces the page with a plain message and a link that opens Hippo in its own tab, and returns `true`. |
+| `checkDeployment(env)` | Returns `Promise<DeploymentCheck[]>`. Never throws; waits at most the relay timeout (default 4 s). |
+| `browserDeploymentEnv(relays)` | Builds `env` from the real `window`, `navigator`, `indexedDB` and `WebSocket`. Settings should call `checkDeployment(browserDeploymentEnv(DEFAULT_RELAYS))`, or the relays from `getSettings(db).relays` when set. |
+
+```ts
+type CheckStatus = 'ok' | 'warning' | 'problem' | 'unknown'
+interface DeploymentCheck {
+  id: 'https' | 'own-origin' | 'not-framed' | 'service-worker' | 'indexeddb' | 'persistent-storage' | 'relays'
+  status: CheckStatus
+  finding: string // one sentence: what was found
+  fix: string // one sentence: what to do; '' when status is 'ok'
+}
+```
+
+The list always has these seven entries in this order. `unknown` means the browser or the situation gave no answer (for example the storage API is missing, or the device is offline), not that something is wrong. The `relays` finding reads "N of M relays answered." Show `problem` first, then `warning`, then `unknown`; show `fix` only when it is not empty. Tests inject `env` (`location`, `framed`, `navigator`, `probeIndexedDb`, `createWebSocket`, `relays`, `relayTimeoutMs`).
 
 ## Backup and settings
 

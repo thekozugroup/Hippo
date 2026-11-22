@@ -17,13 +17,18 @@ const THEME_COLOR = '#1e3a8a'
  * dev server relies on inline scripts and styles. A meta-tag CSP cannot set
  * frame-ancestors (see README, security notes).
  */
+// The one third-party host the app may call over https: the opt-in link preview
+// lookup (src/core/services/link-preview.ts, LINK_PREVIEW_HOST). It is off
+// unless the user turns it on in Settings. Keep this in step with that constant.
+const LINK_PREVIEW_ORIGIN = 'https://api.microlink.io'
+
 const CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self'",
   "img-src 'self' https: data:",
   "font-src 'self'",
-  "connect-src 'self' wss: ws://127.0.0.1:* ws://localhost:*",
+  `connect-src 'self' wss: ${LINK_PREVIEW_ORIGIN} ws://127.0.0.1:* ws://localhost:*`,
   "manifest-src 'self'",
   "worker-src 'self'",
   "object-src 'none'",
