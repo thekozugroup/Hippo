@@ -1,0 +1,29 @@
+.cat-add {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-3);
+}
+.cat-add > .field {
+  flex: 1;
+}
+.cat-add > .btn {
+  margin-bottom: var(--sp-1);
+}
+
+.cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin-top: var(--sp-5);
+}
+
+.cat-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.cat-row__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}

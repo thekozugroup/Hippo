@@ -1,0 +1,488 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Copy, Link2Off, RefreshCw, Send, Share2, Trash2 } from 'lucide-react'
+import { useLocation } from 'wouter'
+import {
+  BottomSheet,
+  Button,
+  Checkbox,
+  EmptyState,
+  LinkButton,
+  SectionHeader,
+  Skeleton,
+  Switch,
+  TextArea,
+  TextField,
+  TwoTone,
+} from '../../../ui/index.ts'
+import {
+  buildShareLink,
+  createSharedList,
+  deleteSharedList,
+  isHippoError,
+  LIMITS,
+  publishList,
+  repairOwnerList,
+  rotateList,
+  syncList,
+  unpublishList,
+  updateSharedList,
+  type Item,
+  type SharedList,
+  type SharedListPatch,
+} from '../../../core/index.ts'
+import { useCore } from '../../core/context.ts'
+import { useItems, useSharedList } from '../../core/data.ts'
+import { useNotify } from '../../core/notify.ts'
+import { AppScreen } from '../../layout/AppScreen.tsx'
+import { appBaseUrl } from '../../lib/capture-tools.ts'
+import { formatEventDate, plural, summariseSync, type SyncSummary } from '../../lib/format.ts'
+import { ListStatusPill } from './ListStatusPill.tsx'
+import { SyncFeedback } from './SyncFeedback.tsx'
+import './ListEditorScreen.css'
+
+interface DetailsState {
+  name: string
+  eventDate: string
+  message: string
+}
+
+type DetailsErrors = Partial<Record<keyof DetailsState, string>>
+
+function validateDetails(d: DetailsState): DetailsErrors {
+  const e: DetailsErrors = {}
+  if (!d.name.trim()) e.name = 'Give the list a name, like "Birthday 2027".'
+  if (d.eventDate && !/^\d{4}-\d{2}-\d{2}$/.test(d.eventDate)) e.eventDate = 'Pick a date, or leave it empty.'
+  return e
+}
+
+function DetailsFields({ value, onChange, errors }: { value: DetailsState; onChange: (v: DetailsState) => void; errors: DetailsErrors }) {
+  return (
+    <>
+      <TextField
+        label="List name"
+        required
+        aria-required="true"
+        value={value.name}
+        maxLength={LIMITS.name}
+        placeholder="Birthday 2027"
+        onChange={(e) => onChange({ ...value, name: e.target.value })}
+        {...(errors.name ? { error: errors.name } : {})}
+      />
+      <TextField
+        label="Date (optional)"
+        type="date"
+        value={value.eventDate}
+        onChange={(e) => onChange({ ...value, eventDate: e.target.value })}
+        hint="Shown to friends. The list stays available after the date."
+        {...(errors.eventDate ? { error: errors.eventDate } : {})}
+      />
+      <TextArea
+        label="Message to friends (optional)"
+        value={value.message}
+        maxLength={LIMITS.message}
+        rows={3}
+        placeholder="Thank you for thinking of me!"
+        onChange={(e) => onChange({ ...value, message: e.target.value })}
+      />
+    </>
+  )
+}
+
+function ItemPicker({ items, selected, onToggle }: { items: Item[]; selected: readonly string[]; onToggle: (id: string, on: boolean) => void }) {
+  if (items.length === 0) {
+    return (
+      <div className="app-banner">
+        <p>
+          Your wishlist is empty. <a className="app-text-link" href="#/item/new">Add a wish</a> first, then come back to put it on this list.
+        </p>
+      </div>
+    )
+  }
+  return (
+    <ul className="list-picker">
+      {items.map((item) => (
+        <li key={item.id}>
+          <Checkbox label={item.title} checked={selected.includes(item.id)} onChange={(e) => onToggle(item.id, e.target.checked)} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function NewListForm() {
+  const core = useCore()
+  const notify = useNotify()
+  const [, navigate] = useLocation()
+  const items = (useItems() ?? []).sort((a, b) => b.createdAt - a.createdAt)
+  const [details, setDetails] = useState<DetailsState>({ name: '', eventDate: '', message: '' })
+  const [errors, setErrors] = useState<DetailsErrors>({})
+  const [picked, setPicked] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    const errs = validateDetails(details)
+    setErrors(errs)
+    if (Object.keys(errs).length > 0) {
+      window.requestAnimationFrame(() => document.querySelector<HTMLElement>('.list-form [aria-invalid="true"]')?.focus())
+      return
+    }
+    setSaving(true)
+    try {
+      const list = await createSharedList(core, {
+        name: details.name.trim(),
+        ...(details.message.trim() ? { message: details.message.trim() } : {}),
+        ...(details.eventDate ? { eventDate: details.eventDate } : {}),
+        itemIds: picked,
+      })
+      notify(`Created ${list.name}. Share it when you are ready.`)
+      navigate(`/list/${list.id}`, { replace: true })
+    } catch (err) {
+      setSaving(false)
+      setErrors({ name: isHippoError(err, 'invalid-input') ? 'Something here is too long.' : 'Could not create the list. Please try again.' })
+    }
+  }
+
+  return (
+    <form className="list-form app-stack app-stack--loose" onSubmit={(e) => void submit(e)} noValidate>
+      <div className="app-stack">
+        <DetailsFields value={details} onChange={setDetails} errors={errors} />
+      </div>
+      <fieldset className="list-fieldset">
+        <legend className="app-section-title">What goes on it?</legend>
+        <p className="app-note">{picked.length === 0 ? 'Choose wishes from your wishlist. You can change this later.' : `${plural(picked.length, 'wish', 'wishes')} chosen`}</p>
+        <ItemPicker items={items} selected={picked} onToggle={(id, on) => setPicked((p) => (on ? [...p, id] : p.filter((x) => x !== id)))} />
+      </fieldset>
+      <Button type="submit" variant="primary" fullWidth loading={saving}>
+        Create list
+      </Button>
+    </form>
+  )
+}
+
+function ShareLinkBox({ list }: { list: SharedList }) {
+  const notify = useNotify()
+  const link = buildShareLink(list, appBaseUrl())
+  const canShare = typeof navigator.share === 'function'
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link)
+      notify('Link copied. Paste it into a message to your friends.')
+    } catch {
+      document.querySelector<HTMLInputElement>('#share-link')?.select()
+      notify('Select the link and copy it.')
+    }
+  }
+
+  const share = async () => {
+    try {
+      await navigator.share({ title: list.name, text: `My wishlist: ${list.name}`, url: link })
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
+      notify('Sharing did not work here. Copy the link instead.')
+    }
+  }
+
+  return (
+    <div className="app-stack">
+      <TextField
+        id="share-link"
+        label="Share link"
+        readOnly
+        value={link}
+        onFocus={(e) => e.currentTarget.select()}
+        hint="Anyone with this link can see the list and mark gifts. Send it only to people you trust."
+        data-testid="share-link"
+      />
+      <div className="app-row app-row--nowrap">
+        <Button variant="primary" size="md" fullWidth icon={<Copy />} onClick={() => void copy()}>
+          Copy link
+        </Button>
+        {canShare ? (
+          <Button variant="secondary" size="md" fullWidth icon={<Share2 />} onClick={() => void share()}>
+            Share
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+type Confirm = 'unpublish' | 'rotate' | 'delete' | null
+
+function ListEditor({ list }: { list: SharedList }) {
+  const core = useCore()
+  const notify = useNotify()
+  const [, navigate] = useLocation()
+  const allItems = useItems(true)
+  const [details, setDetails] = useState<DetailsState>({ name: list.name, eventDate: list.eventDate ?? '', message: list.message ?? '' })
+  const [errors, setErrors] = useState<DetailsErrors>({})
+  const [busy, setBusy] = useState<string | null>(null)
+  const [summary, setSummary] = useState<SyncSummary | null>(null)
+  const [confirm, setConfirm] = useState<Confirm>(null)
+
+  // Repair once when the editor opens: republishes anything relays lost (owner events only).
+  const repaired = useRef(false)
+  useEffect(() => {
+    if (repaired.current || list.status === 'draft') return
+    repaired.current = true
+    void repairOwnerList(core, list.id).catch(() => undefined)
+  }, [core, list.id, list.status])
+
+  const active = (allItems ?? []).filter((i) => i.archivedAt === undefined).sort((a, b) => b.createdAt - a.createdAt)
+  const archivedOnList = (allItems ?? []).filter((i) => i.archivedAt !== undefined && list.itemIds.includes(i.id))
+  const liveCount = list.itemIds.filter((id) => active.some((i) => i.id === id)).length
+  const dirty = details.name !== list.name || details.eventDate !== (list.eventDate ?? '') || details.message !== (list.message ?? '')
+
+  const run = async (label: string, fn: () => Promise<void>) => {
+    setBusy(label)
+    try {
+      await fn()
+    } catch {
+      notify('Something went wrong. Your change is saved on this device; try again in a moment.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const change = (patch: SharedListPatch, message?: string) =>
+    run('update', async () => {
+      await updateSharedList(core, list.id, patch)
+      if (list.status === 'published') {
+        const r = await syncList(core, list.id)
+        setSummary(summariseSync([r]))
+        notify(message ? `${message} Friends will see the update.` : 'Updated for friends.')
+      } else if (message) notify(message)
+    })
+
+  const saveDetails = async (e: FormEvent) => {
+    e.preventDefault()
+    const errs = validateDetails(details)
+    setErrors(errs)
+    if (Object.keys(errs).length > 0) return
+    await change(
+      {
+        name: details.name.trim(),
+        message: details.message.trim() || null,
+        eventDate: details.eventDate || null,
+      },
+      'Details saved.',
+    )
+  }
+
+  const publish = () =>
+    run('publish', async () => {
+      const r = await publishList(core, list.id)
+      const s = summariseSync([r])
+      setSummary(s)
+      notify(s.accepted > 0 ? 'Your list is shared. Copy the link and send it to friends.' : 'Saved. Hippo will finish sharing when you are online.')
+    })
+
+  const unpublish = () =>
+    run('unpublish', async () => {
+      setConfirm(null)
+      const r = await unpublishList(core, list.id)
+      setSummary(summariseSync([r]))
+      notify('Sharing stopped. People with the link now see that the list is no longer shared.')
+    })
+
+  const rotate = () =>
+    run('rotate', async () => {
+      setConfirm(null)
+      const r = await rotateList(core, list.id)
+      setSummary(summariseSync([r.published, r.unpublishedOld]))
+      notify('New link ready. The old link no longer works.')
+    })
+
+  const remove = () =>
+    run('delete', async () => {
+      setConfirm(null)
+      await deleteSharedList(core, list.id)
+      notify(`Deleted ${list.name}. Your wishes are still in your wishlist.`)
+      navigate('/lists')
+    })
+
+  const toggleItem = (id: string, on: boolean) => {
+    const itemIds = on ? [...list.itemIds.filter((x) => x !== id), id] : list.itemIds.filter((x) => x !== id)
+    const title = active.find((i) => i.id === id)?.title ?? 'Item'
+    void change({ itemIds }, on ? `${title} added to the list.` : `${title} taken off the list.`)
+  }
+
+  return (
+    <div className="app-sheet list-editor">
+      <section className="app-stack" aria-labelledby="share-title">
+        <div className="app-row app-row--between">
+          <h2 id="share-title" className="app-section-title">
+            Sharing
+          </h2>
+          <ListStatusPill status={list.status} />
+        </div>
+        {list.status === 'draft' ? (
+          <>
+            <p className="app-note">
+              {liveCount === 0
+                ? 'Add some wishes below, then share. Friends get a private link; no account needed.'
+                : `Ready to share ${plural(liveCount, 'wish', 'wishes')}. Friends get a private link; no account needed.`}
+            </p>
+            <Button variant="primary" fullWidth icon={<Send />} loading={busy === 'publish'} onClick={() => void publish()}>
+              Share list
+            </Button>
+          </>
+        ) : list.status === 'published' ? (
+          <ShareLinkBox list={list} />
+        ) : (
+          <>
+            <p className="app-note">Sharing is stopped. People with the link see that this list is no longer shared.</p>
+            <Button variant="primary" fullWidth icon={<Send />} loading={busy === 'publish'} onClick={() => void publish()}>
+              Share again with the same link
+            </Button>
+          </>
+        )}
+        {busy === 'update' ? (
+          <p className="app-note" role="status">
+            Updating…
+          </p>
+        ) : null}
+        {summary ? <SyncFeedback summary={summary} /> : null}
+        <p className="app-note">Hippo never shows you who is getting what, so your gifts stay a surprise.</p>
+      </section>
+
+      <form className="list-form app-stack" onSubmit={(e) => void saveDetails(e)} noValidate aria-labelledby="details-title">
+        <h2 id="details-title" className="app-section-title">
+          Details
+        </h2>
+        <DetailsFields value={details} onChange={setDetails} errors={errors} />
+        <Button type="submit" variant="secondary" size="md" disabled={!dirty} loading={busy === 'update' && dirty}>
+          Save details
+        </Button>
+      </form>
+
+      <section className="app-stack" aria-labelledby="show-title">
+        <h2 id="show-title" className="app-section-title">
+          What friends see
+        </h2>
+        <Switch
+          label="Show prices"
+          description="Needed for chipping in."
+          checked={list.showPrices}
+          onChange={(e) => void change({ showPrices: e.target.checked }, e.target.checked ? 'Prices are shown.' : 'Prices are hidden.')}
+        />
+        <Switch
+          label="Show notes"
+          description="Your notes on each wish, like size or colour."
+          checked={list.showNotes}
+          onChange={(e) => void change({ showNotes: e.target.checked }, e.target.checked ? 'Notes are shown.' : 'Notes are hidden.')}
+        />
+      </section>
+
+      <fieldset className="list-fieldset">
+        <legend className="app-section-title">{`Wishes on this list (${liveCount})`}</legend>
+        {allItems === undefined ? <Skeleton height={48} shape="tile" /> : <ItemPicker items={active} selected={list.itemIds} onToggle={toggleItem} />}
+        {archivedOnList.length > 0 ? (
+          <p className="app-note">{`${plural(archivedOnList.length, 'archived wish is', 'archived wishes are')} left off until you unarchive ${archivedOnList.length === 1 ? 'it' : 'them'}.`}</p>
+        ) : null}
+      </fieldset>
+
+      <section className="app-stack" aria-labelledby="manage-title">
+        <SectionHeader title={<span id="manage-title">Manage</span>} />
+        {list.status === 'published' ? (
+          <Button variant="secondary" fullWidth icon={<Link2Off />} onClick={() => setConfirm('unpublish')} loading={busy === 'unpublish'}>
+            Stop sharing
+          </Button>
+        ) : null}
+        {list.status !== 'draft' ? (
+          <Button variant="secondary" fullWidth icon={<RefreshCw />} onClick={() => setConfirm('rotate')} loading={busy === 'rotate'}>
+            Make a new link
+          </Button>
+        ) : null}
+        <Button variant="danger" fullWidth icon={<Trash2 />} onClick={() => setConfirm('delete')} loading={busy === 'delete'}>
+          Delete list
+        </Button>
+      </section>
+
+      <BottomSheet
+        open={confirm === 'unpublish'}
+        onClose={() => setConfirm(null)}
+        title="Stop sharing this list?"
+        description="People with the link will see that the list is no longer shared. You can share it again later with the same link."
+      >
+        <div className="app-stack">
+          <Button variant="danger" fullWidth onClick={() => void unpublish()}>
+            Stop sharing
+          </Button>
+          <Button variant="secondary" fullWidth onClick={() => setConfirm(null)}>
+            Keep sharing
+          </Button>
+        </div>
+      </BottomSheet>
+      <BottomSheet
+        open={confirm === 'rotate'}
+        onClose={() => setConfirm(null)}
+        title="Make a new link?"
+        description="The current link stops working. Anyone who has it will see that the list is no longer shared, and gifts they already marked will not carry over to the new link. You will need to send the new link to everyone again."
+      >
+        <div className="app-stack">
+          <Button variant="danger" fullWidth onClick={() => void rotate()}>
+            Make a new link
+          </Button>
+          <Button variant="secondary" fullWidth onClick={() => setConfirm(null)}>
+            Keep the current link
+          </Button>
+        </div>
+      </BottomSheet>
+      <BottomSheet
+        open={confirm === 'delete'}
+        onClose={() => setConfirm(null)}
+        title="Delete this list?"
+        description="Sharing stops and the list is removed from this device. The wishes on it stay in your wishlist."
+      >
+        <div className="app-stack">
+          <Button variant="danger" fullWidth onClick={() => void remove()}>
+            Delete list
+          </Button>
+          <Button variant="secondary" fullWidth onClick={() => setConfirm(null)}>
+            Keep it
+          </Button>
+        </div>
+      </BottomSheet>
+    </div>
+  )
+}
+
+export function ListEditorScreen({ id }: { id?: string }) {
+  const list = useSharedList(id)
+  if (id === undefined) {
+    return (
+      <AppScreen title="New list" back="#/lists" backLabel="Back to lists">
+        <NewListForm />
+      </AppScreen>
+    )
+  }
+  return (
+    <AppScreen
+      title={list ? list.name : 'List'}
+      compactTitle
+      intro={list ? <p>{[list.eventDate ? formatEventDate(list.eventDate) : null, 'Only you see this page'].filter(Boolean).join(' · ')}</p> : null}
+      back="#/lists"
+      backLabel="Back to lists"
+      busy={list === undefined}
+    >
+      {list === undefined ? (
+        <Skeleton height={120} shape="tile" />
+      ) : list === null ? (
+        <EmptyState
+          title={<TwoTone muted="Not found." bright="This list is not on this device." />}
+          description="It may have been deleted, or it was made on another device."
+          action={
+            <LinkButton href="#/lists" variant="secondary">
+              Go to lists
+            </LinkButton>
+          }
+        />
+      ) : (
+        <ListEditor key={list.id} list={list} />
+      )}
+    </AppScreen>
+  )
+}

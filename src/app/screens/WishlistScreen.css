@@ -1,0 +1,20 @@
+.wishlist-tools > .field {
+  flex: 1;
+}
+
+.wishlist-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.wishlist-meta > * {
+  flex: none;
+}
+.wishlist-meta > .wishlist-cats {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

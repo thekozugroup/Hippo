@@ -1,0 +1,47 @@
+.item-form__price {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  gap: var(--sp-3);
+  align-items: start;
+}
+
+.item-form__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.item-form__group > legend {
+  padding: 0;
+  margin-bottom: var(--sp-3);
+}
+
+.item-form__newcat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-3);
+  align-items: start;
+}
+.item-form__newcat > .btn {
+  /* Line up with the 56px field under its 24px label row. */
+  margin-top: calc(16px + var(--sp-2) + 4px);
+}
+
+.item-form__image {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-4);
+  align-items: start;
+}
+.item-form__image > .thumb {
+  margin-top: calc(16px + var(--sp-2));
+}
+
+.item-form__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
