@@ -3,9 +3,11 @@ import { BigValue, IconLink, LinkButton, List, ListRow, MoneyText, SectionHeader
 import { useCore } from '../core/context.ts'
 import { useGuestLists, useItems, useSettings, useSharedLists } from '../core/data.ts'
 import { AppScreen } from '../layout/AppScreen.tsx'
+import { setupChecklist } from '../core/onboarding.ts'
 import { formatAdded, safeUrl } from '../lib/format.ts'
 import { BackupReminder } from './BackupReminder.tsx'
 import { GuestListRow, OwnedListRow } from './lists/ListRows.tsx'
+import { SetupChecklist } from './SetupChecklist.tsx'
 
 const RECENT_SHOWN = 4
 const LISTS_SHOWN = 3
@@ -36,6 +38,16 @@ export function HomeScreen() {
   const recent = [...(items ?? [])].sort((a, b) => b.createdAt - a.createdAt).slice(0, RECENT_SHOWN)
   const liveIds = new Set((items ?? []).map((i) => i.id))
   const shareHref = lists && lists.length > 0 ? '#/lists' : '#/list/new'
+  const checklist =
+    !loading && settings
+      ? setupChecklist({
+          stored: settings.onboarding,
+          hiddenAt: settings.seen.setupChecklist,
+          wishes: count,
+          sharedLists: (lists ?? []).filter((l) => l.status === 'published').length,
+          lastExportAt: settings.lastExportAt,
+        })
+      : null
 
   return (
     <AppScreen
@@ -58,7 +70,7 @@ export function HomeScreen() {
         ) : (
           <div>
             <SectionHeader title={<span id="home-wishlist">Wishlist</span>} action={{ label: 'See all', href: '#/wishlist' }} />
-            {loading ? <Skeleton width={120} height={60} /> : <BigValue value={String(count)} secondary={count === 1 ? ' wish' : ' wishes'} />}
+            {loading ? <Skeleton width={120} height={60} /> : <BigValue className="motion-reveal" value={String(count)} secondary={count === 1 ? ' wish' : ' wishes'} />}
           </div>
         )}
         <div className="app-row app-row--fill">
@@ -87,9 +99,9 @@ export function HomeScreen() {
         ) : null}
       </section>
 
-      {empty ? <HowItWorks /> : null}
+      {checklist ? <SetupChecklist tasks={checklist} wishes={count} lists={lists ?? []} /> : empty ? <HowItWorks /> : null}
 
-      {count > 0 || (lists?.length ?? 0) > 0 ? <BackupReminder lastExportAt={settings?.lastExportAt} /> : null}
+      {!checklist && (count > 0 || (lists?.length ?? 0) > 0) ? <BackupReminder lastExportAt={settings?.lastExportAt} /> : null}
 
       {lists && lists.length > 0 ? (
         <section aria-labelledby="home-lists">

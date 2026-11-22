@@ -16,7 +16,7 @@ The contract for `src/ui/`. The visual direction comes from a set of reference i
 
 Tokens are CSS custom properties on `:root` in `src/ui/styles/tokens.css`. Components use tokens only; no raw hex values in component CSS.
 
-Theming uses a single block. `:root` sets `color-scheme: light dark`; `[data-theme='light']` and `[data-theme='dark']` pin one scheme. Every semantic token is declared once with `light-dark(light, dark)`, which resolves against the used `color-scheme` of the element that uses it, so the system theme and the `data-theme` override share one definition and cannot drift. `light-dark()` is supported in Chrome 123+, Firefox 120+ and Safari 17.5+.
+Theming uses a single block. `:root` sets `color-scheme: light dark`; `[data-theme='light']` and `[data-theme='dark']` pin one scheme. Every semantic token is declared once with `light-dark(light, dark)`, which resolves against the used `color-scheme` of the element that uses it, so the system theme and the `data-theme` override share one definition and cannot drift. `light-dark()` is supported in Chrome 123+, Firefox 120+ and Safari 17.5+. Current Chrome resolves `light-dark()` inside a custom property on the element that declares it (`:root`), so a nested scope that pins a scheme (`StepScreen`) must re-declare the semantic tokens it uses.
 
 ### Colour
 
@@ -95,8 +95,39 @@ Numbers use `font-variant-numeric: tabular-nums`. Long strings wrap (`overflow-w
   The sheet has 32px top padding; list rows are at least 72px tall with 12px vertical padding.
 - Control heights: 56px primary, 48px default, 44px minimum touch target.
 - Shadows are soft and rare: sheet `0 -8px 40px` slate-950 at 18%; floating nav `0 8px 30px` slate-950 at 12%.
-- Motion: 180ms ease-out for state changes; 320ms `cubic-bezier(.2,.8,.2,1)` for sheets. With `prefers-reduced-motion: reduce`, transitions are replaced by instant changes or opacity only.
+- Motion: see section 2a.
 - Print: hero, nav and toasts are removed and text is dark on white (`src/ui/styles/print.css`).
+
+### 2a. Motion
+
+Motion says where something came from or where it went. It starts from its source, stays short and never delays input; if it explains nothing, it is cut. Only `transform` and `opacity` animate (no layout properties, no blur radius), nothing runs longer than `--dur-sheet`, routine actions never bounce, and nothing animates on first paint (enter effects wait for `html[data-booted]`, set 800ms after start).
+
+| Token | Value | Use |
+|---|---|---|
+| `--dur-press` | 100ms | Pressed states (buttons scale to 0.97, rows show a tint layer) |
+| `--dur` | 180ms | State changes: a pill or confirmation appears, a label fades in, a toast arrives |
+| `--dur-exit` | 160ms | What leaves goes a little faster than what arrives |
+| `--dur-page` | 280ms | Route transitions, the nav indicator, rows moving to a new place |
+| `--dur-sheet` | 320ms | Sheets and dialogs rising from the bottom |
+| `--stagger` | 18ms | Delay between dots filling in sequence (a whole sequence is capped at 240ms) |
+| `--ease` | ease-out | Fades |
+| `--ease-in` | `cubic-bezier(.4,0,1,1)` | Exits off screen |
+| `--ease-move` | `cubic-bezier(.3,0,0,1)` | Moves on screen: fast start, soft landing, no overshoot |
+| `--ease-sheet` | `cubic-bezier(.2,.8,.2,1)` | Arrivals from off screen |
+| `--shift-page` | 32px | How far page content slides on a route change |
+| `--shift-enter` | 8px | How far a new element rises as it fades in |
+
+What moves, and what it explains (`src/ui/styles/motion.css`, driven by `src/app/layout/motionLocation.ts`):
+
+- Route transitions use the View Transitions API from the router; browsers without it, a hidden tab and reduced motion change screens instantly. Every history entry carries an index, so a push, Back and Forward are told apart. Going deeper (a list to a wish, Home to an editor, the next setup step) slides the hero title and the sheet's content in from the end side over `--dur-page` while the old content leaves toward the start in `--dur-exit`; Back (button, link or browser) is the mirror image. Bottom-navigation destinations cross-fade (old out in `--dur-press`, new in over `--dur`). Redirects do not animate.
+- Persistent parts carry a `view-transition-name`: the sheet surface (`hippo-sheet`) glides to its new top edge instead of flashing; the nav (`hippo-nav`) stays put between destinations and sinks or rises when a screen has none; the toast (`hippo-toast`) stays above everything; setup keeps its dots and action bar still while the step's content slides. Only full-page screens carry names (previews never do).
+- Rapid navigation never queues: a newer transition skips the running one and the screen always ends on the latest address. A quick A to B to A remounts A fresh. `::view-transition` takes no pointer events, so taps reach the new screen while it animates.
+- Bottom navigation (`BottomNav remember`): the white indicator moves from the previous destination to the new one (`--dur-page`, `--ease-move`); the label and dot fade in once it is most of the way there.
+- Sheets and dialogs: on phones the sheet rises from the bottom edge over `--dur-sheet` and leaves the same way in `--dur-exit`; on wide screens it scales from 0.96 with a fade. The scrim fades with opacity; its blur radius never changes.
+- Lists (`List`, on by default): rows that move after a reorder, a filter or a removal glide from their old place (FLIP, `--dur-page`); new rows rise 8px and fade in, a few at a time.
+- Giver card: when a claim lands, the funding dots fill column by column once (`DotProgress`), and a new status pill or "You are getting this" line rises in (`.motion-enter`).
+- Feedback: pressed states on buttons, chips, rows and nav items; toasts rise in and sink out; content replacing a loading placeholder cross-fades (`.motion-reveal`); skeletons pulse in opacity.
+- Reduced motion: route transitions are not started, the nav indicator and list moves are skipped, sheets only fade, and every CSS transition and animation is instant (`base.css`).
 
 ## 3. Frost (translucent surfaces)
 
@@ -116,7 +147,7 @@ Rules:
 - A single 1px inside hairline: white at 14% on dark tints, `var(--hairline)` on light tints. No gradient borders, no inner glow, no highlight streaks.
 - Contrast guarantee: text and icons on frost meet 4.5:1 on the backdrops frost is allowed on. `--on-hero` frost sits only on the hero's top zone (white on blue-900 through blue-600 behind the tint: 7.5:1 or better); `--panel` in the dark theme sits on slate-950, the dark hero or `--surface` (text 10:1 or better, `--text-2` 6:1 or better); `--bar` sits on the sheet or page (`--text` 9.8:1 or better over any backdrop). Do not place frost over arbitrary photos or bright fills, and do not lower the tints.
 - Fallbacks: without `backdrop-filter` support, and under `prefers-reduced-transparency: reduce` or `prefers-contrast: more`, every `.frost` component becomes fully opaque (its variant's solid colour, no blur) with a 1.5px `--frost-solid-line` border. Under `forced-colors` it is `Canvas` with a `CanvasText` border. Components must not set their own background or `box-shadow` on a frost element: elevation goes through `--frost-elev`, so the hairline and its replacement are never lost.
-- Do not stack frost on frost. Do not animate blur radius (the dialog scrim is not faded for this reason).
+- Do not stack frost on frost. Do not animate blur radius. The dialog scrim fades with `opacity` only; its blur stays at 12px.
 
 ## 4. Components
 
@@ -124,7 +155,7 @@ All components are React function components in `src/ui/components/`, each with 
 
 | Component | Notes |
 |---|---|
-| `HeroBackground` | The grainy gradient field. Variants `blue`, `dark`. |
+| `HeroBackground` | The grainy gradient field. Variants `blue`, `dark`, and `night` (the setup field in both themes: grainy blue at the top falling to slate-950 where the text sits). |
 | `Screen` | Layout: hero area (top bar + optional headline) and the sheet. Handles safe-area insets. With a `nav`, the page reserves scroll padding so a focused control is never hidden behind the floating nav. |
 | `Sheet` | The rounded surface over the hero. |
 | `TopBar` | Left icon button, centre/right slot (profile chip, actions). Sits on the hero. |
@@ -135,20 +166,22 @@ All components are React function components in `src/ui/components/`, each with 
 | `Chip` | Pill with an optional avatar or emoji and its label; selectable (filter) variant with `aria-pressed`, shown selected as the blue tone with a 1.5px ring (not the inverse fill, so a default "All" filter does not outrank the content); may be a link. No dots. A static chip is plain text and takes no ARIA name. |
 | `StatusPill` | Small tinted pill holding a status word, no dot: `available`, `partial`, `funded`, `claimed`, `purchased`, `removed`, `conflict`, `draft`, `published`. The word carries the status; the tint is a second cue (slate or blue for information, emerald for done, amber for attention). Use it for exceptions only: an ordinary state (an available wish, a shared list) shows no pill. The app passes labels in its own vocabulary ("Ben is getting this", "Bought", "Not counted", "Not shared yet"). |
 | `SectionHeader` | Quiet uppercase label left, optional action right ("SEE ALL"). Offer "See all" once per destination on a screen. |
-| `List`, `ListRow` | `List` is a `<ul role="list">`. A row has a leading thumb, title, secondary line, trailing value or control; optional as link/button. Title and secondary text wrap to at most two lines (`lines` = 1, 2 or `full`); the full text stays in the DOM. |
+| `List`, `ListRow` | `List` is a `<ul role="list">`; rows glide to a new place when the list changes (`animate`, default on). A row has a leading thumb, title, secondary line, trailing value or control; optional as link/button. Title and secondary text wrap to at most two lines (`lines` = 1, 2 or `full`); the full text stays in the DOM. |
 | `Thumb` | Rounded image over a first-letter tile on a tinted background. The tile is always rendered, so a slow, lazy or broken image never leaves a blank square; the letter hides once the image loads. `referrerPolicy="no-referrer"`, `loading="lazy"`. |
 | `BigValue` | Display number with a muted secondary part (`$117.450` + `.17` pattern). Used for counts and totals. Shrinks and wraps; never overflows. |
 | `MoneyText` | Formats `Money` with `Intl.NumberFormat`. Never throws: an unknown or malformed currency code renders as a plain number followed by the code as text (`5.00 XX`), a non-finite amount renders as a dash. |
 | `TwoTone` | Two-tone headline text: a muted part and a bright part (`tone="on-hero"` for use over the hero; the muted part stays at 4.5:1 or better). |
 | `DotProgress` | Two rows of 6px dots spanning the full width of its container at any width: it fits as many columns as the width allows (gap at least 4px) and spreads them so the first and last dots touch the edges. `value` 0..1, exposed as a progressbar with a text alternative (`valueText`). It shows no percentage; the screen puts one line of amounts under it (covered of price at the start, what is left at the end). Any progress fills at least one column; anything short of complete leaves one dim. |
 | `ImportanceMark` | Three-level indicator (1 to 3 filled dots) with a text label: 1 "Nice to have", 2 "Want", 3 "Would love". |
-| `BottomNav` | Floating pill. The active destination is an expanded pill (icon in a white circle + label + dot); inactive destinations are circles with icons. `nav` landmark, `aria-current="page"`. Uses `.frost--bar`. Fits four destinations at 320px (items shrink, the label ellipsizes, the dot is hidden under 360px). |
+| `BottomNav` | Floating pill. The active destination is an expanded pill (icon in a white circle + label + dot); inactive destinations are circles with icons. `nav` landmark, `aria-current="page"`. Uses `.frost--bar`. Fits four destinations at 320px (items shrink, the label ellipsizes, the dot is hidden under 360px). With `remember="<key>"` the indicator moves from the destination that was active on the previous screen (section 2a). |
+| `StepScreen` | One step of a stepped flow on the `night` field (dark in both themes; it re-declares the semantic tokens with their dark values). Logo top start, an optional action top end, the question as the only h1 low on the screen (described by "Step 2 of 5"), optional description and fields, `StepProgress`, then a round Back button and a wide pill (white circle with an arrow, label in the middle) that also submits on Enter; one quiet secondary action under it. Escape goes back. `contained` for previews. |
+| `StepProgress` | Small dots for a flow: steps up to the current one are lit, the current one is a short bar, so step 1 already shows progress. Decorative dots plus a text alternative ("Step 2 of 5") to point a heading's `aria-describedby` at. |
 | `TextField`, `TextArea`, `Select`, `MoneyField` | Label above, 56px field on `--surface-2`, radius `--r-tile`, visible focus ring, error text. `MoneyField` announces the currency name as a description and tolerates unknown codes. |
 | `Switch`, `SegmentedControl`, `Checkbox` | Native inputs underneath. A switch's description is exposed as a description, not run into its name. |
 | `BottomSheet` | Modal sheet from the bottom on phones, centred dialog on wide screens. Uses `<dialog>`; focus trap and inert background; Escape closes; `.frost--scrim` backdrop; background scroll is locked while open. React state stays in sync with the native `close` event, and a press that starts inside the sheet never dismisses it. No drag handle (the sheet is not draggable). |
-| `Toast` | `role="status"`, auto-dismiss (8 seconds by default; hover and focus pause it), pill shaped, with a dismiss button. |
+| `Toast` | `role="status"`, auto-dismiss (8 seconds by default; hover and focus pause it), pill shaped, with a dismiss button. Rises in and sinks out. |
 | `EmptyState` | Two-tone headline, one sentence, one action. No icon tile. Use it for an empty list, not under a page heading that already says what happened. |
-| `Skeleton` | Loading placeholder. |
+| `Skeleton` | Loading placeholder (opacity pulse). |
 | `Logo` | Hippo wordmark and a simple original hippo glyph (inline SVG). |
 
 Icons: `lucide-react`, 1.75px stroke, 24px. Icons sit plain beside a fact or on an action; no tinted tiles behind them. A letter thumbnail (`Thumb`) standing in for a missing product image is a recognition aid and stays.
@@ -167,12 +200,13 @@ App-level shared pieces (in `src/app`, because they know the data model): `Owned
 
 | Screen | Hero | Sheet |
 |---|---|---|
-| Home (owner) | Logo, settings button, two-tone headline (first run: what Hippo is for; later: that the wishlist is kept only on this device) | First run: `ADD A WISH` and three short plain steps. Later: "WISHLIST" label with "See all", big wish count, `ADD A WISH` (primary) and `SHARE A LIST` (secondary), the four newest wishes, then "Your lists" and "Shared with me" rows |
+| Home (owner) | Logo, settings button, two-tone headline (first run: what Hippo is for; later: that the wishlist is kept only on this device) | First run: `ADD A WISH` and three short plain steps. Later: "WISHLIST" label with "See all", big wish count, `ADD A WISH` (primary) and `SHARE A LIST` (secondary), the four newest wishes, then "Get set up" (after setup: add three wishes, share your list, save a backup; tracks real state, hides when done or dismissed, and replaces the steps and the backup reminder while shown), "Your lists" and "Shared with me" rows |
 | Wishlist | Title, add button (when there are wishes) | Filter chips, sort, wishes as `ListRow`s with importance and price |
 | Item editor | Back button, title | Form |
 | Lists | Title, add button (when there are lists) | Owned lists (a pill only for "Not shared yet" and "Sharing stopped"); "Shared with me" lists |
 | List editor | Back, list name, date | Sharing (the state shows as its content: share button, link, or "Not shared yet" banner), details, what friends see, wishes on the list, manage |
-| Giver view | List name, date, owner message, nickname chip | Wish cards: thumb, title, price and importance; a pill only for an exception; full-width `DotProgress` with one line of amounts; my gifts as a plain line with quiet actions; one main action; notes and the shop link last. Then "Invite others" and one line on what the owner cannot see |
-| Settings | Title | Theme, categories, backup, capture tools, relays, about |
+| Setup (first run, `#/welcome/<step>`) | `StepScreen` on the night field: what Hippo is, your name, the occasion (creates a draft list), one wish (saved and put on the list), one way to add wishes from this device | (no sheet) |
+| Giver view | List name, "Ann's list" when the owner gave a name, date, owner message, nickname chip | First open on a device: a dismissible "How this works" card (two lines and an optional name). Wish cards: thumb, title, price and importance; a pill only for an exception; full-width `DotProgress` with one line of amounts; my gifts as a plain line with quiet actions; one main action; notes and the shop link last. Then "Invite others" and one line on what the owner cannot see |
+| Settings | Title | Your name (and "Go through setup again"), theme, categories, backup, capture tools, relays, about |
 
 A gallery page at `#/design` renders every component in both themes for visual review.

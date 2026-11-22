@@ -4,7 +4,7 @@
 // their own owner, list and givers.
 import assert from 'node:assert/strict'
 import { test } from './harness.mjs'
-import { addItem, assertNoProblems, card, newUser } from './flows.test.mjs'
+import { addItem, assertNoProblems, card, newUser, skipSetup } from './flows.test.mjs'
 
 /** Console noise expected while the relay is deliberately down. */
 const relayNoise = (p) => !/WebSocket|ERR_CONNECTION|connection/i.test(p)
@@ -38,7 +38,7 @@ test('opening a share link takes its secret out of the address bar and history',
   state.r.ann = a
   const { page } = a
   await page.goto(baseUrl + '#/')
-  await page.getByRole('heading', { level: 1 }).waitFor()
+  await skipSetup(page)
   await openGiver(page, state.r.link)
   const payload = state.r.link.split('#/l/')[1]
   assert.ok(!page.url().includes(payload), 'payload still in the address bar')

@@ -1,0 +1,260 @@
+/* The setup field is dark in both themes. Browsers resolve light-dark() inside a custom property
+   where the property is declared (on :root), so this scope re-declares the semantic tokens its
+   contents use with their dark values (the same values as tokens.css, dark side). */
+.step-screen {
+  --bg: var(--slate-950);
+  --surface: var(--slate-900);
+  --surface-2: color-mix(in srgb, var(--slate-50) 5%, transparent);
+  --surface-3: color-mix(in srgb, var(--slate-50) 9%, transparent);
+  --text: var(--slate-50);
+  --text-2: var(--slate-300);
+  --text-3: var(--slate-400);
+  --hairline: color-mix(in srgb, var(--slate-50) 10%, transparent);
+  --accent: var(--blue-300);
+  --on-accent: var(--slate-950);
+  --danger: var(--rose-300);
+  --success: var(--emerald-300);
+  --dot-dim: color-mix(in srgb, var(--slate-50) 17%, transparent);
+  --overlay-hover: color-mix(in srgb, var(--slate-50) 6%, transparent);
+  --focus-ring: var(--white);
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh; /* fallback */
+  min-height: 100dvh;
+  color-scheme: dark;
+  background: var(--slate-950);
+  color: var(--white);
+  overflow: clip;
+}
+
+.step-screen--contained {
+  min-height: 640px;
+  border-radius: var(--r-card);
+}
+
+.step-screen__col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--col-max);
+  min-width: 0;
+  padding: calc(var(--sp-3) + env(safe-area-inset-top)) var(--gutter) calc(var(--sp-4) + env(safe-area-inset-bottom));
+}
+
+.step-screen__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: var(--h-md);
+}
+.step-screen__top-end {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-inline-start: auto;
+}
+
+/* The question sits low on the screen, near the thumb; the space above it is the field. */
+.step-screen__main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+  padding-block-start: var(--sp-9);
+}
+
+.step-screen__form {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.step-screen__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-related);
+  min-width: 0;
+}
+
+.step-screen__title {
+  margin: 0;
+  font-size: var(--fs-headline);
+  line-height: var(--lh-headline);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+}
+.step-screen__title:focus {
+  outline: none;
+}
+.step-screen__title:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 4px;
+  border-radius: var(--sp-1);
+}
+
+.step-screen__desc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-inline);
+  max-width: 34rem;
+  color: color-mix(in srgb, var(--white) 80%, transparent);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  overflow-wrap: anywhere;
+}
+.step-screen__desc p {
+  margin: 0;
+}
+
+.step-screen__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-group);
+  margin-block-start: var(--space-related);
+  min-width: 0;
+}
+
+.step-screen__progress {
+  margin-block: var(--space-section) var(--sp-5);
+  color: var(--white);
+}
+
+/* With large text the pill takes its own row under Back instead of breaking its label. */
+.step-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.step-screen__back.icon-btn--lg {
+  width: var(--h-lg);
+  height: var(--h-lg);
+}
+
+/* The wide pill: a white circle with the arrow at the start, the label in the middle. */
+.step-screen__continue {
+  position: relative;
+  display: flex;
+  flex: 1 1 12rem;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--h-lg);
+  padding: var(--sp-1);
+  padding-inline-end: calc(var(--h-md) + var(--sp-1));
+  border-radius: var(--r-pill);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur) var(--ease);
+}
+.step-screen__continue:active:not(.is-busy) {
+  transform: scale(0.98);
+  transition-duration: var(--dur-press);
+}
+.step-screen__continue.is-busy {
+  cursor: progress;
+}
+
+.step-screen__continue-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--h-md);
+  height: var(--h-md);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--ink-on-white);
+  transition: transform var(--dur) var(--ease-move);
+}
+.step-screen__continue:hover .step-screen__continue-icon {
+  transform: translateX(2px);
+}
+.step-screen__continue-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.step-screen__continue-label {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  text-align: center;
+  overflow-wrap: break-word;
+}
+
+.step-screen__spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: step-spin 700ms linear infinite;
+}
+@keyframes step-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.step-screen__secondary {
+  display: flex;
+  justify-content: center;
+  margin-block-start: var(--sp-2);
+}
+
+.step-screen__link {
+  min-height: var(--h-min);
+  padding-inline: var(--sp-4);
+  border-radius: var(--r-pill);
+  color: color-mix(in srgb, var(--white) 86%, transparent);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
+  font-weight: 500;
+  transition: transform var(--dur) var(--ease);
+}
+.step-screen__link:hover {
+  color: var(--white);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.step-screen__link:active {
+  transform: scale(0.97);
+  transition-duration: var(--dur-press);
+}
+
+/* Route transitions (styles/motion.css): the step's content slides, dots and actions stay. */
+.step-screen:not(.step-screen--contained) .step-screen__content {
+  view-transition-name: hippo-step;
+}
+.step-screen:not(.step-screen--contained) .step-screen__progress {
+  view-transition-name: hippo-step-progress;
+}
+.step-screen:not(.step-screen--contained) .step-screen__actions {
+  view-transition-name: hippo-step-actions;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-screen__spinner {
+    animation: none;
+    border-inline-end-color: currentColor;
+  }
+}
+
+@media (forced-colors: active) {
+  .step-screen__continue {
+    border: 2px solid ButtonText;
+  }
+  .step-screen__continue-icon {
+    background: ButtonText;
+    color: ButtonFace;
+  }
+}

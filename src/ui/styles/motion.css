@@ -1,0 +1,228 @@
+/*
+ * Motion. Motion says where something came from or went; anything else is cut.
+ * Only transform and opacity animate, timings come from the motion tokens, and
+ * nothing runs longer than --dur-sheet. Under prefers-reduced-motion route
+ * transitions are not started at all and every other animation is instant
+ * (base.css) or a short fade.
+ */
+
+/* ---- Route transitions (View Transitions API) ----
+   The router (src/app/layout/motionLocation.ts) sets html[data-nav-dir] to
+   forward, back or lateral for the length of a transition. Persistent parts
+   carry a view-transition-name so they stay put or morph instead of flashing:
+
+   hippo-sheet     the sheet surface: its top edge glides to the new hero height
+   hippo-headline  the hero title: slides with the page
+   hippo-page      the sheet's content: slides in the direction of travel
+   hippo-nav       the bottom navigation: stays; its indicator moves (BottomNav)
+   hippo-step*     the setup flow: content slides, dots and actions stay */
+
+/* Taps go straight to the new screen while it animates in. */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-group(*) {
+  animation-duration: var(--dur-page);
+  animation-timing-function: var(--ease-move);
+}
+
+/* The page behind (hero field, top bar) barely changes between screens: the new one fades in over
+   the old, which stays opaque underneath so the page background never shows through. */
+::view-transition-old(root) {
+  animation: none;
+}
+::view-transition-new(root) {
+  animation: vt-fade-in var(--dur) var(--ease) both;
+}
+
+/* Content groups do not morph in size or place (scrolled content would swoop); their images slide. */
+::view-transition-group(hippo-headline),
+::view-transition-group(hippo-page),
+::view-transition-group(hippo-step) {
+  animation: none;
+}
+
+:root[data-nav-dir='forward']::view-transition-old(hippo-headline),
+:root[data-nav-dir='forward']::view-transition-old(hippo-page),
+:root[data-nav-dir='forward']::view-transition-old(hippo-step) {
+  animation: vt-out-to-start var(--dur-exit) var(--ease) both;
+}
+:root[data-nav-dir='forward']::view-transition-new(hippo-headline),
+:root[data-nav-dir='forward']::view-transition-new(hippo-page),
+:root[data-nav-dir='forward']::view-transition-new(hippo-step) {
+  animation: vt-in-from-end var(--dur-page) var(--ease-move) both;
+}
+:root[data-nav-dir='back']::view-transition-old(hippo-headline),
+:root[data-nav-dir='back']::view-transition-old(hippo-page),
+:root[data-nav-dir='back']::view-transition-old(hippo-step) {
+  animation: vt-out-to-end var(--dur-exit) var(--ease) both;
+}
+:root[data-nav-dir='back']::view-transition-new(hippo-headline),
+:root[data-nav-dir='back']::view-transition-new(hippo-page),
+:root[data-nav-dir='back']::view-transition-new(hippo-step) {
+  animation: vt-in-from-start var(--dur-page) var(--ease-move) both;
+}
+:root[data-nav-dir='lateral']::view-transition-old(hippo-headline),
+:root[data-nav-dir='lateral']::view-transition-old(hippo-page) {
+  animation: vt-fade-out var(--dur-press) var(--ease) both;
+}
+/* The new screen starts as the old one is nearly gone, so the two never read as one. */
+:root[data-nav-dir='lateral']::view-transition-new(hippo-headline),
+:root[data-nav-dir='lateral']::view-transition-new(hippo-page) {
+  animation: vt-fade-in var(--dur) var(--ease) calc(var(--dur-press) * 0.6) both;
+}
+
+/* The sheet surface: both images are the same blank surface, so only the morph shows. When the
+   page was scrolled, its old place is off screen; it then takes its new place at once. */
+::view-transition-old(hippo-sheet),
+::view-transition-new(hippo-sheet) {
+  animation: none;
+}
+::view-transition-old(hippo-sheet):not(:only-child) {
+  opacity: 0;
+}
+:root[data-nav-scrolled]::view-transition-group(hippo-sheet) {
+  animation: none;
+}
+/* Into the app from setup: the sheet rises from the bottom; back into setup, it sinks. */
+::view-transition-new(hippo-sheet):only-child {
+  animation: vt-rise var(--dur-sheet) var(--ease-sheet) both;
+}
+::view-transition-old(hippo-sheet):only-child {
+  animation: vt-sink var(--dur-exit) var(--ease-in) both;
+}
+
+/* Bottom navigation: between destinations it stays put and BottomNav moves its indicator
+   (the new image is live). It slides away when a screen has no navigation, and back. */
+::view-transition-group(hippo-nav) {
+  animation: none;
+}
+::view-transition-old(hippo-nav) {
+  display: none;
+}
+::view-transition-new(hippo-nav) {
+  animation: none;
+}
+::view-transition-old(hippo-nav):only-child {
+  display: block;
+  animation: vt-sink var(--dur-exit) var(--ease-in) both;
+}
+::view-transition-new(hippo-nav):only-child {
+  animation: vt-rise var(--dur-page) var(--ease-sheet) both;
+}
+
+/* The toast stays where it is, above everything, across screens. */
+::view-transition-group(hippo-toast),
+::view-transition-new(hippo-toast) {
+  animation: none;
+}
+::view-transition-old(hippo-toast) {
+  display: none;
+}
+::view-transition-new(hippo-toast):only-child {
+  animation: vt-fade-in var(--dur) var(--ease) both;
+}
+::view-transition-old(hippo-toast):only-child {
+  display: block;
+  animation: vt-fade-out var(--dur-exit) var(--ease) both;
+}
+
+/* Setup: progress dots and the action bar stay in place while the step's content slides. */
+::view-transition-group(hippo-step-progress),
+::view-transition-group(hippo-step-actions) {
+  animation: none;
+}
+::view-transition-old(hippo-step-progress),
+::view-transition-old(hippo-step-actions) {
+  display: none;
+}
+::view-transition-new(hippo-step-progress),
+::view-transition-new(hippo-step-actions) {
+  animation: none;
+}
+
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-out-to-start {
+  to {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--vt-shift)));
+  }
+}
+@keyframes vt-out-to-end {
+  to {
+    opacity: 0;
+    transform: translateX(var(--vt-shift));
+  }
+}
+@keyframes vt-in-from-end {
+  from {
+    opacity: 0;
+    transform: translateX(var(--vt-shift));
+  }
+}
+@keyframes vt-in-from-start {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--vt-shift)));
+  }
+}
+@keyframes vt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
+@keyframes vt-sink {
+  to {
+    opacity: 0;
+    transform: translateY(48px);
+  }
+}
+
+/* Direction of travel follows the reading direction. */
+:root {
+  --vt-shift: var(--shift-page);
+}
+:root:dir(rtl) {
+  --vt-shift: calc(-1 * var(--shift-page));
+}
+
+/* ---- Small enter effects, shared by components and screens ---- */
+
+/* Something new appears in place (a confirmation, a status pill, a new row): it rises a few
+   pixels and fades in. Not on first paint: only once the app has booted (html[data-booted]). */
+:root[data-booted] .motion-enter {
+  animation: motion-enter var(--dur) var(--ease-sheet) both;
+}
+/* Content replacing a loading placeholder cross-fades in place. */
+:root[data-booted] .motion-reveal {
+  animation: vt-fade-in var(--dur) var(--ease) both;
+}
+
+@keyframes motion-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--shift-enter));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  :root[data-booted] .motion-enter {
+    animation: vt-fade-in var(--dur-press) linear both;
+  }
+}

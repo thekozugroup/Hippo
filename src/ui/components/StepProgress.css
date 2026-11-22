@@ -1,0 +1,45 @@
+.step-progress {
+  display: flex;
+  align-items: center;
+  min-height: var(--sp-4);
+}
+
+.step-progress__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* A dim dot with a bright layer that fades in as the step is reached (opacity only). The current
+   step is a short bar. */
+.step-progress__dot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--dot-dim);
+}
+.step-progress__dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.step-progress__dot.is-done::after {
+  opacity: 1;
+}
+.step-progress__dot.is-current {
+  width: 18px;
+}
+
+@media (forced-colors: active) {
+  .step-progress__dot {
+    background: GrayText;
+  }
+  .step-progress__dot::after {
+    background: CanvasText;
+  }
+}

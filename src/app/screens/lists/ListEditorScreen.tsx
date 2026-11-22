@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { CloudOff, Copy, Link2Off, RefreshCw, Send, Share2, Trash2 } from 'lucide-react'
+import { Check, CloudOff, Copy, Link2Off, RefreshCw, Send, Share2, Trash2 } from 'lucide-react'
 import { useLocation } from 'wouter'
 import {
   BottomSheet,
@@ -159,14 +159,21 @@ function NewListForm() {
   )
 }
 
-function ShareLinkBox({ list }: { list: SharedList }) {
+function ShareLinkBox({ list, entering }: { list: SharedList; entering: boolean }) {
   const notify = useNotify()
   const link = buildShareLink(list, appBaseUrl())
   const canShare = typeof navigator.share === 'function'
+  const [copied, setCopied] = useState(0)
+  useEffect(() => {
+    if (!copied) return
+    const id = window.setTimeout(() => setCopied(0), 2000)
+    return () => window.clearTimeout(id)
+  }, [copied])
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(link)
+      setCopied((n) => n + 1)
       notify('Link copied. Paste it into a message to your friends.')
     } catch {
       document.querySelector<HTMLInputElement>('#share-link')?.select()
@@ -184,7 +191,8 @@ function ShareLinkBox({ list }: { list: SharedList }) {
   }
 
   return (
-    <div className="app-stack">
+    // Just shared: the link rises into place, so it is clear where it came from.
+    <div className={entering ? 'app-stack motion-enter' : 'app-stack'}>
       <TextField
         id="share-link"
         label="Share link"
@@ -195,8 +203,14 @@ function ShareLinkBox({ list }: { list: SharedList }) {
         data-testid="share-link"
       />
       <div className="app-row app-row--fill">
-        <Button variant="primary" size="md" fullWidth icon={<Copy />} onClick={() => void copy()}>
-          Copy link
+        <Button
+          variant="primary"
+          size="md"
+          fullWidth
+          icon={copied ? <Check key={copied} className="motion-enter" /> : <Copy />}
+          onClick={() => void copy()}
+        >
+          {copied ? 'Copied' : 'Copy link'}
         </Button>
         {canShare ? (
           <Button variant="secondary" size="md" fullWidth icon={<Share2 />} onClick={() => void share()}>
@@ -219,6 +233,7 @@ function ListEditor({ list }: { list: SharedList }) {
   const [errors, setErrors] = useState<DetailsErrors>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [summary, setSummary] = useState<SyncSummary | null>(null)
+  const [openedAs] = useState(() => (list.status === 'published' && !list.linkPending ? 'shared' : 'not-shared'))
   const [confirm, setConfirm] = useState<Confirm>(null)
 
   // Repair once when the editor opens: republishes anything relays lost (owner events only).
@@ -372,7 +387,7 @@ function ListEditor({ list }: { list: SharedList }) {
           </>
         ) : list.status === 'published' ? (
           <>
-            <ShareLinkBox list={list} />
+            <ShareLinkBox list={list} entering={openedAs === 'not-shared'} />
             {list.syncPending && busy === null ? (
               <p className="app-note" role="status">
                 Some changes have not reached friends yet. Hippo keeps trying in the background.

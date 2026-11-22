@@ -22,10 +22,19 @@
   border-radius: var(--r-pill);
   background: var(--surface-2);
   color: var(--text);
-  transition:
-    width var(--dur) var(--ease),
-    background-color var(--dur) var(--ease);
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Pressed: the circle gives a little, the way a button does. */
+.bottom-nav__icon {
+  transition: transform var(--dur-press) var(--ease);
+}
+.bottom-nav__item:not(.is-active) {
+  transition: transform var(--dur-press) var(--ease);
+}
+.bottom-nav__item:not(.is-active):active,
+.bottom-nav__item.is-active:active .bottom-nav__icon {
+  transform: scale(0.94);
 }
 
 .bottom-nav__icon,
@@ -42,7 +51,9 @@
   justify-content: flex-start;
   padding-inline-end: var(--sp-5);
   background: transparent;
-  overflow: hidden;
+  /* The indicator travels in from the previous destination (BottomNav.tsx), above the other items. */
+  position: relative;
+  z-index: 1;
 }
 
 .bottom-nav__item.is-active .bottom-nav__icon {
@@ -90,7 +101,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bottom-nav__item {
+  .bottom-nav__item,
+  .bottom-nav__icon {
     transition: none;
   }
 }

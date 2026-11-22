@@ -27,6 +27,7 @@
 
 .icon-btn:active:not(:disabled) {
   transform: scale(0.94);
+  transition-duration: var(--dur-press);
 }
 
 .icon-btn:disabled {

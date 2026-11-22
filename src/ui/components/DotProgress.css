@@ -10,18 +10,33 @@
 }
 
 .dot-progress__dot {
+  position: relative;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--dot-dim);
-  transition: background-color var(--dur) var(--ease);
 }
-.dot-progress__dot.is-on {
+/* The bright dot is a layer that scales and fades in, so a fill is transform and opacity only.
+   --dot-delay (set per dot by DotProgress) makes a change run column by column, once. */
+.dot-progress__dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background: var(--text);
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity var(--dur) var(--ease) var(--dot-delay, 0ms),
+    transform var(--dur) var(--ease-sheet) var(--dot-delay, 0ms);
+}
+.dot-progress__dot.is-on::after {
+  opacity: 1;
+  transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dot-progress__dot {
+  .dot-progress__dot::after {
     transition: none;
   }
 }
@@ -30,7 +45,7 @@
   .dot-progress__dot {
     background: GrayText;
   }
-  .dot-progress__dot.is-on {
+  .dot-progress__dot::after {
     background: CanvasText;
   }
 }

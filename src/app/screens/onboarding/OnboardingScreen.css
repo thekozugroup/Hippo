@@ -1,0 +1,145 @@
+/* Setup screens. The field is dark in both themes (StepScreen sets color-scheme: dark), so the
+   semantic tokens below resolve to their dark values. Tokens only. */
+
+.step-screen--blank {
+  /* Shown for a frame while the saved progress loads. */
+  display: block;
+}
+
+/* Occasion: native radios shown as pills, two per row (one per row when text is large). */
+.setup-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-inline);
+}
+.setup-choices__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
+  gap: var(--sp-2);
+}
+
+.setup-choice {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  cursor: pointer;
+}
+/* The real radio covers its pill, invisible, so a tap or click lands on the control itself. */
+.setup-choice__input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.setup-choice__label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--h-md);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+  color: var(--text);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
+  font-weight: 500;
+  text-align: center;
+  overflow-wrap: anywhere;
+  transition: transform var(--dur) var(--ease);
+}
+.setup-choice__input:checked + .setup-choice__label {
+  background: var(--white);
+  color: var(--ink-on-white);
+  box-shadow: none;
+}
+.setup-choice__input:focus-visible + .setup-choice__label {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+.setup-choice:active .setup-choice__label {
+  transform: scale(0.97);
+  transition-duration: var(--dur-press);
+}
+
+.setup-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-label);
+  line-height: var(--lh-caption);
+}
+
+.setup-ideas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-inline);
+}
+.setup-ideas__label {
+  margin: 0;
+  color: color-mix(in srgb, var(--white) 80%, transparent);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
+}
+.setup-ideas__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.setup-ideas__chips .chip {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-secondary);
+  white-space: normal;
+}
+
+/* One plain action inside a step's text (install, bookmarklet, show me how): a white pill. */
+.setup-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--h-md);
+  padding-inline: var(--sp-5);
+  border-radius: var(--r-pill);
+  background: var(--white);
+  color: var(--ink-on-white);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease);
+}
+.setup-action:active {
+  transform: scale(0.97);
+  transition-duration: var(--dur-press);
+}
+.setup-action[aria-busy='true'] {
+  cursor: progress;
+}
+
+.setup-small {
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
+}
+
+.setup-saved {
+  color: var(--white);
+  font-weight: 500;
+}
+
+@media (forced-colors: active) {
+  .setup-choice__label {
+    border: 1px solid ButtonText;
+  }
+  .setup-choice__input:checked + .setup-choice__label {
+    background: Highlight;
+    color: HighlightText;
+  }
+  .setup-action {
+    border: 1px solid ButtonText;
+  }
+}

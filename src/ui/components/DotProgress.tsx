@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ComponentPropsWithRef } from 'react'
 import { cx } from '../cx.ts'
+import { durationToken } from '../motion.ts'
 import './DotProgress.css'
 
 /** Dot size plus the smallest gap between columns, in CSS pixels (matches DotProgress.css). */
@@ -25,7 +26,10 @@ function columnsFor(width: number): number {
   return Math.max(2, Math.floor((width + MIN_GAP) / (DOT + MIN_GAP)))
 }
 
-/** Two-row dot matrix that spans its container, exposed as a progressbar. */
+/** Longest time the whole sequence may take, so a big jump still reads as one quick fill. */
+const SEQUENCE_MS = 240
+
+/** Two-row dot matrix that spans its container, exposed as a progressbar. A change fills (or empties) the dots in sequence, once. */
 export function DotProgress({ value, label, valueText, columns, className, ...rest }: DotProgressProps) {
   const fixed = columns !== undefined && Number.isInteger(columns) && columns >= 1 ? Math.min(columns, 200) : undefined
   const ref = useRef<HTMLDivElement>(null)
@@ -53,6 +57,20 @@ export function DotProgress({ value, label, valueText, columns, className, ...re
   let filled = Math.round(clamped * cols) * 2
   if (clamped > 0 && filled === 0) filled = 2
   if (clamped < 1 && filled === total) filled = total - 2
+  // Dots that change since the last render light up column by column (CSS transition delays).
+  // Only a change of value animates; fitting the columns to the width (first layout, resize) does not.
+  const [seq, setSeq] = useState({ filled, cols, from: filled })
+  if (seq.filled !== filled || seq.cols !== cols) setSeq({ filled, cols, from: seq.cols === cols ? seq.filled : filled })
+  const from = seq.cols === cols ? seq.from : filled
+  const changedColumns = Math.abs(filled - from) / 2
+  const step = changedColumns > 0 ? Math.min(durationToken('--stagger', 18), SEQUENCE_MS / changedColumns) : 0
+  const delayFor = (i: number): string | undefined => {
+    const lo = Math.min(from, filled)
+    const hi = Math.max(from, filled)
+    if (i < lo || i >= hi) return undefined
+    const col = filled > from ? Math.floor((i - from) / 2) : Math.floor((from - 1 - i) / 2)
+    return `${Math.round(col * step)}ms`
+  }
   return (
     <div
       {...rest}
@@ -71,7 +89,7 @@ export function DotProgress({ value, label, valueText, columns, className, ...re
         <span
           key={i}
           className={cx('dot-progress__dot', i < filled && 'is-on')}
-          style={{ gridColumn: Math.floor(i / 2) + 1, gridRow: (i % 2) + 1 }}
+          style={{ gridColumn: Math.floor(i / 2) + 1, gridRow: (i % 2) + 1, ...(delayFor(i) ? { ['--dot-delay' as string]: delayFor(i) } : {}) }}
           aria-hidden="true"
         />
       ))}

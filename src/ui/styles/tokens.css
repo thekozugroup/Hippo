@@ -97,11 +97,20 @@
   --h-md: 48px;
   --h-min: 44px;
 
-  /* Motion */
-  --dur: 180ms;
-  --dur-sheet: 320ms;
+  /* Motion. Only transform and opacity move; nothing runs longer than --dur-sheet.
+     Under prefers-reduced-motion every transition is instant or a short fade (base.css, motion.css). */
+  --dur-press: 100ms; /* pressed states */
+  --dur: 180ms; /* state changes: a pill appears, a label fades in, a toast leaves */
+  --dur-exit: 160ms; /* what leaves goes a little faster than what arrives */
+  --dur-page: 280ms; /* route transitions, the nav indicator, rows moving to a new place */
+  --dur-sheet: 320ms; /* sheets and dialogs rising from the bottom */
+  --stagger: 18ms; /* delay between dots filling in sequence */
   --ease: ease-out;
-  --ease-sheet: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1); /* exits: leave quickly, no lingering */
+  --ease-move: cubic-bezier(0.3, 0, 0, 1); /* moves on screen: fast start, soft landing, no overshoot */
+  --ease-sheet: cubic-bezier(0.2, 0.8, 0.2, 1); /* arrivals from off screen */
+  --shift-page: 32px; /* how far page content slides on a route change */
+  --shift-enter: 8px; /* how far a new element rises as it fades in */
 
   /* Elevation */
   --shadow-sheet: 0 -8px 40px color-mix(in srgb, var(--slate-950) 18%, transparent);

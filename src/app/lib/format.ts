@@ -129,3 +129,8 @@ export function listStatusLabel(list: Pick<SharedList, 'status' | 'linkPending'>
   if (list.status === 'draft') return 'Not shared yet'
   return 'Sharing stopped'
 }
+
+/** "Ann's", for "Ann's list". Names are shown as the person typed them. */
+export function possessive(name: string): string {
+  return `${name}’s`
+}

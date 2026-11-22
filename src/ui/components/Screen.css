@@ -110,3 +110,15 @@
 .screen--contained.screen--dark {
   background: var(--surface);
 }
+
+/* Persistent parts for route transitions (styles/motion.css). Full-page screens only: previews
+   (contained) never carry names, so several can sit on one page. */
+.screen:not(.screen--contained) .screen__headline {
+  view-transition-name: hippo-headline;
+}
+.screen:not(.screen--contained) > .screen__body .screen__sheet {
+  view-transition-name: hippo-sheet;
+}
+.screen:not(.screen--contained) .screen__nav-inner > .bottom-nav {
+  view-transition-name: hippo-nav;
+}

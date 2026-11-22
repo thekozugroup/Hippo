@@ -6,6 +6,7 @@ import { startMockRelay } from '../src/core/testing/mock-relay.ts'
 import { freePort, loadPlaywright, ROOT, startPreview, tests } from './harness.mjs'
 import './flows.test.mjs'
 import './review.test.mjs'
+import './onboarding.test.mjs'
 
 if (!existsSync(ROOT + 'dist/index.html')) {
   console.error('dist/ is missing: run `npm run build` first (npm run test:e2e does this).')

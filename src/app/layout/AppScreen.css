@@ -38,6 +38,11 @@
   overflow-wrap: anywhere;
 }
 
+/* The sheet's content on a full screen moves with route transitions (ui/styles/motion.css). */
+.app-page {
+  view-transition-name: hippo-page;
+}
+
 .app-sheet {
   display: flex;
   flex-direction: column;
@@ -242,4 +247,16 @@ ul.app-steps {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-related);
+}
+
+/* "Get set up" checklist rows on Home. */
+.setup-task__icon {
+  display: inline-grid;
+  place-items: center;
+  width: var(--h-min);
+  height: var(--h-min);
+  color: var(--text-3);
+}
+.setup-task__icon.is-done {
+  color: var(--success);
 }

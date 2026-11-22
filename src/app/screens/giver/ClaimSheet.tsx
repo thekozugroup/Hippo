@@ -244,11 +244,12 @@ export function ClaimSheet({ request, session, onClose }: ClaimSheetProps) {
   // Keep the last request so the title stays put while the sheet closes;
   // `n` remounts the form for every new request.
   const [track, setTrack] = useState<{ current: SheetRequest | null; shown: SheetRequest | null; n: number }>({ current: request, shown: request, n: 0 })
-  if (request !== track.current) setTrack({ current: request, shown: request ?? track.shown, n: track.n + 1 })
+  // The body stays too, so the sheet leaves whole instead of emptying first.
+  if (request !== track.current) setTrack({ current: request, shown: request ?? track.shown, n: request ? track.n + 1 : track.n })
   const shown = request ?? track.shown
   return (
     <BottomSheet open={request !== null} onClose={() => onClose(false)} title={shown ? sheetTitle(shown) : ''} {...(shown ? { description: sheetDescription(shown) } : {})}>
-      {request ? <Body key={track.n} request={request} session={session} onDone={onClose} /> : null}
+      {shown ? <Body key={track.n} request={shown} session={session} onDone={onClose} /> : null}
     </BottomSheet>
   )
 }

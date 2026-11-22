@@ -57,9 +57,9 @@ export function AppScreen({ title, compactTitle, intro, back, backLabel = 'Back'
           {intro ? <div className="app-hero__intro">{intro}</div> : null}
         </div>
       }
-      nav={nav ? <BottomNav items={NAV} activeId={nav} label="Main" /> : undefined}
+      nav={nav ? <BottomNav items={NAV} activeId={nav} label="Main" remember="main" /> : undefined}
     >
-      <div className="app-sheet" aria-busy={busy || undefined}>
+      <div className="app-sheet app-page" aria-busy={busy || undefined}>
         {children}
       </div>
     </Screen>

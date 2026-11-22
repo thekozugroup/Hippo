@@ -15,28 +15,54 @@
     0 0 0 1px var(--hairline),
     var(--shadow-sheet);
   overflow: hidden;
-  /* Slide-up on phones */
-  transform: translateY(0);
+  /* Phones: rises from the bottom edge and leaves the same way, a little faster than it came. */
+  transform: none;
+  opacity: 1;
   transition:
-    transform var(--dur-sheet) var(--ease-sheet),
-    opacity var(--dur-sheet) var(--ease-sheet),
-    overlay var(--dur-sheet) allow-discrete,
-    display var(--dur-sheet) allow-discrete;
+    transform var(--dur-exit) var(--ease-in),
+    opacity var(--dur-exit) var(--ease-in),
+    overlay var(--dur-exit) allow-discrete,
+    display var(--dur-exit) allow-discrete;
+}
+
+.bottom-sheet[open] {
+  transition-duration: var(--dur-sheet);
+  transition-timing-function: var(--ease-sheet);
 }
 
 .bottom-sheet:not([open]) {
-  transform: translateY(40px);
-  opacity: 0;
+  transform: translateY(100%);
+  /* Leaving: nothing inside takes a tap. */
+  pointer-events: none;
 }
 
 @starting-style {
   .bottom-sheet[open] {
-    transform: translateY(40px);
-    opacity: 0;
+    transform: translateY(100%);
   }
 }
 
-/* The scrim is not faded: opacity on a ::backdrop that carries a blur would animate the blur. */
+/* The scrim fades with opacity. Its blur radius never changes (frost.css): only how much of the
+   blurred layer shows. */
+.bottom-sheet::backdrop {
+  opacity: 1;
+  transition:
+    opacity var(--dur-exit) var(--ease-in),
+    overlay var(--dur-exit) allow-discrete,
+    display var(--dur-exit) allow-discrete;
+}
+.bottom-sheet[open]::backdrop {
+  transition-duration: var(--dur-sheet);
+  transition-timing-function: var(--ease-sheet);
+}
+.bottom-sheet:not([open])::backdrop {
+  opacity: 0;
+}
+@starting-style {
+  .bottom-sheet[open]::backdrop {
+    opacity: 0;
+  }
+}
 
 .bottom-sheet__panel {
   display: flex;
@@ -85,7 +111,7 @@
   margin-inline: calc(-1 * var(--sp-1));
 }
 
-/* Wide screens: centred dialog */
+/* Wide screens: a centred dialog that scales up a touch from where it will sit. */
 @media (min-width: 640px) {
   .bottom-sheet {
     margin: auto;
@@ -93,20 +119,25 @@
     border-radius: var(--r-card);
   }
   .bottom-sheet:not([open]) {
-    transform: scale(0.97);
+    transform: scale(0.96);
+    opacity: 0;
   }
   @starting-style {
     .bottom-sheet[open] {
-      transform: scale(0.97);
+      transform: scale(0.96);
       opacity: 0;
     }
   }
 }
 
+/* Reduced motion: no movement, a fade only (instant with the global reduced-motion rule). */
 @media (prefers-reduced-motion: reduce) {
   .bottom-sheet,
   .bottom-sheet:not([open]) {
     transform: none;
+  }
+  .bottom-sheet:not([open]) {
+    opacity: 0;
   }
   @starting-style {
     .bottom-sheet[open] {

@@ -62,14 +62,29 @@ export async function addItem(page, baseUrl, { title, price, qty, love, contrib,
 
 export const card = (page, title) => page.getByRole('article', { name: title })
 
-test('first run: empty home explains what to do, with the strict CSP in place', async ({ browser, relay, baseUrl, state }) => {
+/**
+ * A fresh profile that opens Home starts first-run setup. Owners in the main flows close it at
+ * step 1 ("Not now"), which is itself a supported path: Home then shows the Get set up checklist.
+ * Setup has its own tests in onboarding.test.mjs.
+ */
+export async function skipSetup(page) {
+  await page.getByRole('button', { name: 'Not now' }).click()
+  await page.waitForURL(/#\/$/)
+  await page.getByRole('heading', { name: /Get set up/ }).waitFor()
+}
+
+test('first run: setup opens, closing it at step 1 lands on Home, with the strict CSP in place', async ({ browser, relay, baseUrl, state }) => {
   const owner = await newUser(browser, relay, 'owner', state)
   state.owner = owner
   const { page } = owner
   await page.goto(baseUrl)
-  await page.getByRole('heading', { level: 1 }).waitFor()
-  await page.getByRole('heading', { name: 'How it works' }).waitFor()
+  await page.getByRole('heading', { level: 1, name: /Make a wishlist/ }).waitFor()
+  await skipSetup(page)
   await page.getByRole('link', { name: 'Add a wish' }).waitFor()
+  // Closed means closed: Home again does not reopen it.
+  await page.reload()
+  await page.getByRole('heading', { name: /Get set up/ }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Not now' }).count(), 0)
   const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
   assert.match(csp ?? '', /script-src 'self';/)
   assert.doesNotMatch(csp ?? '', /unsafe-inline|unsafe-eval/)
@@ -272,7 +287,7 @@ test('the ?relays= test override is loopback-only and lasts for one tab', async 
     const note = page.getByRole('note').filter({ hasText: 'Test mode' })
     // A non-loopback relay in the parameter is ignored.
     await page.goto(`${baseUrl}?relays=${encodeURIComponent('wss://relay.evil.example')}#/`)
-    await page.getByRole('heading', { level: 1 }).waitFor()
+    await skipSetup(page)
     assert.equal(await note.count(), 0)
     // A loopback relay switches this tab into test mode, also after a reload...
     await page.goto(`${baseUrl}?relays=${encodeURIComponent('ws://127.0.0.1:1')}#/`)
@@ -327,8 +342,9 @@ test('share target and deep link prefill the Add form; hostile values are droppe
   assert.equal(await page.getByRole('textbox', { name: 'Picture link' }).inputValue(), '')
   assert.equal(await page.locator('img[src="x"]').count(), 0)
 
-  // FR-7: pasting a link suggests a name.
+  // FR-7: pasting a link suggests a name. (Nothing was saved, so Home starts setup here.)
   await page.goto(baseUrl + '#/')
+  await skipSetup(page)
   await page.getByRole('link', { name: 'Add a wish', exact: true }).click()
   await page.getByRole('textbox', { name: 'Shop link' }).fill('https://shop.example/products/linen-duvet-cover')
   await page.getByRole('textbox', { name: 'Shop link' }).blur()

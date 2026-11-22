@@ -9,6 +9,11 @@
   pointer-events: none;
 }
 
+/* The app's toast keeps its place during route transitions (styles/motion.css). */
+.toast-region:not(.toast-region--inline) > .toast {
+  view-transition-name: hippo-toast;
+}
+
 .toast-region--inline {
   position: static;
   padding: 0;
@@ -25,7 +30,8 @@
   min-height: var(--h-md);
   padding: var(--sp-1);
   padding-inline-start: var(--sp-5);
-  border-radius: var(--r-pill);
+  /* A pill on one line; a rounded card when the text wraps (large text, narrow screens). */
+  border-radius: var(--r-card);
   background: var(--surface-inverse);
   color: var(--text-inverse);
   box-shadow: var(--shadow-nav);
@@ -33,7 +39,13 @@
   line-height: var(--lh-secondary);
   font-weight: 500;
   pointer-events: auto;
-  animation: toast-in var(--dur-sheet) var(--ease-sheet);
+  animation: toast-in var(--dur) var(--ease-sheet);
+}
+
+/* Leaves the way it came: sinks a little and fades. */
+.toast.is-leaving {
+  pointer-events: none;
+  animation: toast-out var(--dur-exit) var(--ease-in) forwards;
 }
 
 .toast__message {
@@ -61,15 +73,17 @@
     transform: translateY(12px);
   }
 }
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .toast {
-    animation: toast-fade var(--dur) linear;
-  }
-  @keyframes toast-fade {
-    from {
-      opacity: 0;
-    }
+  .toast,
+  .toast.is-leaving {
+    animation: none;
   }
 }
 

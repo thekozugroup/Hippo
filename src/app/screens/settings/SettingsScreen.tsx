@@ -1,25 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bookmark, Copy, Download, ExternalLink, Tags, Upload } from 'lucide-react'
-import { BottomSheet, Button, SectionHeader, SegmentedControl, TextArea } from '../../../ui/index.ts'
+import { Bookmark, Copy, Download, ExternalLink, RotateCcw, Tags, Upload } from 'lucide-react'
+import { BottomSheet, Button, SectionHeader, SegmentedControl, TextArea, TextField } from '../../../ui/index.ts'
 import {
   DEFAULT_RELAYS,
   importData,
   isHippoError,
   isRelayUrl,
+  LIMITS,
   parseExportFile,
+  setOnboarding,
+  setOwnerName,
   setRelayOverride,
   setTheme,
   type ExportFile,
   type Theme,
 } from '../../../core/index.ts'
 import { useCore } from '../../core/context.ts'
-import { useSettings } from '../../core/data.ts'
+import { useSettings, useSharedLists } from '../../core/data.ts'
 import { useNotify } from '../../core/notify.ts'
 import { applyTheme } from '../../core/theme.ts'
+import { newFlow, toStored } from '../../core/onboarding.ts'
+import { writeSetupHint } from '../../core/setupHint.ts'
+import { useLocation } from 'wouter'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { downloadBackup } from '../../lib/backup-file.ts'
 import { appBaseUrl, bookmarkletCode, shortcutScript } from '../../lib/capture-tools.ts'
-import { plural } from '../../lib/format.ts'
+import { plural, possessive } from '../../lib/format.ts'
+import { resyncLists } from '../../lib/sync.ts'
 import { CategoriesSheet } from '../CategoriesSheet.tsx'
 import './SettingsScreen.css'
 
@@ -37,6 +44,88 @@ async function copyText(text: string): Promise<boolean> {
 /** Relays end up in share links, so only public wss:// relays are allowed (same rule as core). */
 function isRelayInput(s: string): boolean {
   return isRelayUrl(s)
+}
+
+/** The owner's name (shown to friends on shared lists) and a way to go through setup again. */
+function ProfileSection() {
+  const core = useCore()
+  const notify = useNotify()
+  const settings = useSettings()
+  const lists = useSharedLists()
+  const [, navigate] = useLocation()
+  const [text, setText] = useState<string | null>(null)
+  const [error, setError] = useState<string | undefined>()
+  const [saving, setSaving] = useState(false)
+  const value = text ?? settings?.ownerName ?? ''
+  const shown = value.replace(/\s+/g, ' ').trim()
+
+  const save = async () => {
+    if (saving) return
+    if ([...shown].length > LIMITS.ownerName) {
+      setError(`Use up to ${LIMITS.ownerName} characters.`)
+      return
+    }
+    setError(undefined)
+    setSaving(true)
+    try {
+      await setOwnerName(core.db, shown || undefined)
+      setText(null)
+      notify(shown ? `Saved. Friends see \u201c${possessive(shown)} list\u201d.` : 'Name removed. Friends see the list name only.')
+      resyncLists(
+        core,
+        (lists ?? []).filter((l) => l.status === 'published').map((l) => l.id),
+        notify,
+      )
+    } catch {
+      setError('Could not save your name. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const replay = async () => {
+    try {
+      await setOnboarding(core.db, toStored(newFlow(settings?.ownerName ? { ownerName: settings.ownerName } : {}), Date.now()))
+      writeSetupHint(false)
+      navigate('/welcome/start')
+    } catch {
+      notify('Could not open setup. Please try again.')
+    }
+  }
+
+  return (
+    <section className="app-stack" aria-labelledby="set-profile">
+      <h2 id="set-profile" className="app-section-title">
+        Your name
+      </h2>
+      <form
+        className="app-stack"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault()
+          void save()
+        }}
+      >
+        <TextField
+          label="First name or nickname"
+          value={value}
+          autoComplete="given-name"
+          maxLength={LIMITS.ownerName * 2}
+          onChange={(e) => setText(e.target.value)}
+          hint={shown ? `Friends you share a list with see \u201c${possessive(shown)} list\u201d.` : 'Shown at the top of lists you share. Leave it empty to show the list name only.'}
+          {...(error ? { error } : {})}
+        />
+        <div className="app-row app-row--fill">
+          <Button type="submit" variant="secondary" size="md" fullWidth loading={saving} disabled={text === null}>
+            Save name
+          </Button>
+          <Button type="button" variant="ghost" size="md" fullWidth icon={<RotateCcw />} onClick={() => void replay()}>
+            Go through setup again
+          </Button>
+        </div>
+      </form>
+    </section>
+  )
 }
 
 function ThemeSection() {
@@ -408,6 +497,7 @@ export default function SettingsScreen() {
   const [manage, setManage] = useState(false)
   return (
     <AppScreen nav="settings" title="Settings">
+      <ProfileSection />
       <ThemeSection />
       <section className="app-stack" aria-labelledby="set-cats">
         <h2 id="set-cats" className="app-section-title">

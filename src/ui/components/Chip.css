@@ -14,7 +14,15 @@
   text-transform: uppercase;
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+  transition:
+    background-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.chip--interactive:active {
+  transform: scale(0.96);
+  transition-duration: var(--dur-press);
 }
 
 .chip--interactive {

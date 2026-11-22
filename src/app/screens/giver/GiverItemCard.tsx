@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ExternalLink, TriangleAlert } from 'lucide-react'
 import { Button, DotProgress, ImportanceMark, MoneyText, StatusPill, Thumb } from '../../../ui/index.ts'
 import type { ClaimRow, GiverItemView } from '../../../core/index.ts'
@@ -17,9 +17,9 @@ export interface GiverItemCardProps {
  * One of my gifts on a wish: a plain line with its quiet actions, never a box. `text` is null
  * when the status pill already says the same thing.
  */
-export function MyGiftLine({ text, pending, children }: { text: string | null; pending?: boolean; children: ReactNode }) {
+export function MyGiftLine({ text, pending, entering, children }: { text: string | null; pending?: boolean; entering?: boolean; children: ReactNode }) {
   return (
-    <li className="giver-line giver-line--mine">
+    <li className={entering ? 'giver-line giver-line--mine motion-enter' : 'giver-line giver-line--mine'}>
       {text ? (
         <span className="giver-line__text">
           {text}
@@ -54,6 +54,9 @@ export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchase
   const myPledge = myRows.some((r) => r.kind === 'pledge')
   const titleId = itemHeadingId(item.id)
   const main = canClaim ? 'claim' : canCover ? 'cover' : canPledge ? 'pledge' : null
+  // What was on the card when it first showed; anything that changes after that enters with a
+  // little motion, so a claim is seen to land (the dots fill in DotProgress).
+  const [initial] = useState(() => ({ label: status?.label, mine: new Set(myRows.map((r) => r.claimId)) }))
 
   return (
     <article className="giver-item" aria-labelledby={titleId}>
@@ -72,7 +75,9 @@ export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchase
             ) : null}
             <ImportanceMark level={importanceLevel(item.importance)} />
           </p>
-          {status ? <StatusPill status={status.status} label={status.label} className="giver-item__status" /> : null}
+          {status ? (
+            <StatusPill key={status.label} status={status.status} label={status.label} className={status.label === initial.label ? 'giver-item__status' : 'giver-item__status motion-enter'} />
+          ) : null}
         </div>
       </div>
 
@@ -124,6 +129,7 @@ export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchase
               key={row.claimId}
               text={rowNeedsText(row, item, state) ? `${describeRow(row)}${row.conflict ? ' (not counted)' : ''}` : null}
               pending={pendingClaimIds.includes(row.claimId)}
+              entering={!initial.mine.has(row.claimId)}
             >
               {!row.conflict ? (
                 <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onMarkPurchased(row, row.status !== 'purchased')}>

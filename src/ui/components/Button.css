@@ -22,6 +22,8 @@
     transform var(--dur) var(--ease),
     background-color var(--dur) var(--ease),
     opacity var(--dur) var(--ease);
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .btn--lg {
@@ -45,8 +47,10 @@
   width: 100%;
 }
 
+/* Pressed: gives at once (--dur-press) and springs back at the normal pace. */
 .btn:active:not(:disabled):not([aria-disabled='true']) {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  transition-duration: var(--dur-press);
 }
 
 .btn__icon,

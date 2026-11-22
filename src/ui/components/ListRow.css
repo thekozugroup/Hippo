@@ -14,13 +14,26 @@
   color: inherit;
 }
 
+/* Pressed: a tint layer fades in under the row's content (opacity only). */
 .list-row__inner--action {
+  position: relative;
+  isolation: isolate;
   border-radius: var(--r-tile);
-  transition: background-color var(--dur) var(--ease);
   -webkit-tap-highlight-color: transparent;
 }
-.list-row__inner--action:active {
+.list-row__inner--action::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
   background: var(--surface-2);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.list-row__inner--action:active::before {
+  opacity: 1;
+  transition-duration: var(--dur-press);
 }
 
 .list-row__leading {

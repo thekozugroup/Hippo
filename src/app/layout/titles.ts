@@ -16,6 +16,11 @@ const ROUTES: ReadonlyArray<[RegExp, string]> = [
   [/^\/g\/[^/]+$/, 'Shared list'],
   [/^\/settings$/, 'Settings'],
   [/^\/design$/, 'Design gallery'],
+  [/^\/welcome\/start$/, 'Welcome, step 1 of 5'],
+  [/^\/welcome\/name$/, 'Your name, step 2 of 5'],
+  [/^\/welcome\/occasion$/, 'The occasion, step 3 of 5'],
+  [/^\/welcome\/wish$/, 'Your first wish, step 4 of 5'],
+  [/^\/welcome\/capture$/, 'Add wishes from anywhere, step 5 of 5'],
 ]
 
 export function titleFor(path: string): string {

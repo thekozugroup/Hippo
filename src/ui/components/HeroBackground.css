@@ -14,6 +14,16 @@
   color-scheme: dark;
 }
 
+/* Setup field (both themes): blue-700 to blue-900 at the top, falling to slate-950 by the middle,
+   where the headline and controls sit. White text keeps 15:1 or better over the lower half. */
+.hero-bg--night {
+  color-scheme: dark;
+  background-color: var(--slate-950);
+  background-image:
+    radial-gradient(ellipse 90% 45% at 20% 18%, color-mix(in srgb, var(--blue-600) 55%, transparent) 0%, transparent 100%),
+    linear-gradient(180deg, var(--blue-800) 0%, var(--blue-900) 22%, var(--blue-950) 42%, var(--slate-950) 62%);
+}
+
 /* Film grain: inline SVG turbulence blended over the gradient. It also dithers the
    gradient, which hides 8-bit banding. */
 .hero-bg::after {

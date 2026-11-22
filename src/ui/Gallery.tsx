@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowLeft, Bell, Gift, House, ListChecks, Menu, Plus, Search, Settings, Share2, Sparkles } from 'lucide-react'
+import { ArrowLeft, Bell, Gift, House, ListChecks, Menu, Plus, Search, Settings, Share2 } from 'lucide-react'
 import { BigValue } from './components/BigValue.tsx'
 import { BottomNav } from './components/BottomNav.tsx'
 import { BottomSheet } from './components/BottomSheet.tsx'
@@ -18,6 +18,8 @@ import { Logo } from './components/Logo.tsx'
 import { MoneyField } from './components/MoneyField.tsx'
 import { MoneyText } from './components/MoneyText.tsx'
 import { Screen } from './components/Screen.tsx'
+import { StepProgress } from './components/StepProgress.tsx'
+import { StepScreen } from './components/StepScreen.tsx'
 import { SectionHeader } from './components/SectionHeader.tsx'
 import { SegmentedControl } from './components/SegmentedControl.tsx'
 import { Select } from './components/Select.tsx'
@@ -206,25 +208,25 @@ function Showcase({ theme }: { theme: Theme }) {
         </div>
       </Section>
 
-      <Section title="Onboarding hero" note="Two-tone headline over the dark hero.">
-        <Screen
+      <Section title="Step screen, step progress" note="One question per screen on the setup field (dark in both themes). Dots start partly done; Back, a wide pill to continue, one quiet secondary action.">
+        <StepScreen
           contained
-          variant="dark"
-          sheetAs="div"
-          hero={<TopBar start={<Logo />} />}
-          headline={
-            <h2 className="t-headline">
-              <TwoTone tone="on-hero" muted="Since last week" bright="3 gifts have been claimed!" />
-            </h2>
-          }
+          step={2}
+          total={5}
+          title={<TwoTone tone="on-hero" muted="What should we" bright="call you?" />}
+          description={<p>Your first name or a nickname is enough.</p>}
+          onBack={() => undefined}
+          continueLabel="Continue"
+          onContinue={() => undefined}
+          secondaryAction={{ label: 'Skip', onClick: () => undefined }}
         >
-          <p className="t-secondary t-muted">Every wish, one private link.</p>
-          <div className="gx-mt">
-            <Button variant="primary" fullWidth icon={<Sparkles />}>
-              Start
-            </Button>
-          </div>
-        </Screen>
+          <TextField label="Your name" defaultValue="Ann" hint={'Friends you share a list with see \u201cAnn\u2019s list\u201d.'} />
+        </StepScreen>
+        <div className="gx-row gx-row--gap gx-mt">
+          <StepProgress current={1} total={5} />
+          <StepProgress current={3} total={5} />
+          <StepProgress current={5} total={5} />
+        </div>
       </Section>
 
       <Section title="Frost" note="Four variants. Uniform blur, flat tint, one hairline.">

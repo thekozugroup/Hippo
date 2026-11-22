@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { CloudOff, Copy, LockKeyhole, Share2, UserRound } from 'lucide-react'
+import { CloudOff, Copy, LockKeyhole, Share2, UserRound, X } from 'lucide-react'
 import { useLocation } from 'wouter'
-import { BottomSheet, Button, Chip, EmptyState, LinkButton, SectionHeader, Skeleton, StatusPill, TwoTone } from '../../../ui/index.ts'
+import { BottomSheet, Button, Chip, EmptyState, IconButton, LinkButton, SectionHeader, Skeleton, StatusPill, TextField, TwoTone } from '../../../ui/index.ts'
 import {
   buildGuestShareLink,
   getGuestList,
   hideGuestList,
+  LIMITS,
+  markSeen,
   type ClaimPayload,
   type ClaimRow,
   type GiverListSession,
@@ -13,11 +15,12 @@ import {
 } from '../../../core/index.ts'
 import { useCore } from '../../core/context.ts'
 import { useAddGuestLink, useGiverSession, useGiverView, type GiverProblem } from '../../core/giver.ts'
+import { useSettings } from '../../core/data.ts'
 import { useNotify } from '../../core/notify.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { ScreenMessage } from '../../layout/ScreenMessage.tsx'
 import { appBaseUrl } from '../../lib/capture-tools.ts'
-import { formatEventDate, plural } from '../../lib/format.ts'
+import { formatEventDate, plural, possessive } from '../../lib/format.ts'
 import { ClaimSheet, type SheetRequest } from './ClaimSheet.tsx'
 import { GiverItemCard, MyGiftLine } from './GiverItemCard.tsx'
 import { actionErrorMessage, describeRow, itemHeadingId, OFFLINE_SAVED_NOTE, OWNER_HIDDEN_NOTE, requestItemId } from './giverText.ts'
@@ -104,6 +107,88 @@ export function GiverRemovedSection({ view, onRequest }: { view: GiverListView; 
   )
 }
 
+/**
+ * First open of a shared list on this device: how it works in two lines, and an optional
+ * nickname. Not a blocking step; shown once per device and dismissible.
+ */
+function GiverIntro({ session, ownerName, nickname, onDismiss }: { session: GiverListSession; ownerName: string | undefined; nickname: string | undefined; onDismiss: () => void }) {
+  const notify = useNotify()
+  const [name, setName] = useState(nickname ?? '')
+  const [error, setError] = useState<string | undefined>()
+  const [saving, setSaving] = useState(false)
+  const owner = ownerName ?? 'the list owner'
+  const save = async () => {
+    if (saving) return
+    const clean = name.replace(/\s+/g, ' ').trim()
+    if ([...clean].length > LIMITS.nickname) {
+      setError(`Use up to ${LIMITS.nickname} characters.`)
+      return
+    }
+    setSaving(true)
+    try {
+      await session.setNickname(clean || undefined)
+      notify(clean ? `Others with the link see you as ${clean}.` : 'You appear as Someone.')
+      onDismiss()
+    } catch {
+      setError('Could not save the name. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <section className="giver-intro motion-enter" aria-labelledby="giver-intro-title">
+      <div className="giver-intro__head">
+        <h2 id="giver-intro-title" className="app-banner__title">
+          How this works
+        </h2>
+        <IconButton variant="ghost" aria-label="Dismiss how this works" icon={<X />} onClick={onDismiss} />
+      </div>
+      <div className="giver-intro__text">
+        <p>Pick a wish and say &ldquo;I&apos;ll get this&rdquo;, or chip in toward it.</p>
+        <p>{`Hippo hides this from ${owner}, so it stays a surprise.`}</p>
+      </div>
+      <form
+        className="giver-intro__form"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault()
+          void save()
+        }}
+      >
+        <TextField
+          label="Your name (optional)"
+          value={name}
+          maxLength={LIMITS.nickname * 2}
+          autoComplete="nickname"
+          onChange={(e) => {
+            setName(e.target.value)
+            setError(undefined)
+          }}
+          hint={`Others with the link see it next to what you pick. ${ownerName ?? 'The owner'} never does.`}
+          {...(error ? { error } : {})}
+        />
+        <div>
+          <Button type="submit" variant="ghost" size="md" loading={saving} className="giver-intro__save">
+            Save name
+          </Button>
+        </div>
+      </form>
+    </section>
+  )
+}
+
+/** Whether to show the giver intro: decided once, when settings first load, and recorded as shown. */
+function useGiverIntro(): [boolean, () => void] {
+  const core = useCore()
+  const settings = useSettings()
+  const [show, setShow] = useState<boolean | null>(null)
+  if (show === null && settings) setShow(settings.seen.giverIntro === undefined)
+  useEffect(() => {
+    if (show) void markSeen(core.db, 'giverIntro', Date.now()).catch(() => undefined)
+  }, [show, core])
+  return [show === true, () => setShow(false)]
+}
+
 function InviteOthers({ topic, listName }: { topic: string; listName: string }) {
   const core = useCore()
   const notify = useNotify()
@@ -162,6 +247,12 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
   const [confirmForget, setConfirmForget] = useState(false)
   const [forgetting, setForgetting] = useState(false)
   const [marking, setMarking] = useState<string | null>(null)
+  const [showIntro, dismissIntro] = useGiverIntro()
+  // While a sheet covers the cards, they keep showing what was there; the change (dots filling,
+  // a pill appearing) plays as the sheet leaves, where it can be seen.
+  const [cardsView, setCardsView] = useState(view)
+  if (!request && cardsView !== view) setCardsView(view)
+  const cards = request ? cardsView : view
   const meta = view.meta
   const available = view.items.filter((v) => v.state.status === 'available' || v.state.status === 'partial').length
   const myActive = new Set<string>()
@@ -212,6 +303,7 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
   const title = meta?.name ?? (view.status === 'loading' ? 'Opening list…' : 'Shared list')
   const intro = meta ? (
     <>
+      {meta.ownerName ? <p className="giver-owner">{`${possessive(meta.ownerName)} list`}</p> : null}
       {meta.eventDate ? <p className="giver-date">{formatEventDate(meta.eventDate)}</p> : null}
       {meta.message ? <p className="giver-message">{meta.message}</p> : null}
     </>
@@ -237,6 +329,18 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
         <Banner icon={<CloudOff aria-hidden="true" />} title={meta ? 'You are offline' : 'Cannot reach this list right now'}>
           <p>{meta ? 'Showing what was saved on this device. Hippo keeps trying and updates when it can.' : 'Check your connection. Hippo keeps trying while this page is open.'}</p>
         </Banner>
+      ) : null}
+
+      {showIntro && meta && view.status !== 'unpublished' ? (
+        <GiverIntro
+          session={session}
+          ownerName={meta.ownerName}
+          nickname={view.nickname}
+          onDismiss={() => {
+            dismissIntro()
+            document.getElementById('giver-items')?.focus()
+          }}
+        />
       ) : null}
 
       {view.status === 'loading' && !meta ? (
@@ -271,12 +375,12 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
           {view.items.length === 0 ? (
             <p className="app-note">There is nothing on this list yet. Check back later.</p>
           ) : (
-            <div className="giver-items">
-              {view.items.map((v) => (
+            <div className="giver-items motion-reveal">
+              {cards.items.map((v) => (
                 <GiverItemCard
                   key={v.item.id}
                   view={v}
-                  pendingClaimIds={view.pendingClaimIds}
+                  pendingClaimIds={cards.pendingClaimIds}
                   onRequest={setRequest}
                   onMarkPurchased={(row, p) => void markPurchased(row, p)}
                 />

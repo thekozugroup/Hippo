@@ -121,6 +121,8 @@ The list always has these seven entries in this order. `unknown` means the brows
 | `exportData(db)` | JSON-serialisable object with all data **including private keys**; records the export time. |
 | `importData(db, parsedJson, { mode: 'merge' \| 'replace' })` | Validates everything first; rejects other versions, any bad record, and FR-25 conflicts (`invalid-import`). Merge never replaces lists already on the device (`skippedLists`). |
 | `getSettings(db)`, `setTheme(db, theme)`, `setRelayOverride(db, relays?)` | Settings; the relay override applies to lists created afterwards and accepts public `wss://` relays only (`isRelayUrl`). |
+| `setOwnerName(db, name?)` | The owner's first name or nickname (max 40, whitespace collapsed; `RangeError` when longer). Published lists carry it as `ownerName` in their meta from their next sync, so call `syncList` for published lists after a change. |
+| `setOnboarding(db, state?)`, `markSeen(db, flag, at)` | First-run setup progress (`{ status, step, answers, listId?, itemId?, updatedAt }`, validated on write and read) and one-time hints (`giverIntro`, `setupChecklist`), returned by `getSettings` as `onboarding` and `seen`. |
 
 ## Other exports
 
