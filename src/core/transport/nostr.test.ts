@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { finalizeEvent, generateSecretKey } from 'nostr-tools/pure'
-import { useWebSocketImplementation } from 'nostr-tools/pool'
+// Renamed: the `use` prefix makes the React hooks lint rule treat it as a hook.
+import { useWebSocketImplementation as setWebSocketImplementation } from 'nostr-tools/pool'
 import WebSocket from 'ws'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { randomId } from '../crypto/bytes.ts'
@@ -25,7 +26,7 @@ const transports: NostrTransport[] = []
 // calls close() from its onerror handler on a refused connection, which
 // recurses until the stack overflows. Browsers do not do this; under Node we
 // use the `ws` client instead.
-useWebSocketImplementation(WebSocket)
+setWebSocketImplementation(WebSocket)
 
 beforeAll(async () => {
   relay = await startMockRelay()

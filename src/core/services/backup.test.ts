@@ -70,13 +70,19 @@ describe('export / import', () => {
 
   it('rejects the whole file when any record is malformed, with a path', async () => {
     const source = await populated()
-    const good = JSON.parse(JSON.stringify(await exportData(source.db))) as Record<string, unknown[]>
-    const variants: Array<(f: Record<string, unknown[]>) => void> = [
-      (f) => delete (f.sharedLists?.[0] as Record<string, unknown>).ownerSecretKey,
-      (f) => ((f.guestLists?.[0] as Record<string, unknown>).guestSecretKey = 'short'),
-      (f) => ((f.items?.[0] as Record<string, unknown>).title = ''),
-      (f) => ((f.sharedLists?.[0] as Record<string, unknown>).relays = ['http://evil.example']),
-      (f) => f.items?.push(f.items[0]),
+    type Rec = Record<string, unknown>
+    const good = JSON.parse(JSON.stringify(await exportData(source.db))) as Record<string, Rec[]>
+    const rec = (f: Record<string, Rec[]>, key: string): Rec => {
+      const r = f[key]?.[0]
+      if (!r) throw new Error(`fixture has no ${key}`)
+      return r
+    }
+    const variants: Array<(f: Record<string, Rec[]>) => void> = [
+      (f) => delete rec(f, 'sharedLists').ownerSecretKey,
+      (f) => (rec(f, 'guestLists').guestSecretKey = 'short'),
+      (f) => (rec(f, 'items').title = ''),
+      (f) => (rec(f, 'sharedLists').relays = ['http://evil.example']),
+      (f) => f.items?.push(rec(f, 'items')),
     ]
     for (const mutate of variants) {
       const f = structuredClone(good)
@@ -91,7 +97,7 @@ describe('export / import', () => {
     }
     const target = openDb(`hippo-test-${randomId()}`)
     const bad = structuredClone(good)
-    delete (bad.sharedLists?.[0] as Record<string, unknown>).listSecret
+    delete rec(bad, 'sharedLists').listSecret
     await expect(importData(target, bad)).rejects.toThrow(/sharedLists\[0\]\.listSecret/)
     expect(await target.items.count()).toBe(0)
   })

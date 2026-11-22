@@ -208,3 +208,18 @@ Relays may drop events. On opening a list the client compares what the relays re
 
 - Unpublish: publish meta with `status: 'unpublished'` and empty `itemIds`; publish empty tombstones for items.
 - Rotate: create a new `listSecret` (and owner key), publish the list under the new topic, then publish old meta with `status: 'unpublished'` and no `movedTo` (rotation exists to cut off holders of the old link). Claims are not migrated.
+
+## 10. Implementation notes (agreed refinements)
+
+These were settled while implementing `src/core/` and are part of the protocol.
+
+1. `subscribe`'s `onEose` receives `{ relaysReached, relaysTotal }`, so a client can tell "no events yet" from "no relay reachable".
+2. An item tombstone is an owner-signed item event with empty content. Tombstones are sent on unpublish and rotation only. Items removed from a live list are dropped from `itemIds` and left to expire, so givers who claimed them still see the title.
+3. Expiration is never earlier than creation + 30 days, so a past event date cannot produce an already-expired event.
+4. Funding counts granted full claims as covering their units: `remainingAmount = price * (quantity - granted) - pledged`.
+5. Rotation tombstones the old items as well as unpublishing the old meta.
+6. A replacement event always carries a `created_at` greater than the version it replaces.
+7. Money amounts are limited to 10^11 minor units so sums stay exact. Payload URLs that are not `http:` or `https:` are dropped during validation.
+8. A full claim is refused on an item that already has pledges; clients offer "Cover the rest" instead.
+
+Known limitation: claim-slot ownership is "first author seen on this device". A giver who already holds the link could publish a backdated event into another giver's claim slot and win on a device that has not yet seen the original. The effect is limited to hiding or replacing one claim for some viewers, among people the owner already trusted with the link. Closing this would need claim ids bound to the author's key (for example `claimId = H(pubkey || nonce)`), which is planned for protocol v2.
