@@ -17,17 +17,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Bookmark, Download, X } from 'lucide-react'
 import { useLocation } from 'wouter'
-import { Chip, IconButton, StepScreen, TextField, TwoTone } from '../../../ui/index.ts'
+import { Chip, HeroBackground, IconButton, StepScreen, TextField, TwoTone } from '../../../ui/index.ts'
 import {
-  createItem,
-  createSharedList,
-  getItem,
-  getSharedList,
   LIMITS,
   setOnboarding,
   setOwnerName,
-  updateItem,
-  updateSharedList,
 } from '../../../core/index.ts'
 import { useCore } from '../../core/context.ts'
 import { useSettings, useSharedLists } from '../../core/data.ts'
@@ -51,6 +45,7 @@ import {
   type WelcomeStep,
 } from '../../core/onboarding.ts'
 import { markLogoIntroPlayed, shouldPlayLogoIntro } from '../../core/logoIntro.ts'
+import { endBoot } from '../../core/boot.ts'
 import { writeSetupHint } from '../../core/setupHint.ts'
 import { requestPersistentStorage } from '../../core/storage.ts'
 import { historyIndex, returnTo } from '../../layout/motionLocation.ts'
@@ -59,6 +54,7 @@ import { possessive } from '../../lib/format.ts'
 import { resyncLists } from '../../lib/sync.ts'
 import { canPromptInstall, isStandalone, onInstallChange, promptInstall } from '../../pwa/install.ts'
 import { captureMethodFor, hostOf, parseWish, wishError, type CaptureMethod } from './flow.ts'
+import { ensureSetupList, ensureSetupWish, persistFlow } from './store.ts'
 import './OnboardingScreen.css'
 
 const OCCASION_LABEL: Record<OccasionId, string> = {
@@ -97,24 +93,32 @@ export default function OnboardingScreen({ step }: { step: string }) {
   if (!initial && stored?.status === 'active') setInitial(fromStored(stored))
 
   useEffect(() => {
-    if (initial || !settings) return
+    if (!settings) return
     if (!isWelcomeStep(step)) {
-      navigate('/welcome/start', { replace: true })
+      // An address that is not a step: go to the step in progress (or the first one).
+      navigate(`/welcome/${initial?.step ?? (stored?.status === 'active' ? (fromStored(stored)?.step ?? 'start') : 'start')}`, { replace: true })
       return
     }
+    if (initial) return
     if (!stored) {
       // First visit: start a flow (Home sends new owners here; nothing is written before that).
-      void setOnboarding(core.db, toStored({ ...newFlow(settings.ownerName ? { ownerName: settings.ownerName } : {}), step }, Date.now()))
+      void setOnboarding(core.db, toStored({ ...newFlow(settings.ownerName ? { ownerName: settings.ownerName } : {}), step }, core.now()))
       return
     }
     if (stored.status !== 'active') {
       // Finished or closed before: never shown again unless replayed from Settings.
-      writeSetupHint(true)
+      writeSetupHint(true, core.db.name)
       navigate('/', { replace: true })
     }
   }, [initial, settings, stored, step, core, navigate])
 
-  if (!initial || !isWelcomeStep(step)) return <div className="step-screen step-screen--blank" aria-busy="true" aria-label="Loading" />
+  if (!initial || !isWelcomeStep(step)) {
+    return (
+      <div className="step-screen step-screen--blank" data-theme="dark" aria-busy="true" aria-label="Loading">
+        <HeroBackground variant="night" />
+      </div>
+    )
+  }
   return <SetupFlow initial={initial} step={step} />
 }
 
@@ -132,10 +136,11 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
 
   useEffect(() => {
     flowBase = historyIndex()
+    endBoot()
   }, [])
 
   const persist = (f: Flow) => {
-    setOnboarding(core.db, toStored(f, Date.now())).catch(() => undefined)
+    persistFlow(core.db, f, core.now()).catch(() => undefined)
   }
 
   // The address says which step shows (browser Back and Forward included); remember it for resuming.
@@ -174,6 +179,16 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
     if (next) goTo(next)
   }
 
+  /** Skip clears this step's answer, so nothing typed and not saved is used later. */
+  const skip = (cleared: Partial<Answers>) => {
+    if (busyRef.current) return
+    const f = reduceFlow(latest.current, { type: 'answer', patch: cleared })
+    latest.current = f
+    setFlow(f)
+    setErrors({})
+    goNext()
+  }
+
   const goBack = () => {
     const i = WELCOME_STEPS.indexOf(step)
     const prev = WELCOME_STEPS[i - 1]
@@ -204,11 +219,11 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
     const f = { ...latest.current, status }
     setFlow(f)
     try {
-      await setOnboarding(core.db, toStored(f, Date.now()))
+      await persistFlow(core.db, f, core.now())
     } catch {
       // The flow still closes; it may show once more next time.
     }
-    writeSetupHint(true)
+    writeSetupHint(true, core.db.name)
     busyRef.current = false
     setBusy(false)
     if (status === 'completed') {
@@ -250,14 +265,9 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
       return false
     }
     const name = listNameFor(a)
-    const existing = flow.listId ? await getSharedList(core.db, flow.listId) : undefined
-    if (existing) {
-      await updateSharedList(core, existing.id, { name, eventDate: a.date || null })
-    } else {
-      const list = await createSharedList(core, { name, ...(a.date ? { eventDate: a.date } : {}) })
-      setFlow((f) => reduceFlow(f, { type: 'created', listId: list.id }))
-      latest.current = reduceFlow(latest.current, { type: 'created', listId: list.id })
-    }
+    const listId = await ensureSetupList(core, latest.current, { name, eventDate: a.date })
+    setFlow((f) => reduceFlow(f, { type: 'created', listId }))
+    latest.current = reduceFlow(latest.current, { type: 'created', listId })
     return true
   }
 
@@ -269,20 +279,10 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
       focusError()
       return false
     }
-    const existing = flow.itemId ? await getItem(core.db, flow.itemId) : undefined
-    let itemId: string
-    if (existing) {
-      await updateItem(core.db, existing.id, { title: draft.title, url: draft.url ?? null })
-      itemId = existing.id
-    } else {
-      const item = await createItem(core.db, { title: draft.title, ...(draft.url ? { url: draft.url } : {}) })
-      itemId = item.id
-      setFlow((f) => reduceFlow(f, { type: 'created', itemId }))
-      latest.current = reduceFlow(latest.current, { type: 'created', itemId })
-      void requestPersistentStorage()
-    }
-    const list = latest.current.listId ? await getSharedList(core.db, latest.current.listId) : undefined
-    if (list && !list.itemIds.includes(itemId)) await updateSharedList(core, list.id, { itemIds: [...list.itemIds, itemId] })
+    const { itemId, created } = await ensureSetupWish(core, latest.current, draft)
+    setFlow((f) => reduceFlow(f, { type: 'created', itemId }))
+    latest.current = reduceFlow(latest.current, { type: 'created', itemId })
+    if (created) void requestPersistentStorage()
     return true
   }
 
@@ -328,7 +328,7 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
           description={<p>No account and nothing to install. Setting up takes about a minute.</p>}
           continueLabel="Get started"
           onContinue={goNext}
-          secondaryAction={{ label: 'Not now', onClick: () => void leave('dismissed') }}
+          secondaryAction={{ label: 'Skip setup', onClick: () => void leave('dismissed') }}
         />
       )
 
@@ -340,7 +340,7 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
           description={<p>Your first name or a nickname is enough.</p>}
           continueLabel="Continue"
           onContinue={() => void run(saveName)}
-          secondaryAction={{ label: 'Skip', onClick: goNext }}
+          secondaryAction={{ label: 'Skip', onClick: () => skip({ name: '' }) }}
         >
           <TextField
             label="Your name"
@@ -365,7 +365,7 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
           description={<p>Hippo starts a list for it. Nobody sees it until you share it.</p>}
           continueLabel="Continue"
           onContinue={() => void run(saveOccasion)}
-          secondaryAction={{ label: 'Skip', onClick: goNext }}
+          secondaryAction={{ label: 'Skip', onClick: () => skip({ occasion: '', occasionText: '', date: '' }) }}
         >
           <OccasionChoices
             value={flow.answers.occasion}
@@ -413,7 +413,7 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
           description={<p>Type it, or paste a link from any shop. Price and notes can come later.</p>}
           continueLabel="Save wish"
           onContinue={() => void run(saveWish)}
-          secondaryAction={{ label: 'Skip', onClick: goNext }}
+          secondaryAction={{ label: 'Skip', onClick: () => skip({ wish: '' }) }}
         >
           <TextField
             label="Your wish, or a link to it"

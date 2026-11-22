@@ -271,7 +271,7 @@ export class TimeSync implements Clock {
 export function describeClockOffset(ms: number): string {
   const abs = Math.abs(ms)
   const unit = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`
-  if (abs >= 36 * 3600_000) return unit(Math.round(abs / 86_400_000), 'day')
+  if (abs >= 22 * 3600_000) return unit(Math.max(1, Math.round(abs / 86_400_000)), 'day')
   if (abs >= 55 * 60_000) return unit(Math.max(1, Math.round(abs / 3600_000)), 'hour')
   return unit(Math.max(1, Math.round(abs / 60_000)), 'minute')
 }

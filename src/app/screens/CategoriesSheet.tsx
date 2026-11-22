@@ -19,6 +19,13 @@ function CategoryRow({ category, index, total, all }: { category: Category; inde
   const { db } = useCore()
   const notify = useNotify()
   const [name, setName] = useState(category.name)
+  // The name as this field loaded it: a rename elsewhere replaces an untouched field, and only a
+  // name typed here is saved.
+  const [base, setBase] = useState(category.name)
+  if (category.name !== base && name === base) {
+    setBase(category.name)
+    setName(category.name)
+  }
   const [error, setError] = useState<string | undefined>()
   const [busy, setBusy] = useState(false)
 
@@ -37,15 +44,17 @@ function CategoryRow({ category, index, total, all }: { category: Category; inde
 
   const save = async () => {
     const trimmed = name.trim()
-    if (trimmed === category.name) return
+    if (trimmed === base || trimmed === category.name) return
     if (!trimmed) {
       setError('A category needs a name.')
       return
     }
     try {
+      const elsewhere = category.name !== base
       await updateCategory(db, category.id, { name: trimmed })
+      setBase(trimmed)
       setError(undefined)
-      notify(`Renamed to ${trimmed}`)
+      notify(elsewhere ? `Renamed to ${trimmed}. It had also been renamed somewhere else; your name replaced that.` : `Renamed to ${trimmed}`)
     } catch (e) {
       setError(isHippoError(e, 'invalid-input') ? `Use up to ${LIMITS.categoryName} characters.` : 'Could not rename this category.')
     }

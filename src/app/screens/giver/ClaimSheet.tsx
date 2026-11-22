@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { BottomSheet, Button, Checkbox, MoneyField, TextField } from '../../../ui/index.ts'
 import { LIMITS, type ClaimActionResult, type ClaimRow, type GiverItemView, type GiverListSession } from '../../../core/index.ts'
 import { useNotify } from '../../core/notify.ts'
-import { moneyInputValue, moneyText, parseMoneyInput } from '../../lib/format.ts'
+import { moneyInputValue, moneyText, parseMoneyInput, priceExample } from '../../lib/format.ts'
 import { actionErrorMessage, claimResultMessage } from './giverText.ts'
 
 export type SheetRequest =
@@ -87,7 +87,7 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
           if (!price) break
           const m = parseMoneyInput(amount, price.currency)
           if (!m) {
-            setError('Enter an amount like 20 or 12.50.')
+            setError(`Enter an amount like ${priceExample(price.currency)}.`)
             break
           }
           finish([await session.pledge(request.view.item.id, m.amount)], `Thank you! You chipped in ${moneyText(m)}.`)
@@ -108,7 +108,7 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
             const currency = request.row.amount?.currency ?? price?.currency
             const m = currency ? parseMoneyInput(amount, currency) : undefined
             if (!m) {
-              setError('Enter an amount like 20 or 12.50.')
+              setError(`Enter an amount like ${priceExample(currency ?? 'USD')}.`)
               break
             }
             if (pledgeCap && m.amount > pledgeCap.amount) {

@@ -133,3 +133,16 @@ svg {
 .lucide {
   stroke-width: 1.75;
 }
+
+/* First run on its way to setup (src/app/core/boot.ts): from the first paint, the page is the
+   setup's night field instead of the light page background, so nothing light flashes first. */
+html[data-boot='setup'] {
+  background-color: var(--slate-950);
+  background-image:
+    radial-gradient(ellipse 90% 45% at 20% 18%, color-mix(in srgb, var(--blue-600) 55%, transparent) 0%, transparent 100%),
+    linear-gradient(180deg, var(--blue-800) 0%, var(--blue-900) 22%, var(--blue-950) 42%, var(--slate-950) 62%);
+  background-attachment: fixed;
+}
+html[data-boot='setup'] body {
+  background: transparent;
+}

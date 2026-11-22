@@ -43,6 +43,8 @@ export {
   updateItem,
   archiveItem,
   unarchiveItem,
+  mergeItemEdit,
+  type MergeResult,
   deleteItem,
   getItem,
   listItems,
@@ -68,6 +70,7 @@ export {
   TRACKING_PARAMS,
   parsePrice,
   currencyDigits,
+  isKnownCurrency,
   type CaptureInput,
   type DraftItem,
 } from './services/capture.ts'

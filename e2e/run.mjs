@@ -8,6 +8,8 @@ import './flows.test.mjs'
 import './review.test.mjs'
 import './onboarding.test.mjs'
 import './wire.test.mjs'
+import './clock.test.mjs'
+import './fixes.test.mjs'
 
 if (!existsSync(ROOT + 'dist/index.html')) {
   console.error('dist/ is missing: run `npm run build` first (npm run test:e2e does this).')

@@ -4,17 +4,12 @@
 // shows while the clock is fine.
 
 import { useEffect } from 'react'
-import { CLOCK_WARN_MS, describeClockOffset } from '../../core/index.ts'
+import { CLOCK_WARN_MS } from '../../core/index.ts'
+import { clockNoticeText } from './clockText.ts'
 import { useCore } from './context.ts'
 import { useNotify } from './notify.ts'
 
 const TOLD_KEY = 'hippo:clock-told'
-
-/** The sentence for an offset (positive: the device clock is behind). */
-export function clockNoticeText(offsetMs: number): string {
-  const way = offsetMs > 0 ? 'behind' : 'ahead'
-  return `The clock on this device is about ${describeClockOffset(offsetMs)} ${way}. Hippo uses the correct time instead, so everyone sees the same gifts. You can fix the clock in your device settings.`
-}
 
 function readTold(): boolean {
   try {

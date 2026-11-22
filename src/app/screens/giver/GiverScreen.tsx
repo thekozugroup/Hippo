@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { CloudOff, Copy, LockKeyhole, Share2, UserRound, X } from 'lucide-react'
+import { CloudOff, Copy, LockKeyhole, RefreshCw, Share2, UserRound, X } from 'lucide-react'
 import { useLocation } from 'wouter'
-import { BottomSheet, Button, Chip, EmptyState, IconButton, LinkButton, SectionHeader, Skeleton, StatusPill, TextField, TwoTone } from '../../../ui/index.ts'
+import { BottomSheet, Button, Chip, EmptyState, IconButton, LinkButton, SectionHeader, Skeleton, StatusPill, TwoTone } from '../../../ui/index.ts'
 import {
   buildGuestShareLink,
   getGuestList,
   hideGuestList,
-  LIMITS,
   markSeen,
   type ClaimPayload,
   type ClaimRow,
@@ -35,6 +34,44 @@ function Banner({ icon, title, children }: { icon: ReactNode; title: string; chi
         {children}
       </div>
     </div>
+  )
+}
+
+function useBrowserOnline(): boolean {
+  const [online, setOnline] = useState(() => navigator.onLine !== false)
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine !== false)
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
+  return online
+}
+
+/**
+ * No sync server answered. "Offline" only when the browser says so; otherwise the device is online
+ * and the sync servers are not answering, which says nothing about whether the list exists.
+ */
+function ConnectionBanner({ hasList, onRetry }: { hasList: boolean; onRetry: () => void }) {
+  const online = useBrowserOnline()
+  const title = online ? 'Hippo cannot reach its sync servers' : 'You are offline'
+  const body = hasList
+    ? 'Showing what was saved on this device. Hippo keeps trying and updates when it can.'
+    : online
+      ? 'So it cannot open this list right now. Hippo keeps trying while this page is open.'
+      : 'Connect to the internet to open this list. Hippo keeps trying while this page is open.'
+  return (
+    <Banner icon={<CloudOff aria-hidden="true" />} title={title}>
+      <p>{body}</p>
+      <div>
+        <Button variant="secondary" size="md" icon={<RefreshCw />} onClick={onRetry}>
+          Try again
+        </Button>
+      </div>
+    </Banner>
   )
 }
 
@@ -108,71 +145,17 @@ export function GiverRemovedSection({ view, onRequest }: { view: GiverListView; 
 }
 
 /**
- * First open of a shared list on this device: how it works in two lines, and an optional
- * nickname. Not a blocking step; shown once per device and dismissible.
+ * First open of a shared list on this device: how it works, in two short lines. Shown once per
+ * device and dismissible; the name is set in one place only, the chip at the top.
  */
-function GiverIntro({ session, ownerName, nickname, onDismiss }: { session: GiverListSession; ownerName: string | undefined; nickname: string | undefined; onDismiss: () => void }) {
-  const notify = useNotify()
-  const [name, setName] = useState(nickname ?? '')
-  const [error, setError] = useState<string | undefined>()
-  const [saving, setSaving] = useState(false)
-  const owner = ownerName ?? 'the list owner'
-  const save = async () => {
-    if (saving) return
-    const clean = name.replace(/\s+/g, ' ').trim()
-    if ([...clean].length > LIMITS.nickname) {
-      setError(`Use up to ${LIMITS.nickname} characters.`)
-      return
-    }
-    setSaving(true)
-    try {
-      await session.setNickname(clean || undefined)
-      notify(clean ? `Others with the link see you as ${clean}.` : 'You appear as Someone.')
-      onDismiss()
-    } catch {
-      setError('Could not save the name. Please try again.')
-    } finally {
-      setSaving(false)
-    }
-  }
+function GiverIntro({ ownerName, onDismiss }: { ownerName: string | undefined; onDismiss: () => void }) {
   return (
-    <section className="giver-intro motion-enter" aria-labelledby="giver-intro-title">
-      <div className="giver-intro__head">
-        <h2 id="giver-intro-title" className="app-banner__title">
-          How this works
-        </h2>
-        <IconButton variant="ghost" aria-label="Dismiss how this works" icon={<X />} onClick={onDismiss} />
-      </div>
+    <section className="giver-intro motion-enter" aria-label="How this works">
       <div className="giver-intro__text">
-        <p>Pick a wish and say &ldquo;I&apos;ll get this&rdquo;, or chip in toward it.</p>
-        <p>{`Hippo hides this from ${owner}, so it stays a surprise.`}</p>
+        <p>Pick a wish and say &ldquo;I&apos;ll get this&rdquo;, or chip in.</p>
+        <p>{`Hippo hides this from ${ownerName ?? 'the list owner'}.`}</p>
       </div>
-      <form
-        className="giver-intro__form"
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault()
-          void save()
-        }}
-      >
-        <TextField
-          label="Your name (optional)"
-          value={name}
-          maxLength={LIMITS.nickname * 2}
-          autoComplete="nickname"
-          onChange={(e) => {
-            setName(e.target.value)
-            setError(undefined)
-          }}
-          hint={`Others with the link see it next to what you pick. ${ownerName ?? 'The owner'} never does.`}
-          {...(error ? { error } : {})}
-        />
-        <div>
-          <Button type="submit" variant="ghost" size="md" loading={saving} className="giver-intro__save">
-            Save name
-          </Button>
-        </div>
-      </form>
+      <IconButton variant="ghost" aria-label="Dismiss how this works" icon={<X />} onClick={onDismiss} />
     </section>
   )
 }
@@ -319,23 +302,22 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
       busy={view.status === 'loading' && !meta}
       actions={
         meta ? (
-          <Chip tone="frost" avatar={<UserRound size={16} />} onClick={() => setRequest({ mode: 'nickname', ...(view.nickname ? { current: view.nickname } : {}) })} aria-label={`Your name on this list: ${view.nickname ?? 'Someone'}. Change`}>
-            {view.nickname ?? 'Someone'}
+          <Chip
+            tone="frost"
+            avatar={<UserRound size={16} />}
+            onClick={() => setRequest({ mode: 'nickname', ...(view.nickname ? { current: view.nickname } : {}) })}
+            aria-label={view.nickname ? `Your name on this list: ${view.nickname}. Change` : 'Add your name. Others with the link see it next to what you pick'}
+          >
+            {view.nickname ?? 'Add your name'}
           </Chip>
         ) : undefined
       }
     >
-      {view.status === 'offline' ? (
-        <Banner icon={<CloudOff aria-hidden="true" />} title={meta ? 'You are offline' : 'Cannot reach this list right now'}>
-          <p>{meta ? 'Showing what was saved on this device. Hippo keeps trying and updates when it can.' : 'Check your connection. Hippo keeps trying while this page is open.'}</p>
-        </Banner>
-      ) : null}
+      {view.status === 'offline' ? <ConnectionBanner hasList={meta !== null} onRetry={() => session.retryNow()} /> : null}
 
       {showIntro && meta && view.status !== 'unpublished' ? (
         <GiverIntro
-          session={session}
           ownerName={meta.ownerName}
-          nickname={view.nickname}
           onDismiss={() => {
             dismissIntro()
             document.getElementById('giver-items')?.focus()

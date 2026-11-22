@@ -38,7 +38,8 @@ Status: v1 in development. License: MIT.
 - FR-3 Categories: create, rename, reorder, delete. An item can be in several categories. Deleting a category does not delete items.
 - FR-4 Filter by category and importance; sort by importance, date added, price.
 - FR-5 All private data is stored on the device (IndexedDB). Nothing is published until the owner shares a list.
-- FR-6 Export all data to a JSON file and import it again (backup, device move).
+- FR-6 Export all data to a JSON file and import it again (backup, device move). The file also holds the owner's name, the Link lookup setting and whether first-run setup is done, so a restore on a new device opens Home with the data, not setup.
+- FR-6a Edits are not lost: saving a wish writes only the fields changed in that form onto the stored wish (another tab's changes to other fields stay), and says so when the same field was also changed elsewhere. Unsaved typing in the wish form is kept for the browser tab and comes back with a "Start over" action.
 
 ### 4.2 Capture
 
@@ -46,6 +47,7 @@ Status: v1 in development. License: MIT.
 - FR-8 Share target (Android, desktop Chromium, installed PWA): Hippo appears in the system share sheet and opens the Add Item form prefilled from the shared `title`, `text` and `url`.
 - FR-9 Deep link: `/?title=&text=&url=&image=&price=&currency=` opens the same prefilled form. This is the entry point for the iOS Shortcut and the bookmarklet, which read the page's metadata themselves and pass it along. They send the page's canonical link when it has one (else the address without its fragment), and well-known tracking parameters (`utm_*`, `fbclid`, `gclid` and similar) are removed from captured links, since a published wish shows its link to givers.
 - FR-10 Settings shows install instructions for the bookmarklet and the iOS Shortcut recipe.
+- FR-10b First-run setup: a new owner is asked, one question per screen, for a name, an occasion (which creates a draft list) and one wish, then shown one way to add wishes from that device. Every step can be skipped ("Skip" clears that step's answer), "Skip setup" on the first screen ends it, and Settings can run it again. Setup open in two tabs creates one list and one wish.
 - FR-10a Link preview (opt-in, off by default). For a wish added by pasting a link or through the Android share sheet, Hippo can ask one third-party service (Microlink, `api.microlink.io`) for the page's title and picture. It runs only after the user turns it on in Settings, sends only the link (tracking parameters and fragment removed, https only), times out after a few seconds, and fills only fields the user has left empty. Answers are validated like any other untrusted input. The bookmarklet and Shortcut read the page themselves and need no third party; they remain the recommended method.
 
 ### 4.3 Shared lists (owner)
@@ -65,7 +67,8 @@ Status: v1 in development. License: MIT.
 - FR-20 For items that allow contributions, a giver can pledge an amount. Givers see the total pledged against the price as a progress indicator. A giver can change or withdraw their pledge.
 - FR-21 A giver may set a nickname for a list. It is shown to other givers next to their claims and pledges. Without one, they appear as "Someone".
 - FR-22 Item states for givers: available, partly funded, fully funded, claimed, purchased, removed by owner.
-- FR-23 If two givers claim the same item at the same time, the earliest claim wins and the later giver sees a conflict notice on their own claim.
+- FR-23 If two givers claim the same item at the same time, the earliest claim wins and the later giver sees a conflict notice on their own claim. A giver is told their claim worked only when other devices would accept and count it.
+- FR-23a A device whose clock is wrong must not change who is getting what. The app measures the device clock against its own web host's `Date` header and uses the corrected time for every date it writes or checks (PROTOCOL.md section 10, note 13), and says once, plainly, when the clock is more than about two minutes off.
 - FR-24 Opened lists are remembered on the giver's device under "Lists shared with me". Removing one hides it but keeps the giver's identity, so opening the link again lets them change or take back their claims. After a list is opened, the share link's secret is replaced in the address bar by the remembered list's address; givers can copy the link from the list to invite others.
 - FR-25 If the giver is also the owner of that list on this device, the app refuses to show claim state and explains why.
 
@@ -73,7 +76,7 @@ Status: v1 in development. License: MIT.
 
 - FR-26 List content and claims are end-to-end encrypted. The decryption key travels only in the URL fragment of the share link. Relays store ciphertext.
 - FR-27 Only the owner's key can publish or change list content. Only a claim's author can change or withdraw that claim.
-- FR-28 The app makes no requests to third parties except the configured relays, item images that the owner chose to attach (loaded with `referrerpolicy="no-referrer"`), and, only after the owner opts in (FR-10a), the link preview service.
+- FR-28 The app makes no requests to third parties except the configured relays, item images that the owner chose to attach (loaded with `referrerpolicy="no-referrer"`, from any `https` host), and, only after the owner opts in (FR-10a), the link preview service. Its own host is asked for the time (a HEAD request to the app's address).
 - FR-29 Hippo refuses to run inside another site's frame (GitHub Pages cannot send `frame-ancestors`): before the app starts it shows a message with a link that opens Hippo in its own tab.
 - FR-30 Settings can show deployment checks: HTTPS, an origin of its own, not framed, service worker, storage, persistent storage and relay reachability, each with a plain-language finding and fix.
 
@@ -95,6 +98,7 @@ Known limitation: hiding claims from the owner is enforced by the app, not by cr
 - Owner turns contributions off after pledges exist: existing pledges stay visible to givers; new pledges, including "Cover the rest", are blocked. A giver may still lower or withdraw their own pledge.
 - Pledges exceed the price: shown as fully funded; the surplus is displayed to givers.
 - An item has pledges and someone wants to claim it outright: the action is labelled "Cover the rest" and records a pledge for the remainder.
+- Relays reachable but silent: when no relay answers, the giver sees that Hippo cannot reach its sync servers and is retrying, with Try again; "this list could not be found" is shown only when relays answered and the list was not there. "You are offline" is shown only when the browser is offline.
 - Relay unavailable: the app works from its local cache and retries (at start, when back online, when the app returns to the foreground, and on a backoff timer); publishing shows which relays accepted. A list no relay has accepted yet is shown as not shared yet, without a link.
 - Owner stops sharing or replaces the link: givers see that the list is no longer shared, with the titles of what they had said they would get or chip in on.
 - Lost device: the owner restores from an export file. (Recovery code and multi-device sync are planned for a later milestone.)
@@ -129,9 +133,9 @@ Code layout:
 | # | Scope | Status |
 |---|---|---|
 | M0 | Relay acceptance test | Done: 4 of 8 public relays tried accepted and returned an encrypted kind-30078 event; long-term retention not yet measured |
-| M1 | Private wishlist, installable PWA, Pages deploy | In progress |
-| M2 | Shared lists: publish, link, giver view | In progress |
-| M3 | Claims, pledges, conflicts, owner-side hiding | In progress |
-| M4 | Share target, deep link, bookmarklet, iOS Shortcut recipe | In progress |
+| M1 | Private wishlist, installable PWA, Pages deploy | Done |
+| M2 | Shared lists: publish, link, giver view | Done |
+| M3 | Claims, pledges, conflicts, owner-side hiding, device clock correction | Done |
+| M4 | Share target, deep link, bookmarklet, iOS Shortcut recipe | Done; the Shortcut recipe has not been checked on every iOS version |
 | M5 | Recovery code, multi-device sync, optional self-hosted relay | Planned |
 | M5a | Weekly relay health check (`relay-health` workflow) with 1, 4 and 12 week retention probes | Done; needs several months of runs before retention numbers mean anything |

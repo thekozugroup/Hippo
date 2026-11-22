@@ -209,6 +209,7 @@ function ShareLinkBox({ list, entering }: { list: SharedList; entering: boolean 
           fullWidth
           icon={copied ? <Check key={copied} className="motion-enter" /> : <Copy />}
           onClick={() => void copy()}
+          data-share-copy=""
         >
           {copied ? 'Copied' : 'Copy link'}
         </Button>
@@ -229,7 +230,17 @@ function ListEditor({ list }: { list: SharedList }) {
   const notify = useNotify()
   const [, navigate] = useLocation()
   const allItems = useItems(true)
-  const [details, setDetails] = useState<DetailsState>({ name: list.name, eventDate: list.eventDate ?? '', message: list.message ?? '' })
+  const stored: DetailsState = { name: list.name, eventDate: list.eventDate ?? '', message: list.message ?? '' }
+  const [details, setDetails] = useState<DetailsState>(stored)
+  // The details as this form loaded them: saving writes only what was changed here.
+  const [detailsBase, setDetailsBase] = useState<DetailsState>(stored)
+  // A field not touched here follows changes made elsewhere (another tab).
+  const follow = (Object.keys(stored) as (keyof DetailsState)[]).filter((k) => stored[k] !== detailsBase[k] && details[k] === detailsBase[k])
+  if (follow.length > 0) {
+    const update = Object.fromEntries(follow.map((k) => [k, stored[k]])) as Partial<DetailsState>
+    setDetails({ ...details, ...update })
+    setDetailsBase({ ...detailsBase, ...update })
+  }
   const [errors, setErrors] = useState<DetailsErrors>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [summary, setSummary] = useState<SyncSummary | null>(null)
@@ -247,7 +258,8 @@ function ListEditor({ list }: { list: SharedList }) {
   const active = (allItems ?? []).filter((i) => i.archivedAt === undefined).sort((a, b) => b.createdAt - a.createdAt)
   const archivedOnList = (allItems ?? []).filter((i) => i.archivedAt !== undefined && list.itemIds.includes(i.id))
   const liveCount = list.itemIds.filter((id) => active.some((i) => i.id === id)).length
-  const dirty = details.name !== list.name || details.eventDate !== (list.eventDate ?? '') || details.message !== (list.message ?? '')
+  const changedKeys = (Object.keys(details) as (keyof DetailsState)[]).filter((k) => details[k] !== detailsBase[k])
+  const dirty = changedKeys.length > 0
 
   const run = async (label: string, fn: () => Promise<void>) => {
     if (busy !== null && busy !== 'update') return
@@ -283,18 +295,42 @@ function ListEditor({ list }: { list: SharedList }) {
     const errs = validateDetails(details)
     setErrors(errs)
     if (Object.keys(errs).length > 0) return
+    const patch: SharedListPatch = {}
+    if (changedKeys.includes('name')) patch.name = details.name.trim()
+    if (changedKeys.includes('message')) patch.message = details.message.trim() || null
+    if (changedKeys.includes('eventDate')) patch.eventDate = details.eventDate || null
+    const words: Record<keyof DetailsState, string> = { name: 'name', eventDate: 'date', message: 'message' }
+    const elsewhere = changedKeys.filter((k) => stored[k] !== detailsBase[k]).map((k) => words[k])
     await change(
-      {
-        name: details.name.trim(),
-        message: details.message.trim() || null,
-        eventDate: details.eventDate || null,
-      },
-      'Details saved.',
+      patch,
+      elsewhere.length > 0 ? `Details saved. The ${elsewhere.join(' and ')} had also been changed somewhere else; yours replaced it.` : 'Details saved.',
     )
+    setDetailsBase(details)
   }
+
+  // "Share list" disappears once the list is shared: move focus to what replaces it. The list may
+  // show "Not shared yet" (with Try again) for a moment before the link, so focus follows until the
+  // link's Copy button is there, unless the person has moved focus elsewhere.
+  const focusShare = useRef(false)
+  useEffect(() => {
+    if (!focusShare.current || busy !== null || list.status !== 'published') return
+    const id = window.requestAnimationFrame(() => {
+      const active = document.activeElement
+      const free = !active || active === document.body || active.hasAttribute('data-share-retry') || active.hasAttribute('data-share-copy')
+      if (!free) {
+        focusShare.current = false
+        return
+      }
+      const target = document.querySelector<HTMLElement>(list.linkPending ? '[data-share-retry]' : '[data-share-copy]')
+      target?.focus()
+      if (!list.linkPending) focusShare.current = false
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [busy, list.status, list.linkPending])
 
   const publish = () =>
     run('publish', async () => {
+      focusShare.current = true
       const r = await publishList(core, list.id)
       const s = summariseSync([r])
       setSummary(s)
@@ -381,7 +417,7 @@ function ListEditor({ list }: { list: SharedList }) {
                 <p>Hippo could not reach the sync servers, so the link would not work yet. It keeps trying in the background and shows the link here once it works.</p>
               </div>
             </div>
-            <Button variant="secondary" fullWidth icon={<RefreshCw />} loading={busy === 'retry'} onClick={() => void retryNow()}>
+            <Button variant="secondary" fullWidth icon={<RefreshCw />} loading={busy === 'retry'} onClick={() => void retryNow()} data-share-retry="">
               Try again now
             </Button>
           </>

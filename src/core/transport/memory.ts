@@ -79,7 +79,7 @@ export class MemoryTransport implements Transport {
     queueMicrotask(() => {
       if (!active || this.offline) return
       for (const e of this.network.store.query(filter).reverse()) onEvent(e)
-      onEose?.({ relaysReached: 1, relaysTotal: 1 })
+      onEose?.({ relaysReached: 1, relaysAnswered: 1, relaysTotal: 1 })
     })
     const detach = this.offline ? () => undefined : this.network.attach(sub)
     const unsubscribe = (): void => {

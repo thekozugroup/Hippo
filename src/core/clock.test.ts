@@ -201,32 +201,82 @@ describe.each([
 })
 
 describe('without a correction (what the correction prevents)', () => {
-  it('a claim from a clock one hour fast is counted on its own device and dropped everywhere else, and the giver is told', async () => {
+  it('a claim from a clock one hour fast is dropped by every other device', async () => {
     const truth = testClock()
     const network = new MemoryNetwork({ nowSeconds: () => Math.floor(truth.now() / 1000) })
     const { scarf, link } = await ownerWithList(network, truth)
-    const fast = await giver(network, link, 'fast', truth, fixedOffsetClock(HOUR + LIMITS.futureSkewMs, truth.now))
+    const fast = await giver(network, link, 'fast', truth, fixedOffsetClock(HOUR, truth.now))
     const honest = await giver(network, link, 'honest', truth, fixedOffsetClock(0, truth.now))
     const r = await fast.claim(scarf)
-    // Its own receive rules accept it, but the self-check judges like others would only with their clock,
-    // so the honest device (the real judge) drops it as future-dated.
+    expect(r.result.ok).toBe(true)
+    expect(counted(fast, scarf)).toBe(r.claim.id)
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(counted(honest, scarf)).toBeNull()
-    expect(r.result.ok).toBe(true)
+    expect(LIMITS.futureSkewMs).toBeLessThan(HOUR)
   })
+})
 
-  it('reports a claim another giver got first as not counted', async () => {
+describe('the outcome a giver is told', () => {
+  it('is "not counted" when another claim that was counted first arrives while mine is being sent', async () => {
     const truth = testClock()
     const network = new MemoryNetwork({ nowSeconds: () => Math.floor(truth.now() / 1000) })
     const { scarf, link } = await ownerWithList(network, truth)
     const ann = await giver(network, link, 'ann', truth, fixedOffsetClock(0, truth.now))
-    const ben = await giver(network, link, 'ben', truth, fixedOffsetClock(0, truth.now))
-    // Both press "I'll get this" before either sees the other's claim: Ben's view does not have Ann's yet.
-    network.store.clear?.()
+
+    // Ben is on his own relay, which has the list but not yet Ann's claim.
+    const benNet = new MemoryNetwork({ nowSeconds: () => Math.floor(truth.now() / 1000) })
+    for (const e of network.store.query({})) benNet.store.add(e)
     const annClaim = await ann.claim(scarf)
-    expect(annClaim.outcome).toEqual({ kind: 'counted' })
+    const annEvents = network.store.query({}).filter((e) => e.tags.some((t) => t[0] === 'd' && t[1]?.endsWith(`:claim:${annClaim.claim.id}`)))
+    expect(annEvents).toHaveLength(1)
+
+    const benDevice = testDevice(benNet, truth, 'ben')
+    const inner = benDevice.transport
+    const wrapped = {
+      publish: async (e: Parameters<typeof inner.publish>[0]) => {
+        // Ann's earlier claim reaches Ben's relay (and Ben) while his own is on its way.
+        for (const a of annEvents) {
+          benNet.store.add(a)
+          benNet.broadcast(a)
+        }
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        return inner.publish(e)
+      },
+      subscribe: inner.subscribe.bind(inner),
+      fetch: inner.fetch.bind(inner),
+      close: inner.close.bind(inner),
+    }
+    const benDeps = { ...benDevice, transports: () => wrapped }
+    const guest = await addGuestListFromLink(benDeps, link)
+    const ben = await openGuestList(benDeps, guest.topic, { eoseTimeoutMs: 200, retryMs: 100 })
+    sessions.push(ben)
+    await ben.start()
+    await waitFor(() => ben.getSnapshot().status === 'live')
+    truth.advance(1000)
+    const benClaim = await ben.claim(scarf)
+    expect(benClaim.result.ok).toBe(true)
+    expect(benClaim.outcome).toEqual({ kind: 'not-counted', reason: 'taken' })
     await waitFor(() => counted(ben, scarf) === annClaim.claim.id)
-    // Ben's device now holds Ann's earlier claim, so a claim of his would not be counted: the app refuses it outright.
-    await expect(ben.claim(scarf)).rejects.toThrow()
+  })
+
+  it('is "rejected" for an event other devices would drop as dated in the future', async () => {
+    const truth = testClock()
+    const network = new MemoryNetwork({ nowSeconds: () => Math.floor(truth.now() / 1000) })
+    const { scarf, link } = await ownerWithList(network, truth)
+    // The device stamps with a clock an hour fast but judges with the true time (its correction arrived late).
+    const device = testDevice(network, truth, 'late')
+    let stampSkew = HOUR
+    const deps = { ...device, now: () => truth.now() + stampSkew }
+    const guest = await addGuestListFromLink(deps, link)
+    const session = await openGuestList(deps, guest.topic, { eoseTimeoutMs: 200, retryMs: 100 })
+    sessions.push(session)
+    await session.start()
+    await waitFor(() => session.getSnapshot().status === 'live')
+    const first = await session.claim(scarf)
+    expect(first.outcome).toEqual({ kind: 'counted' })
+    // The correction arrives: the claim it already sent is now judged as other devices judge it.
+    stampSkew = 0
+    const again = await session.markPurchased(first.claim.id)
+    expect(again.outcome).toEqual({ kind: 'rejected', reason: 'future' })
   })
 })

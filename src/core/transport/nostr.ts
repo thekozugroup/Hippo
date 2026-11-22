@@ -75,45 +75,71 @@ export class NostrTransport implements Transport {
     return { ok: relays.some((r) => r.ok), relays }
   }
 
+  /**
+   * One subscription per relay, so the transport knows which relays really
+   * answered (sent EOSE). A relay that accepts the socket but never answers
+   * does not count as answered: after `eoseTimeoutMs` `onEose` reports it, and
+   * the caller can tell "no relay answered" from "the relays have nothing".
+   */
   subscribe(filter: Filter, onEvent: (e: NostrEvent) => void, onEose?: (info: EoseInfo) => void): Unsubscribe {
     let closed = false
     let eosed = false
+    const answered = new Set<string>()
+    const settled = new Set<string>()
+    const subs: { close: (reason?: string) => void }[] = []
+    const seen = new Set<string>()
     const fireEose = (): void => {
       if (eosed || closed) return
       eosed = true
-      onEose?.(this.connectionInfo())
-    }
-    // SimplePool reports EOSE only when every relay has answered or failed;
-    // this guard covers a relay that accepts the socket but never answers.
-    const guard = setTimeout(fireEose, this.eoseTimeoutMs + 1000)
-    let sub: { close: (reason?: string) => void } | undefined
-    try {
-      sub = this.pool.subscribe([...this.relays], filter, {
-        maxWait: this.eoseTimeoutMs,
-        onevent: (e) => {
-          if (!closed) onEvent(e)
-        },
-        oneose: () => {
-          clearTimeout(guard)
-          fireEose()
-        },
-        onclose: () => {
-          clearTimeout(guard)
-          fireEose()
-        },
-      })
-    } catch {
       clearTimeout(guard)
-      queueMicrotask(fireEose)
+      onEose?.({ ...this.connectionInfo(), relaysAnswered: answered.size })
     }
+    const settle = (url: string, didAnswer: boolean): void => {
+      if (didAnswer) answered.add(url)
+      settled.add(url)
+      if (settled.size >= this.relays.length) fireEose()
+    }
+    const guard = setTimeout(fireEose, this.eoseTimeoutMs)
+    for (const url of this.relays) {
+      void (async () => {
+        let relay: Awaited<ReturnType<SimplePool['ensureRelay']>>
+        try {
+          relay = await this.pool.ensureRelay(url, { connectionTimeout: this.eoseTimeoutMs })
+        } catch {
+          settle(url, false)
+          return
+        }
+        if (closed) return
+        try {
+          const sub = relay.subscribe([filter], {
+            // Only a real EOSE counts as an answer: the library's own timeout is pushed past ours.
+            eoseTimeout: this.eoseTimeoutMs + 60_000,
+            onevent: (e) => {
+              if (closed || seen.has(e.id)) return
+              if (seen.size < LIMITS.eventsPerFetch) seen.add(e.id)
+              onEvent(e)
+            },
+            oneose: () => settle(url, true),
+            onclose: () => settle(url, false),
+          })
+          subs.push(sub)
+          if (closed) sub.close()
+        } catch {
+          settle(url, false)
+        }
+      })()
+    }
+    if (this.relays.length === 0) queueMicrotask(fireEose)
     const unsubscribe = (): void => {
       if (closed) return
       closed = true
       clearTimeout(guard)
-      try {
-        sub?.close()
-      } catch {
-        // Closing a subscription on a dead socket is harmless.
+      for (const sub of subs) {
+        try {
+          sub.close()
+        } catch {
+          // Closing a subscription on a dead socket is harmless.
+        }
       }
       this.closers.delete(unsubscribe)
     }
@@ -121,7 +147,7 @@ export class NostrTransport implements Transport {
     return unsubscribe
   }
 
-  private connectionInfo(): EoseInfo {
+  private connectionInfo(): Omit<EoseInfo, 'relaysAnswered'> {
     const status = this.pool.listConnectionStatus()
     let relaysReached = 0
     for (const r of this.relays) {

@@ -29,12 +29,13 @@ import {
   guessTitleFromUrl,
   IMPORTANCE_LEVELS,
   isHippoError,
+  isKnownCurrency,
   LIMITS,
   lookupLinkPreview,
   markSeen,
   stripTrackingParams,
+  mergeItemEdit,
   unarchiveItem,
-  updateItem,
   type DraftItem,
   type Importance,
   type Item,
@@ -47,7 +48,8 @@ import { useCategories, useItem, useSharedLists } from '../core/data.ts'
 import { useNotify } from '../core/notify.ts'
 import { requestPersistentStorage } from '../core/storage.ts'
 import { AppScreen } from '../layout/AppScreen.tsx'
-import { CURRENCIES, IMPORTANCE_LABEL, moneyInputValue, parseMoneyInput, safeUrl } from '../lib/format.ts'
+import { CURRENCIES, IMPORTANCE_LABEL, moneyInputValue, parseMoneyInput, priceExample, safeUrl } from '../lib/format.ts'
+import { clearFormDraft, readFormDraft, writeFormDraft } from '../lib/form-draft.ts'
 import { resyncItem, resyncLists } from '../lib/sync.ts'
 import './ItemEditorScreen.css'
 
@@ -56,7 +58,7 @@ const CURRENCY_KEY = 'hippo:currency'
 function defaultCurrency(): string {
   try {
     const c = localStorage.getItem(CURRENCY_KEY)
-    if (c && /^[A-Z]{3}$/.test(c)) return c
+    if (c && isKnownCurrency(c)) return c
   } catch {
     // ignore
   }
@@ -112,11 +114,76 @@ function validate(f: FormState): { errors: Errors; price: Money | null; quantity
   if (f.url.trim() && !isWebAddress(f.url.trim())) errors.url = 'Use a web address that starts with https://'
   if (f.imageUrl.trim() && !isWebAddress(f.imageUrl.trim())) errors.imageUrl = 'Use an image address that starts with https://'
   const price = parseMoneyInput(f.price, f.currency)
-  if (price === undefined) errors.price = 'Enter a price like 24.99, or leave it empty.'
+  if (price === undefined) errors.price = `Enter a price like ${priceExample(f.currency)}, or leave it empty.`
   const quantity = Number(f.quantity)
   if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > LIMITS.quantity) errors.quantity = `Enter a whole number from 1 to ${LIMITS.quantity}.`
   if (f.allowContributions && !price) errors.allowContributions = 'Add a price so friends can see how much is still needed.'
   return { errors, price: price ?? null, quantity }
+}
+
+/** The form as an item patch (what saving would write), or null when it does not validate. */
+function toPatch(f: FormState, categoryIds: readonly string[]): ItemPatch | null {
+  const { errors, price, quantity } = validate(f)
+  if (Object.keys(errors).length > 0) return null
+  return {
+    title: f.title.trim(),
+    quantity,
+    importance: f.importance,
+    categoryIds: f.categoryIds.filter((id) => categoryIds.includes(id)),
+    allowContributions: f.allowContributions,
+    url: f.url.trim() || null,
+    imageUrl: f.imageUrl.trim() || null,
+    notes: f.notes.trim() || null,
+    price,
+  }
+}
+
+const FIELD_WORDS: Record<keyof ItemPatch, string> = {
+  title: 'name',
+  url: 'shop link',
+  imageUrl: 'picture link',
+  price: 'price',
+  quantity: 'number wanted',
+  importance: 'how much you want it',
+  notes: 'notes',
+  categoryIds: 'categories',
+  allowContributions: 'chipping in',
+}
+
+function joinWords(words: string[]): string {
+  return words.length <= 1 ? (words[0] ?? '') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`
+}
+
+/** What a saved draft holds: the form, the form as it was loaded (to tell what this tab changed), and whether the currency was picked by hand. */
+interface ItemDraft {
+  form: FormState
+  base: FormState
+  currencyPicked: boolean
+}
+
+function isFormState(v: unknown): v is FormState {
+  if (typeof v !== 'object' || v === null) return false
+  const o = v as Record<string, unknown>
+  const str = (k: string) => typeof o[k] === 'string'
+  return (
+    ['title', 'url', 'imageUrl', 'price', 'currency', 'quantity', 'notes'].every(str) &&
+    (IMPORTANCE_LEVELS as readonly unknown[]).includes(o.importance) &&
+    Array.isArray(o.categoryIds) &&
+    o.categoryIds.every((x) => typeof x === 'string') &&
+    typeof o.allowContributions === 'boolean' &&
+    isKnownCurrency(String(o.currency))
+  )
+}
+
+function parseItemDraft(v: unknown): ItemDraft | null {
+  if (typeof v !== 'object' || v === null) return null
+  const o = v as Record<string, unknown>
+  if (!isFormState(o.form) || !isFormState(o.base) || typeof o.currencyPicked !== 'boolean') return null
+  return { form: o.form, base: o.base, currencyPicked: o.currencyPicked }
+}
+
+function draftKeyFor(item: Item | null): string {
+  return item ? `item:${item.id}` : 'item:new'
 }
 
 function focusFirstError(): void {
@@ -152,7 +219,7 @@ function filledText(patch: { title?: string; imageUrl?: string; price?: Money })
 function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, prefilled: boolean) {
   const core = useCore()
   const [note, setNote] = useState<LookupNote | undefined>()
-  const run = useRef<{ id: number; url: string | undefined }>({ id: 0, url: undefined })
+  const run = useRef<{ id: number; url: string | undefined; controller?: AbortController }>({ id: 0, url: undefined })
   // The answer may arrive after the person kept typing: merge into what the form holds then.
   const latest = useRef(f)
   useEffect(() => {
@@ -160,6 +227,7 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
   })
 
   const cancel = () => {
+    run.current.controller?.abort()
     run.current = { id: run.current.id + 1, url: undefined }
     setNote(undefined)
   }
@@ -169,7 +237,9 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
     if (!titleBlank && now.imageUrl.trim()) return
     if (run.current.url === url) return // one lookup per link, never a retry
     const id = run.current.id + 1
-    run.current = { id, url }
+    run.current.controller?.abort()
+    const controller = new AbortController()
+    run.current = { id, url, controller }
     setNote(undefined)
     void (async () => {
       const on = await getLinkPreviewEnabled(core.db)
@@ -179,13 +249,13 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
           const seen = await getSettings(core.db).then((st) => st.seen.linkPreviewHint !== undefined, () => true)
           if (run.current.id !== id || seen) return
           setNote({ kind: 'off-hint' })
-          void markSeen(core.db, 'linkPreviewHint', Date.now()).catch(() => undefined)
+          void markSeen(core.db, 'linkPreviewHint', core.now()).catch(() => undefined)
         }
         return
       }
       setNote({ kind: 'pending', text: 'Looking up the title and picture\u2026' })
-      const result = await lookupLinkPreview(url, { db: core.db })
-      if (run.current.id !== id) return
+      const result = await lookupLinkPreview(url, { db: core.db, signal: controller.signal })
+      if (run.current.id !== id || result.kind === 'cancelled') return
       if (result.kind === 'found') {
         const prev = latest.current
         const typedPrice = parseMoneyInput(prev.price, prev.currency)
@@ -219,6 +289,7 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
   useEffect(() => {
     if (prefilled) start(f.url, f, false)
     return () => {
+      run.current.controller?.abort()
       run.current = { id: run.current.id + 1, url: undefined }
     }
     // Once per mount: later changes to the form never start a lookup by themselves.
@@ -235,7 +306,35 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
   const [, navigate] = useLocation()
   const categories = useCategories() ?? []
   const lists = useSharedLists() ?? []
-  const [f, setF] = useState<FormState>(() => initialState(item, draft))
+  const draftKey = draftKeyFor(item)
+  // A link handed over by the share sheet or a deep link starts a fresh form; otherwise an unsaved
+  // draft from earlier in this tab comes back.
+  const [start] = useState(() => {
+    const saved = draft && !item ? null : parseItemDraft(readFormDraft(draftKey))
+    if (draft && !item) clearFormDraft(draftKey)
+    const loaded = initialState(item, draft)
+    return saved ? { form: saved.form, base: saved.base, currencyPicked: saved.currencyPicked, restored: true } : { form: loaded, base: loaded, currencyPicked: false, restored: false }
+  })
+  const [f, setF] = useState<FormState>(start.form)
+  const [base, setBase] = useState<FormState>(start.base)
+  const [currencyPicked, setCurrencyPicked] = useState(start.currencyPicked)
+  const [restored, setRestored] = useState(start.restored)
+  const saved = useRef(false)
+  // Unsaved typing is kept for this tab only (sessionStorage), so Back or a reload does not lose it.
+  useEffect(() => {
+    if (saved.current) return
+    if (JSON.stringify(f) === JSON.stringify(base)) clearFormDraft(draftKey)
+    else writeFormDraft(draftKey, { form: f, base, currencyPicked } satisfies ItemDraft)
+  }, [f, base, currencyPicked, draftKey])
+  const startOver = () => {
+    const fresh = initialState(item, null)
+    clearFormDraft(draftKey)
+    setF(fresh)
+    setBase(fresh)
+    setCurrencyPicked(false)
+    setRestored(false)
+    setErrors({})
+  }
   const [errors, setErrors] = useState<Errors>({})
   const [saving, setSaving] = useState(false)
   const [newCat, setNewCat] = useState('')
@@ -296,26 +395,37 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
       return
     }
     setSaving(true)
+    const catIds = categories.map((c) => c.id)
     const fields = {
       title: f.title.trim(),
       quantity,
       importance: f.importance,
-      categoryIds: f.categoryIds.filter((id) => categories.some((c) => c.id === id)),
+      categoryIds: f.categoryIds.filter((id) => catIds.includes(id)),
       allowContributions: f.allowContributions,
     }
     try {
-      if (price) rememberCurrency(price.currency)
+      // The currency becomes the default for new wishes only when the person picked it in this form.
+      if (price && currencyPicked) rememberCurrency(price.currency)
       if (item) {
-        const patch: ItemPatch = {
-          ...fields,
-          url: f.url.trim() || null,
-          imageUrl: f.imageUrl.trim() || null,
-          notes: f.notes.trim() || null,
-          price,
+        // Only what was changed in this form is written, onto the wish as it is stored now.
+        const full = toPatch(f, catIds) ?? {}
+        const loaded = toPatch(base, catIds)
+        const patch: ItemPatch = {}
+        const expected: ItemPatch = {}
+        for (const k of Object.keys(full) as (keyof ItemPatch)[]) {
+          if (loaded && JSON.stringify(full[k] ?? null) === JSON.stringify(loaded[k] ?? null)) continue
+          Object.assign(patch, { [k]: full[k] })
+          if (loaded) Object.assign(expected, { [k]: loaded[k] })
         }
-        await updateItem(core.db, item.id, patch)
-        resyncItem(core, item.id, notify)
-        notify('Changes saved')
+        const r = await mergeItemEdit(core.db, item.id, patch, expected, core.now())
+        saved.current = true
+        clearFormDraft(draftKey)
+        if (Object.keys(patch).length > 0) resyncItem(core, item.id, notify)
+        notify(
+          r.changedElsewhere.length > 0
+            ? `Changes saved. This wish was also changed somewhere else; your ${joinWords(r.changedElsewhere.map((k) => FIELD_WORDS[k]))} replaced that.`
+            : 'Changes saved',
+        )
       } else {
         await createItem(core.db, {
           ...fields,
@@ -323,7 +433,9 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
           ...(f.imageUrl.trim() ? { imageUrl: f.imageUrl.trim() } : {}),
           ...(f.notes.trim() ? { notes: f.notes.trim() } : {}),
           ...(price ? { price } : {}),
-        })
+        }, core.now())
+        saved.current = true
+        clearFormDraft(draftKey)
         clearCaptureDraft()
         // Ask the browser to keep Hippo's data now that there is something worth keeping (never awaited).
         void requestPersistentStorage()
@@ -342,10 +454,10 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
     setBusy('archive')
     try {
       if (item.archivedAt === undefined) {
-        await archiveItem(core.db, item.id)
+        await archiveItem(core.db, item.id, core.now())
         notify('Archived. It stays in your wishlist but is left off shared lists.')
       } else {
-        await unarchiveItem(core.db, item.id)
+        await unarchiveItem(core.db, item.id, core.now())
         notify('Back in your wishlist')
       }
       resyncItem(core, item.id, notify)
@@ -360,7 +472,9 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
     if (!item || busy) return
     setBusy('delete')
     try {
-      const changed = await deleteItem(core.db, item.id)
+      const changed = await deleteItem(core.db, item.id, core.now())
+      saved.current = true
+      clearFormDraft(draftKey)
       resyncLists(core, changed, notify)
       setConfirmDelete(false)
       notify(`Deleted ${item.title}`)
@@ -375,6 +489,14 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
 
   return (
     <form className="item-form app-stack app-stack--loose" onSubmit={(e) => void submit(e)} noValidate>
+      {restored ? (
+        <div className="item-form__restored" role="status">
+          <p className="app-note">Your unsaved changes are back.</p>
+          <Button variant="ghost" size="md" onClick={startOver}>
+            Start over
+          </Button>
+        </div>
+      ) : null}
       {draft && !item ? (
         <p className="app-banner" role="note">
           We filled in what the page shared. Check the details before saving.
@@ -433,7 +555,14 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
           onChange={(e) => set('price', e.target.value)}
           {...err('price')}
         />
-        <Select label="Currency" value={f.currency} onChange={(e) => set('currency', e.target.value)}>
+        <Select
+          label="Currency"
+          value={f.currency}
+          onChange={(e) => {
+            set('currency', e.target.value)
+            setCurrencyPicked(true)
+          }}
+        >
           {[...new Set([f.currency, ...CURRENCIES])].map((c) => (
             <option key={c} value={c}>
               {c}

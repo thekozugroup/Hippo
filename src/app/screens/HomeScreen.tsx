@@ -1,5 +1,5 @@
-import { Plus, Settings, Share2 } from 'lucide-react'
-import { BigValue, IconLink, LinkButton, List, ListRow, MoneyText, SectionHeader, Skeleton, Thumb, TwoTone } from '../../ui/index.ts'
+import { Plus, Share2 } from 'lucide-react'
+import { BigValue, LinkButton, List, ListRow, MoneyText, SectionHeader, Skeleton, Thumb, TwoTone } from '../../ui/index.ts'
 import { useCore } from '../core/context.ts'
 import { useGuestLists, useItems, useSettings, useSharedLists } from '../core/data.ts'
 import { AppScreen } from '../layout/AppScreen.tsx'
@@ -60,7 +60,6 @@ export function HomeScreen() {
           <TwoTone tone="on-hero" muted="Your wishlist," bright="kept only on this device" />
         )
       }
-      actions={<IconLink href="#/settings" variant="frost" aria-label="Settings" icon={<Settings />} />}
     >
       <section className="app-stack" aria-labelledby="home-wishlist">
         {empty ? (

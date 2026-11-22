@@ -328,7 +328,8 @@ export class GiverListSession {
       (info: EoseInfo) => {
         if (eosed) return
         eosed = true
-        if (info.relaysReached === 0) {
+        // A socket that opened but never answered is no answer: the list may well exist.
+        if (info.relaysAnswered === 0) {
           this.goOffline()
           return
         }
@@ -356,6 +357,14 @@ export class GiverListSession {
           if (this.pending.size > 0) this.scheduleRetry()
         })
     })
+  }
+
+  /** "Try again": asks the relays again now instead of waiting for the next retry. */
+  retryNow(): void {
+    if (this.stopped || !this.startPromise || this.connection === 'live') return
+    this.connection = 'loading'
+    this.emit()
+    this.connect()
   }
 
   private goOffline(): void {

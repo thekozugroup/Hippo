@@ -61,7 +61,7 @@ describe('export / import', () => {
   it('rejects unknown formats and versions', () => {
     expect(() => parseExportFile({ format: 'other', version: 1 })).toThrow()
     try {
-      parseExportFile({ format: 'hippo-export', version: 2 })
+      parseExportFile({ format: 'hippo-export', version: 3 })
     } catch (e) {
       expect(isHippoError(e, 'unsupported-version')).toBe(true)
     }

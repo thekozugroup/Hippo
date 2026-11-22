@@ -48,6 +48,27 @@
   backdrop-filter: var(--frost-scrim-filter);
 }
 
+/* Frost over scrolling content (the bottom navigation). Chromium blurs a backdrop poorly near the
+   bottom edge of the blurred box when the device pixel ratio is 2 or more: a strip of what is behind
+   shows through sharp. So the blurred box reaches --frost-bleed past the surface above and below
+   (the component adds that to its padding and takes it off its margin, so layout is unchanged), and
+   clip-path cuts it back to the visible rounded surface. Only pixels inside the surface are
+   blurred. The clip would also cut an outer hairline and shadow, so the hairline is drawn inside
+   the visible surface by ::after, and the surface has no outer shadow (flat, as the recipe asks). */
+.frost--bleed {
+  position: relative;
+  clip-path: inset(var(--frost-bleed) 0 round var(--frost-bleed-radius, var(--r-pill)));
+  box-shadow: none;
+}
+.frost--bleed::after {
+  content: '';
+  position: absolute;
+  inset: var(--frost-bleed) 0;
+  border-radius: var(--frost-bleed-radius, var(--r-pill));
+  box-shadow: inset 0 0 0 var(--frost-line-w, 1px) var(--frost-line);
+  pointer-events: none;
+}
+
 /* On the hero the replacement border is white, on the solid blue-800. */
 .frost--on-hero {
   --frost-solid-line: var(--white);
@@ -91,5 +112,11 @@
     backdrop-filter: none;
     box-shadow: none;
     border: 1px solid CanvasText;
+  }
+  .frost--bleed {
+    border: none;
+  }
+  .frost--bleed::after {
+    box-shadow: inset 0 0 0 1px CanvasText;
   }
 }

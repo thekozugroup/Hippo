@@ -3,6 +3,7 @@ import { Route, Router, Switch, useLocation } from 'wouter'
 import type { Core } from '../core/index.ts'
 import { Skeleton } from '../ui/index.ts'
 import { useCore } from './core/context.ts'
+import { endBoot, isSetupBoot } from './core/boot.ts'
 import { ClockNotice } from './core/ClockNotice.tsx'
 import { CoreProvider } from './core/CoreProvider.tsx'
 import { useGuestLists, useItems, useSettings, useSharedLists } from './core/data.ts'
@@ -53,6 +54,8 @@ function RouteFocus() {
   useLayoutEffect(() => {
     if (first.current) return
     window.scrollTo(0, 0)
+    // Leaving Home or setup: whatever shows now has its own background.
+    if (!location.startsWith('/welcome/') && location !== '/') endBoot()
   }, [location])
   useEffect(() => {
     if (first.current) {
@@ -97,6 +100,8 @@ function ThemeSync() {
 }
 
 function Loading() {
+  // Likely a first run on its way to setup: an empty night field, not a light placeholder.
+  if (isSetupBoot()) return <div className="app-boot" aria-busy="true" aria-label="Loading" />
   return (
     <div className="app-loading" aria-busy="true" aria-label="Loading">
       <Skeleton height={200} shape="tile" />
@@ -127,20 +132,26 @@ function StorageGate({ children }: { children: ReactNode }) {
  * deep-link captures open their own screens and never pass through here.
  */
 function HomeRoute() {
+  const core = useCore()
   const settings = useSettings()
   const items = useItems()
   const lists = useSharedLists()
   const guests = useGuestLists()
   const [, navigate] = useLocation()
+  const dbName = core.db.name
   const decided = settings !== undefined && items !== undefined && lists !== undefined && guests !== undefined
   const step = decided ? onboardingStepFor({ stored: settings.onboarding, items: items.length, lists: lists.length, guests: guests.length }) : null
   useEffect(() => {
     if (!decided) return
     if (step) navigate(`/welcome/${step}`, { replace: true })
-    else writeSetupHint(true)
-  }, [decided, step, navigate])
+    else writeSetupHint(true, dbName)
+  }, [decided, step, navigate, dbName])
   // Returning people see Home at once; a first visit waits for the answer instead of flashing Home.
-  if (step || (!decided && !readSetupHint())) return <Loading />
+  const waiting = Boolean(step) || (!decided && !readSetupHint(core.db.name))
+  useLayoutEffect(() => {
+    if (!waiting) endBoot()
+  }, [waiting])
+  if (waiting) return <Loading />
   return <HomeScreen />
 }
 

@@ -47,6 +47,15 @@ export function moneyText(money: Money, locale?: string): string {
   return new Intl.NumberFormat(locale, { style: 'currency', currency: money.currency }).format(money.amount / 10 ** digits)
 }
 
+/**
+ * An example amount in the shape a currency is written: "24.99" for USD, "2499" for JPY (no minor
+ * units), "24.990" for KWD (three). Used in hints and validation messages.
+ */
+export function priceExample(currency: string): string {
+  const digits = currencyDigits(currency) ?? 2
+  return digits === 0 ? '2499' : `24.${'99'.padEnd(digits, '0').slice(0, digits)}`
+}
+
 /** The editable text for an amount, e.g. 2490 USD -> "24.90". */
 export function moneyInputValue(money: Money | undefined): string {
   if (!money) return ''

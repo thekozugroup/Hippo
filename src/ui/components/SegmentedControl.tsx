@@ -10,7 +10,10 @@ export interface SegmentedOption<T extends string> {
   label: string
 }
 
-export interface SegmentedControlProps<T extends string> extends Omit<ComponentPropsWithRef<'div'>, 'onChange' | 'children' | 'role' | 'aria-label'> {
+export interface SegmentedControlProps<T extends string> extends Omit<
+  ComponentPropsWithRef<'div'>,
+  'onChange' | 'children' | 'role' | 'aria-label'
+> {
   /** Accessible name of the group. */
   label: string
   /** The choices (two to four work best). */
@@ -22,23 +25,33 @@ export interface SegmentedControlProps<T extends string> extends Omit<ComponentP
 }
 
 /** Pill segmented control built on native radio inputs (arrow keys move the selection). */
-export function SegmentedControl<T extends string>({ label, options, value, onChange, className, ...rest }: SegmentedControlProps<T>) {
+export function SegmentedControl<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  className,
+  ...rest
+}: SegmentedControlProps<T>) {
   const name = useId()
   return (
-    <div {...rest} role="radiogroup" aria-label={label} className={cx('segmented', className)}>
-      {options.map((opt) => (
-        <label key={opt.value} className="segmented__option">
-          <input
-            type="radio"
-            className="segmented__input"
-            name={name}
-            value={opt.value}
-            checked={opt.value === value}
-            onChange={() => onChange(opt.value)}
-          />
-          <span className="segmented__label">{opt.label}</span>
-        </label>
-      ))}
+    // The box lets the control stack its options when they do not fit side by side (large text).
+    <div className="segmented-box">
+      <div {...rest} role="radiogroup" aria-label={label} className={cx('segmented', className)}>
+        {options.map((opt) => (
+          <label key={opt.value} className="segmented__option">
+            <input
+              type="radio"
+              className="segmented__input"
+              name={name}
+              value={opt.value}
+              checked={opt.value === value}
+              onChange={() => onChange(opt.value)}
+            />
+            <span className="segmented__label">{opt.label}</span>
+          </label>
+        ))}
+      </div>
     </div>
   )
 }

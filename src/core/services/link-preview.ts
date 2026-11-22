@@ -59,13 +59,19 @@ export type LinkPreviewResult =
   | { kind: 'disabled' }
   /** Not an https URL with a public host. Nothing was sent. */
   | { kind: 'invalid-url' }
+  /** The caller aborted (`signal`); the request, if one was running, was stopped. */
+  | { kind: 'cancelled' }
 
 export interface LinkPreviewDeps {
   db: HippoDb
   /** Defaults to the global `fetch`. */
   fetch?: typeof fetch
   timeoutMs?: number
+  /** Aborting it stops the request (for example when the link in the form changes). */
+  signal?: AbortSignal
 }
+
+class Cancelled extends Error {}
 
 /**
  * The URL that would be sent: https only, public host, no credentials,
@@ -178,7 +184,9 @@ class Timeout extends Error {}
  */
 export async function lookupLinkPreview(url: string, deps: LinkPreviewDeps): Promise<LinkPreviewResult> {
   try {
+    if (deps.signal?.aborted) return { kind: 'cancelled' }
     if (!(await getLinkPreviewEnabled(deps.db))) return { kind: 'disabled' }
+    if (deps.signal?.aborted) return { kind: 'cancelled' }
     const cleaned = previewRequestUrl(url)
     if (cleaned === undefined) return { kind: 'invalid-url' }
     const doFetch = deps.fetch ?? globalThis.fetch
@@ -192,6 +200,12 @@ export async function lookupLinkPreview(url: string, deps: LinkPreviewDeps): Pro
         reject(new Timeout())
       }, timeoutMs)
     })
+    const onAbort = (): void => controller.abort()
+    deps.signal?.addEventListener('abort', onAbort, { once: true })
+    const cancelled = new Promise<never>((_, reject) => {
+      deps.signal?.addEventListener('abort', () => reject(new Cancelled()), { once: true })
+    })
+    cancelled.catch(() => undefined)
     const work = (async (): Promise<LinkPreviewResult> => {
       const res = await doFetch(previewServiceRequest(cleaned), {
         method: 'GET',
@@ -222,11 +236,13 @@ export async function lookupLinkPreview(url: string, deps: LinkPreviewDeps): Pro
     })()
     work.catch(() => undefined) // a late rejection after the timeout is expected
     try {
-      return await Promise.race([work, timeout])
+      return await Promise.race([work, timeout, cancelled])
     } finally {
       clearTimeout(timer)
+      deps.signal?.removeEventListener('abort', onAbort)
     }
   } catch (e) {
+    if (e instanceof Cancelled || deps.signal?.aborted) return { kind: 'cancelled' }
     return { kind: 'failed', reason: e instanceof Timeout ? 'timeout' : 'network' }
   }
 }

@@ -138,11 +138,20 @@
   /* Frost, constant parts. Tints are fixed so text contrast holds on the backdrops
      frost is allowed on (DESIGN.md section 3). */
   --frost-hero-tint: color-mix(in srgb, var(--blue-950) 36%, transparent);
-  --frost-hero-filter: blur(24px) saturate(1.4);
+  /* Blur radii stay at 14px or less: Chromium renders a larger backdrop blur at a device pixel
+     ratio of 2 or 3 with a sharp copy of what is behind showing through, so text behind a 28px
+     frost stayed readable on phones. Strength comes from the tint instead. */
+  --frost-hero-filter: blur(14px) saturate(1.4);
   --frost-hero-line: color-mix(in srgb, var(--white) 14%, transparent);
   --frost-hero-solid: var(--blue-900);
-  --frost-panel-filter: blur(28px) saturate(1.3);
-  --frost-bar-filter: blur(28px) saturate(1.5);
+  --frost-panel-filter: blur(14px) saturate(1.3);
+  /* The bottom navigation: a heavy frost, so what scrolls under the pill is soft shapes and colour,
+     never readable text. Only the pixels inside the pill are blurred. */
+  --frost-bar-blur: 14px;
+  /* How far a .frost--bleed surface's blurred box reaches past it, above and below (frost.css). */
+  --frost-bleed: 32px;
+  --frost-bar-saturate: 1.4;
+  --frost-bar-filter: blur(var(--frost-bar-blur)) saturate(var(--frost-bar-saturate));
   --frost-scrim-tint: color-mix(in srgb, var(--slate-950) 36%, transparent);
   --frost-scrim-filter: blur(12px);
   --frost-scrim-solid: color-mix(in srgb, var(--slate-950) 80%, transparent);
@@ -213,7 +222,8 @@
   --frost-panel-tint: light-dark(color-mix(in srgb, var(--surface) 90%, transparent), color-mix(in srgb, var(--slate-900) 55%, transparent));
   --frost-panel-line: light-dark(var(--hairline), color-mix(in srgb, var(--white) 14%, transparent));
   --frost-panel-solid: light-dark(var(--surface), var(--slate-900));
-  --frost-bar-tint: color-mix(in srgb, var(--surface) 72%, transparent);
+  --frost-bar-tint: color-mix(in srgb, var(--surface) var(--frost-bar-tint-strength), transparent);
+  --frost-bar-tint-strength: 80%;
   --frost-bar-line: light-dark(var(--hairline), color-mix(in srgb, var(--white) 14%, transparent));
   --frost-bar-solid: var(--surface);
   --frost-solid-line: var(--text-2);

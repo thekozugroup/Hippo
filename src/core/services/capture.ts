@@ -174,9 +174,28 @@ const SYMBOLS: ReadonlyArray<[string, string]> = [
   ['$', 'USD'],
 ]
 
+let knownCurrencies: Set<string> | null | undefined
+
+/**
+ * True for a real ISO 4217 currency code that this browser knows (`Intl.supportedValuesOf`).
+ * A well-formed but made-up code such as `XYZ` is refused, so a deep link cannot invent one.
+ * Where the browser cannot list currencies, any three capital letters that `Intl` accepts pass.
+ */
+export function isKnownCurrency(code: string): boolean {
+  if (!/^[A-Z]{3}$/.test(code)) return false
+  if (knownCurrencies === undefined) {
+    try {
+      knownCurrencies = typeof Intl.supportedValuesOf === 'function' ? new Set(Intl.supportedValuesOf('currency')) : null
+    } catch {
+      knownCurrencies = null
+    }
+  }
+  return knownCurrencies === null || knownCurrencies.has(code)
+}
+
 /** Minor-unit digits for a currency (JPY 0, EUR 2, KWD 3); `undefined` for unknown codes. */
 export function currencyDigits(currency: string): number | undefined {
-  if (!/^[A-Z]{3}$/.test(currency)) return undefined
+  if (!isKnownCurrency(currency)) return undefined
   try {
     return new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits
   } catch {

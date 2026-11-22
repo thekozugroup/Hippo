@@ -1,8 +1,17 @@
+/* Price and currency side by side; with large text the currency goes under the price. */
 .item-form__price {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 128px;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--sp-3);
-  align-items: start;
+  align-items: flex-start;
+}
+.item-form__price > :first-child {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+.item-form__price > :last-child {
+  flex: 0 1 8rem;
+  min-width: min(8rem, 100%);
 }
 
 .item-form__group {
@@ -20,14 +29,19 @@
 }
 
 .item-form__newcat {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--sp-3);
-  align-items: start;
+  align-items: flex-start;
+}
+.item-form__newcat > :first-child {
+  flex: 1 1 6rem;
+  min-width: 0;
 }
 .item-form__newcat > .btn {
-  /* Line up the 48px button with the 56px field under its label row. */
-  margin-block-start: calc(var(--lh-label) + var(--sp-2) + var(--sp-1));
+  /* Beside the field: lined up with the 56px field's middle. Under it (large text): on its own line. */
+  align-self: flex-end;
+  margin-block-end: var(--sp-1);
 }
 
 .item-form__image {
@@ -44,4 +58,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-group);
+}
+
+/* "Your unsaved changes are back" with its Start over action, on one quiet line. */
+.item-form__restored {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-block-end: calc(-1 * var(--sp-2));
 }

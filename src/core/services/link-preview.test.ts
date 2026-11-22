@@ -209,6 +209,28 @@ describe('lookupLinkPreview never throws', () => {
     expect(signal?.aborted).toBe(true)
   })
 
+  it('stops the request when the caller aborts (a changed link)', async () => {
+    let signal: AbortSignal | undefined
+    const f = vi.fn<typeof fetch>((_u, init) => {
+      signal = init?.signal ?? undefined
+      return new Promise<Response>(() => undefined)
+    })
+    const controller = new AbortController()
+    const pending = lookupLinkPreview('https://shop.example/p/1', { db, fetch: f, signal: controller.signal })
+    await vi.waitFor(() => expect(f).toHaveBeenCalled())
+    controller.abort()
+    expect(await pending).toEqual({ kind: 'cancelled' })
+    expect(signal?.aborted).toBe(true)
+  })
+
+  it('sends nothing when already aborted', async () => {
+    const f = vi.fn<typeof fetch>()
+    const controller = new AbortController()
+    controller.abort()
+    expect(await lookupLinkPreview('https://shop.example/p/1', { db, fetch: f, signal: controller.signal })).toEqual({ kind: 'cancelled' })
+    expect(f).not.toHaveBeenCalled()
+  })
+
   it('returns disabled rather than throwing when the database is closed', async () => {
     db.close()
     const f = mockFetch(jsonResponse(okBody({ title: 'x' })))

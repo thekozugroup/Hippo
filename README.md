@@ -73,7 +73,7 @@ If you would rather use your own domain, skip this step and do step 5 instead. I
 3. Wait for the run to turn green (about 5 minutes). Open `https://<name>.github.io/`.
 4. Back in **Settings → Pages**, tick **Enforce HTTPS** if it is offered.
 
-There is nothing to configure: no secrets, no environment variables, no database.
+There is nothing to configure: no secrets, no database. The workflow passes your site's address to the build, so links you paste in chats show a preview card with a picture; a build without it still works, and the card then has no picture.
 
 ### 5. Optional: use your own domain instead
 
@@ -124,8 +124,9 @@ GitHub switches off scheduled workflows after 60 days without any activity in th
 - **Share links only name public relays.** Links that point at `ws://`, `localhost`, `.local` names or private-network addresses are refused. The `?relays=` developer override accepts loopback relays only, lasts for one browser tab, and the app shows a notice while it is on.
 - **Changing a link (rotation) or deleting a list** keeps the old keys on your device until the relays have accepted the "no longer shared" notice for the old link. Hippo retries this, and any list change no relay has accepted yet, at start, when the device comes back online, when the app comes back to the foreground, and every few minutes while something is waiting.
 - **Framing.** GitHub Pages cannot send the `frame-ancestors` header, and a policy set in a `<meta>` tag cannot include it. So Hippo checks for itself: if it is shown inside another site's frame, it starts nothing and shows a message with a link that opens Hippo in its own tab. If you host Hippo where you control headers, also send `Content-Security-Policy: frame-ancestors 'none'`.
+- **Device clocks.** Claims are ordered by time, and a device whose clock is wrong would disagree with everyone else about who is getting a gift. Hippo measures the device clock against the `Date` header of a request to its own address (never a third party) and uses the corrected time; it tells the person once when the clock is more than about two minutes off. Without an answer (offline on a first visit) it uses the device clock.
 - **Content-Security-Policy is set by a `<meta>` tag**, because GitHub Pages cannot send custom headers. The policy allows plain `ws:` only for loopback addresses (the developer relay override), so test and production builds are identical. `require-trusted-types-for 'script'` is not set: with it, Chromium blocks the service worker registration (a `TrustedScriptURL` sink) unless a Trusted Types policy is added.
-- **Link lookup is off by default.** If you turn on **Link lookup** in Settings, Hippo sends the link of each wish you add to Microlink (`api.microlink.io`), a third-party service, so it can look up the page's title and picture. Only the link is sent, after tracking parameters and the part after `#` are removed, and only for `https` links to public sites. Microlink sees the link and your IP address, as any web server would. Nothing is sent to it while the setting is off. This host is the only one besides the relays that the content policy allows Hippo to contact.
+- **Link lookup is off by default.** If you turn on **Link lookup** in Settings, Hippo sends the link of each wish you add to Microlink (`api.microlink.io`), a third-party service, so it can look up the page's title and picture. Only the link is sent, after tracking parameters and the part after `#` are removed, and only for `https` links to public sites. Microlink sees the link and your IP address, as any web server would. Nothing is sent to it while the setting is off. Besides the relays and Hippo's own address, the content policy allows two kinds of outside requests: this one host, and pictures over `https` from any host, because a wish's picture can come from any shop (PRD FR-28).
 - **Removing a list shared with you** hides it on this device but keeps your guest key, so opening the link again lets you change or take back what you said you would get. Backups include hidden lists.
 
 ## Develop
@@ -150,7 +151,7 @@ Source layout:
 | `src/ui/` | Design system: tokens, styles, components |
 | `src/app/` | Screens and routing |
 | `e2e/` | Playwright end-to-end tests |
-| `scripts/` | Maintainer scripts: icons, relay health check |
+| `scripts/` | Maintainer scripts: icons, the link preview picture (`node scripts/generate-og-image.mjs`), relay health check |
 
 ## Adding items
 

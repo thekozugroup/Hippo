@@ -9,7 +9,8 @@ Every expected failure throws `HippoError` with a `code` (`invalid-link`, `own-l
 | Function | What it does |
 |---|---|
 | `applyRelayOverrideFromUrl(location.href)` | Copies `?relays=ws://127.0.0.1:7447` (loopback only) into sessionStorage `hippo:relays`, so it lasts for this tab only. Call before `createCore`. `readRelayOverride()` returns the active override. |
-| `createCore(options?)` | Returns `{ db, transports, now, forcedRelays?, close() }`, the `deps` every service takes. Nostr relays by default; pass `transport` to use a `MemoryTransport`. |
+| `createCore(options?)` | Returns `{ db, transports, now, clockSync?, forcedRelays?, close() }`, the `deps` every service takes. Nostr relays by default; pass `transport` to use a `MemoryTransport`. Pass `clock` (a `TimeSync`) to correct a wrong device clock, or `now` for a fixed test clock. |
+| `new TimeSync({ url, storage? })` | The corrected clock (PROTOCOL.md section 10, note 13): `now()`, `offset()` (ms the device is behind; undefined until measured), `ready()`, `refresh()`, `refreshIfOlderThan(ms)`, `subscribe(fn)`. Measures with a HEAD request to `url` (the app's own address) and its `Date` header. `CLOCK_WARN_MS` (2 minutes) is when to tell the person; `describeClockOffset(ms)` words it. Every stamp and every time check in core comes from `deps.now`; `systemNow` is the uncorrected default for tests. |
 
 **End-to-end tests:** start `node src/core/testing/mock-relay.ts` (port from `MOCK_RELAY_PORT`, default 7447; prints `mock relay listening on ws://127.0.0.1:<port>`), then either open the app with `?relays=ws://127.0.0.1:7447` or set sessionStorage `hippo:relays` with `page.addInitScript`. Only loopback relays are honoured. Every transport, including list and link relays, then uses only those relays. The UI should show when `core.forcedRelays` is set. `startMockRelay(port?)` returns `{ url, port, events, filters, clear(), pause(), resume(), close() }` for use inside Node tests; `pause()` drops and refuses connections (keeping stored events) to simulate an outage.
 
@@ -19,6 +20,7 @@ Every expected failure throws `HippoError` with a `code` (`invalid-link`, `own-l
 |---|---|
 | `createItem(db, input, now?)` | New item; validates and trims; defaults: quantity 1, importance `want`, contributions off. |
 | `updateItem(db, id, patch, now?)` | Patch fields; `null` clears an optional field. |
+| `mergeItemEdit(db, id, patch, base, now?)` | An editor's save: writes only `patch` onto the stored item in one transaction; returns `{ item, changedElsewhere }`, the patched fields whose stored value no longer equals `base` (the value the form loaded). |
 | `archiveItem` / `unarchiveItem(db, id)` | Archived items are hidden and left out of published lists. |
 | `deleteItem(db, id)` | Deletes and unlinks from shared lists; returns the changed list ids. |
 | `getItem`, `listItems(db, { includeArchived? })` | Reads. |
@@ -43,7 +45,7 @@ For wishes added from a pasted link or the share sheet. Off by default; see the 
 | Function | What it does |
 |---|---|
 | `getLinkPreviewEnabled(db)`, `setLinkPreviewEnabled(db, enabled)` | The opt-in. Stored in the `settings` table under key `LINK_PREVIEW_SETTING_KEY` (`'linkPreview'`); only the boolean `true` means on. |
-| `lookupLinkPreview(url, { db, fetch?, timeoutMs? })` | Never throws. Returns `{ kind: 'found', patch: { title?, imageUrl?, price? } }`, `{ kind: 'nothing-found' }`, `{ kind: 'failed', reason: 'timeout' \| 'network' \| 'rate-limited' \| 'service-error' \| 'bad-response' }`, `{ kind: 'disabled' }` (setting off, nothing sent) or `{ kind: 'invalid-url' }` (not https or not a public host, nothing sent). Sends one GET with only the cleaned link (tracking parameters and fragment removed) to `LINK_PREVIEW_HOST` (`api.microlink.io`). Default timeout 6 s. |
+| `lookupLinkPreview(url, { db, fetch?, timeoutMs?, signal? })` | Never throws. Aborting `signal` stops the request and returns `{ kind: 'cancelled' }`. Returns `{ kind: 'found', patch: { title?, imageUrl?, price? } }`, `{ kind: 'nothing-found' }`, `{ kind: 'failed', reason: 'timeout' \| 'network' \| 'rate-limited' \| 'service-error' \| 'bad-response' }`, `{ kind: 'disabled' }` (setting off, nothing sent) or `{ kind: 'invalid-url' }` (not https or not a public host, nothing sent). Sends one GET with only the cleaned link (tracking parameters and fragment removed) to `LINK_PREVIEW_HOST` (`api.microlink.io`). Default timeout 6 s. |
 | `fillEmptyFields(current, patch)` | Returns the part of the patch that fills fields the user left empty. Pass a blank `title` when the current title is only a guess from the URL (`draftFromCapture`). |
 
 The UI toggle must show this sentence, unchanged (`LINK_PREVIEW_DISCLOSURE`): "Hippo will send each link you add to Microlink (api.microlink.io), a third-party service, so it can look up the page's title and picture. Nothing else is sent." Call `lookupLinkPreview` only for a link the user just added, never for links read from lists. A price is returned only if the service supplies one; Microlink usually does not.
@@ -87,7 +89,7 @@ The owner side never reads claims: every request is restricted to the owner's ke
 | `session.setNickname(name?, { applyToExisting? })` | Max 40 characters. |
 | `session.repair()` | Manual re-sync; runs automatically when the session goes live. |
 
-Claim actions return `{ claim, result: PublishResult }`. They update the view immediately; if `result.ok` is false the claim id stays in `pendingClaimIds` and is retried every `retryMs` (15 s) while the session runs, and on reconnect.
+Claim actions return `{ claim, result: PublishResult, outcome }`. `outcome` is what other devices make of the event, worked out with their rules on everything this device holds: `counted`, `not-counted` (`taken`, `currency`, `unavailable`) or `rejected` (for example `future`). Show success only for `counted`. `session.retryNow()` asks the relays again at once ("Try again"). `status` is `offline` when no relay answered (EOSE), even if sockets are open. They update the view immediately; if `result.ok` is false the claim id stays in `pendingClaimIds` and is retried every `retryMs` (15 s) while the session runs, and on reconnect.
 
 `removedItemsWithMyClaims[].title` is the item's last known title (remembered for items I claimed), so it can still be shown after a tombstone or after the owner stops sharing (`status === 'unpublished'`).
 
@@ -118,8 +120,8 @@ The list always has these seven entries in this order. `unknown` means the brows
 
 | Function | What it does |
 |---|---|
-| `exportData(db)` | JSON-serialisable object with all data **including private keys**; records the export time. |
-| `importData(db, parsedJson, { mode: 'merge' \| 'replace' })` | Validates everything first; rejects other versions, any bad record, and FR-25 conflicts (`invalid-import`). Merge never replaces lists already on the device (`skippedLists`). |
+| `exportData(db, now?)` | JSON-serialisable object (version 2) with all data **including private keys**, plus the owner's name, the Link lookup setting and whether setup is done; records the export time. |
+| `importData(db, parsedJson, { mode: 'merge' \| 'replace' })` | Validates everything first; rejects other versions, any bad record, and FR-25 conflicts (`invalid-import`). Merge never replaces lists already on the device (`skippedLists`). Version 1 and 2 files are read. A restore that brings data marks setup as done unless it already ended on the device. |
 | `getSettings(db)`, `setTheme(db, theme)`, `setRelayOverride(db, relays?)` | Settings; the relay override applies to lists created afterwards and accepts public `wss://` relays only (`isRelayUrl`). |
 | `setOwnerName(db, name?)` | The owner's first name or nickname (max 40, whitespace collapsed; `RangeError` when longer). Published lists carry it as `ownerName` in their meta from their next sync, so call `syncList` for published lists after a change. |
 | `setOnboarding(db, state?)`, `markSeen(db, flag, at)` | First-run setup progress (`{ status, step, answers, listId?, itemId?, updatedAt }`, validated on write and read) and one-time hints (`giverIntro`, `setupChecklist`, `linkPreviewHint`), returned by `getSettings` as `onboarding` and `seen`. |

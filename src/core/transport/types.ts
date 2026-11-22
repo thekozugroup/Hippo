@@ -24,7 +24,10 @@ export type Unsubscribe = () => void
  * giver view needs to tell "caught up" from "offline".
  */
 export interface EoseInfo {
+  /** Relays with an open connection. */
   relaysReached: number
+  /** Relays that answered the request (sent EOSE). Zero means nothing was heard, even if sockets are open. */
+  relaysAnswered: number
   relaysTotal: number
 }
 

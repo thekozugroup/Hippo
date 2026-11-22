@@ -45,7 +45,7 @@ describe('App shell', () => {
   it('closing setup at step 1 lands on Home, and the Add form still works', async () => {
     const user = userEvent.setup()
     render(<App core={testCore()} />)
-    await user.click(await screen.findByRole('button', { name: 'Not now' }))
+    await user.click(await screen.findByRole('button', { name: 'Skip setup' }))
     expect(await screen.findByRole('heading', { name: /Get set up/ }, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
 

@@ -68,7 +68,7 @@ describe('NostrTransport against the mock relay', () => {
     let eose: EoseInfo | undefined
     const unsub = t.subscribe({ kinds: [30078], '#t': ['topic-a'] }, (e) => seen.push(e.id), (info) => (eose = info))
     await waitFor(() => eose !== undefined)
-    expect(eose).toEqual({ relaysReached: 1, relaysTotal: 1 })
+    expect(eose).toEqual({ relaysReached: 1, relaysAnswered: 1, relaysTotal: 1 })
     expect(seen).toEqual([stored.id])
     const live = event('slot-2', 1001)
     await t.publish(live)
@@ -129,8 +129,22 @@ describe('NostrTransport against the mock relay', () => {
     let eose: EoseInfo | undefined
     const unsub = t.subscribe({ '#d': ['slot'] }, () => undefined, (info) => (eose = info))
     await waitFor(() => eose !== undefined)
-    expect(eose).toEqual({ relaysReached: 1, relaysTotal: 2 })
+    expect(eose).toEqual({ relaysReached: 1, relaysAnswered: 1, relaysTotal: 2 })
     unsub()
+  })
+
+  it('does not count a relay that accepts the connection but never answers', async () => {
+    const t = transport([relay.url])
+    relay.silence()
+    try {
+      let eose: EoseInfo | undefined
+      const unsub = t.subscribe({ '#d': ['slot'] }, () => undefined, (info) => (eose = info))
+      await waitFor(() => eose !== undefined, 5000)
+      expect(eose).toEqual({ relaysReached: 1, relaysAnswered: 0, relaysTotal: 1 })
+      unsub()
+    } finally {
+      relay.speak()
+    }
   })
 
   it('reports failure without throwing when every relay is dead', async () => {

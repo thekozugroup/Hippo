@@ -1,5 +1,5 @@
 import { resolveItemState, type ClaimPayload, type ItemPayload, type ResolveClaim } from '../../../core/index.ts'
-import { coveredPercent, fundingProgress } from './giverText.ts'
+import { claimResultMessage, coveredPercent, fundingProgress, OFFLINE_SAVED_NOTE } from './giverText.ts'
 
 const T = Date.UTC(2026, 10, 1)
 const OTHER = 'b'.repeat(64)
@@ -91,5 +91,18 @@ describe('fundingProgress', () => {
   it('over-covered keeps a separate note about the surplus', () => {
     const f = funding(item({ price: { amount: 20000, currency: 'USD' } }), [pledge(25000, 'USD')])
     expect(f).toMatchObject({ percent: '100%', rest: 'Covered', surplus: '$50.00 more than needed' })
+  })
+})
+
+describe('claimResultMessage', () => {
+  const ok = { ok: true, relays: [{ relay: 'r', ok: true }] }
+  const claim = { v: 1 as const, id: 'c', itemId: 'i', kind: 'full' as const, status: 'reserved' as const, createdAt: 1, updatedAt: 1 }
+  it('thanks the giver only when other devices would count it', () => {
+    expect(claimResultMessage([{ claim, result: ok, outcome: { kind: 'counted' } }], 'Thank you!')).toBe('Thank you!')
+    expect(claimResultMessage([{ claim, result: ok, outcome: { kind: 'not-counted', reason: 'taken' } }], 'Thank you!')).toBe(
+      'Someone else got there first, so yours is not counted. You can take it back.',
+    )
+    expect(claimResultMessage([{ claim, result: ok, outcome: { kind: 'rejected', reason: 'future' } }], 'Thank you!')).toMatch(/clock on this device is wrong/)
+    expect(claimResultMessage([{ claim, result: { ok: false, relays: [] }, outcome: { kind: 'counted' } }], 'Thank you!')).toBe(OFFLINE_SAVED_NOTE)
   })
 })

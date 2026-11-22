@@ -132,7 +132,7 @@ export function BottomNav({ items, activeId, label = 'Main', remember, className
   const own = useRef<HTMLElement>(null)
   useSwitchMotion(own, remember, activeId)
   return (
-    <nav {...rest} ref={mergeRefs(own, ref)} aria-label={label} className={cx('bottom-nav', 'frost', 'frost--bar', className)}>
+    <nav {...rest} ref={mergeRefs(own, ref)} aria-label={label} className={cx('bottom-nav', 'frost', 'frost--bar', 'frost--bleed', className)}>
       {items.map((item) => {
         const active = item.id === activeId
         const content = (

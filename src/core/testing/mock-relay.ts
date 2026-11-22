@@ -26,6 +26,9 @@ export interface MockRelay {
   /** Simulates an outage: drops every connection and refuses new ones until `resume()`. Stored events are kept. */
   pause(): void
   resume(): void
+  /** Simulates a relay that accepts connections but never answers a request (no events, no EOSE) until `speak()`. */
+  silence(): void
+  speak(): void
   close(): Promise<void>
 }
 
@@ -57,6 +60,7 @@ export function startMockRelay(port = 0): Promise<MockRelay> {
   }
 
   let paused = false
+  let silent = false
   wss.on('connection', (ws) => {
     if (paused) {
       ws.terminate()
@@ -104,6 +108,7 @@ export function startMockRelay(port = 0): Promise<MockRelay> {
         }
         return
       }
+      if (type === 'REQ' && silent) return
       if (type === 'REQ') {
         const subId = rest[0]
         if (typeof subId !== 'string') {
@@ -156,6 +161,12 @@ export function startMockRelay(port = 0): Promise<MockRelay> {
         },
         resume: () => {
           paused = false
+        },
+        silence: () => {
+          silent = true
+        },
+        speak: () => {
+          silent = false
         },
         close: () =>
           new Promise<void>((done) => {

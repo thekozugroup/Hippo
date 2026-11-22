@@ -17,7 +17,9 @@
   /* Same parity as the room it is centred in, so its left edge lands on a whole pixel: route
      transitions snap a half pixel otherwise, and the bar would nudge at the start and the end. */
   width: calc(round(down, min(var(--nav-natural), 100% - 2 * var(--sp-4)) - mod(100%, 2px), 2px) + mod(100%, 2px));
-  padding: var(--nav-pad);
+  /* .frost--bleed: the blurred box reaches past the pill above and below; layout is unchanged. */
+  padding: calc(var(--nav-pad) + var(--frost-bleed, 0px)) var(--nav-pad);
+  margin-block: calc(-1 * var(--frost-bleed, 0px));
   border-radius: var(--r-pill);
   color: var(--text);
   font-size: var(--fs-secondary);

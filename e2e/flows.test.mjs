@@ -64,11 +64,11 @@ export const card = (page, title) => page.getByRole('article', { name: title })
 
 /**
  * A fresh profile that opens Home starts first-run setup. Owners in the main flows close it at
- * step 1 ("Not now"), which is itself a supported path: Home then shows the Get set up checklist.
+ * step 1 ("Skip setup"), which is itself a supported path: Home then shows the Get set up checklist.
  * Setup has its own tests in onboarding.test.mjs.
  */
 export async function skipSetup(page) {
-  await page.getByRole('button', { name: 'Not now' }).click()
+  await page.getByRole('button', { name: 'Skip setup' }).click()
   await page.waitForURL(/#\/$/)
   await page.getByRole('heading', { name: /Get set up/ }).waitFor()
 }
@@ -84,7 +84,7 @@ test('first run: setup opens, closing it at step 1 lands on Home, with the stric
   // Closed means closed: Home again does not reopen it.
   await page.reload()
   await page.getByRole('heading', { name: /Get set up/ }).waitFor()
-  assert.equal(await page.getByRole('button', { name: 'Not now' }).count(), 0)
+  assert.equal(await page.getByRole('button', { name: 'Skip setup' }).count(), 0)
   const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
   assert.match(csp ?? '', /script-src 'self';/)
   assert.doesNotMatch(csp ?? '', /unsafe-inline|unsafe-eval/)
@@ -143,7 +143,7 @@ test('a giver sets a nickname, claims one item and pledges on another', async ({
   await page.getByRole('heading', { level: 1, name: 'Birthday 2027' }).waitFor()
   await page.getByText('Thank you!').waitFor()
 
-  await page.getByRole('button', { name: /Your name on this list/ }).click()
+  await page.getByRole('button', { name: /^Add your name/ }).click()
   await page.getByRole('dialog').getByRole('textbox', { name: 'Nickname' }).fill('Maya')
   await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
   await page.getByRole('button', { name: /Your name on this list: Maya/ }).waitFor()

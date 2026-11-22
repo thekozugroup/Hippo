@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Bookmark, Copy, Download, ExternalLink, RotateCcw, Tags, Upload } from 'lucide-react'
 import { BottomSheet, Button, SectionHeader, SegmentedControl, Switch, TextArea, TextField } from '../../../ui/index.ts'
 import {
+  listSharedLists,
   DEFAULT_RELAYS,
   importData,
   isHippoError,
@@ -89,7 +90,7 @@ function ProfileSection() {
   const replay = async () => {
     try {
       await setOnboarding(core.db, toStored(newFlow(settings?.ownerName ? { ownerName: settings.ownerName } : {}), Date.now()))
-      writeSetupHint(false)
+      writeSetupHint(false, core.db.name)
       navigate('/welcome/start')
     } catch {
       notify('Could not open setup. Please try again.')
@@ -99,7 +100,7 @@ function ProfileSection() {
   return (
     <section className="app-stack" aria-labelledby="set-profile">
       <h2 id="set-profile" className="app-section-title">
-        Your name
+        You and setup
       </h2>
       <form
         className="app-stack"
@@ -118,15 +119,23 @@ function ProfileSection() {
           hint={shown ? `Friends you share a list with see \u201c${possessive(shown)} list\u201d.` : 'Shown at the top of lists you share. Leave it empty to show the list name only.'}
           {...(error ? { error } : {})}
         />
-        <div className="app-row app-row--fill">
-          <Button type="submit" variant="secondary" size="md" fullWidth loading={saving} disabled={text === null}>
+        <div>
+          <Button type="submit" variant="secondary" size="md" loading={saving} disabled={text === null}>
             Save name
-          </Button>
-          <Button type="button" variant="ghost" size="md" fullWidth icon={<RotateCcw />} onClick={() => void replay()}>
-            Go through setup again
           </Button>
         </div>
       </form>
+      <div className="app-stack app-stack--tight" aria-labelledby="set-setup">
+        <h3 id="set-setup" className="field__label">
+          Setup
+        </h3>
+        <p className="app-note">The first-run questions: your name, an occasion with a list, and a first wish.</p>
+        <div>
+          <Button type="button" variant="secondary" size="md" icon={<RotateCcw />} onClick={() => void replay()}>
+            Go through setup again
+          </Button>
+        </div>
+      </div>
     </section>
   )
 }
@@ -164,7 +173,8 @@ function ThemeSection() {
 }
 
 function BackupSection() {
-  const { db } = useCore()
+  const core = useCore()
+  const { db } = core
   const notify = useNotify()
   const settings = useSettings()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -177,7 +187,7 @@ function BackupSection() {
     if (exporting) return
     setExporting(true)
     try {
-      await downloadBackup(db)
+      await downloadBackup(db, core.now())
       notify('Backup saved. Keep the file somewhere private.')
     } catch {
       notify('The backup could not be saved. Please try again.')
@@ -213,8 +223,14 @@ function BackupSection() {
     if (!pending || busy) return
     setBusy(true)
     try {
-      const r = await importData(db, pending.file, { mode })
+      const r = await importData(db, pending.file, { mode, now: core.now() })
       setPending(null)
+      // A restore is not a first run: Home opens with the restored data, not setup.
+      writeSetupHint(true, core.db.name)
+      if (pending.file.settings.ownerName) {
+        const shared = (await listSharedLists(db)).filter((l) => l.status === 'published').map((l) => l.id)
+        resyncLists(core, shared, notify)
+      }
       notify(`Imported ${plural(r.items, 'wish', 'wishes')} and ${plural(r.sharedLists + r.guestLists, 'list', 'lists')}.`)
     } catch (e) {
       setError(

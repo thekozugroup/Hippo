@@ -68,9 +68,12 @@
   animation: vt-fade-out var(--dur-press) var(--ease) both;
 }
 /* The new screen starts as the old one is nearly gone, so the two never read as one. */
-:root[data-nav-dir='lateral']::view-transition-new(hippo-headline),
 :root[data-nav-dir='lateral']::view-transition-new(hippo-page) {
   animation: vt-fade-in var(--dur) var(--ease) calc(var(--dur-press) * 0.6) both;
+}
+/* Two headlines are never on screen together: the new hero title waits until the old one is gone. */
+:root[data-nav-dir='lateral']::view-transition-new(hippo-headline) {
+  animation: vt-fade-in var(--dur) var(--ease) var(--dur-press) both;
 }
 
 /* The sheet surface: both images are the same blank surface, so only the morph shows. When the
@@ -97,6 +100,16 @@
    it shrinks the previous one (the new image is live, so those animations play on the real nav). It slides away when a screen has no navigation, and back. */
 ::view-transition-group(hippo-nav) {
   animation: none;
+}
+/* While a route transition runs, the bar is drawn with its opaque frost colour instead of a live
+   blur. A view-transition capture cannot carry a live backdrop: Chromium draws the bar's blur into
+   the page image as a square box with no clip (a blurred band around the pill, or square blurred
+   corners as the bar rises). The tint is at 80%, so the switch for these few frames is not seen. */
+:root[data-nav-dir] .frost--bleed {
+  --frost-bleed: 0px;
+  --frost-tint: var(--frost-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 ::view-transition-old(hippo-nav) {
   display: none;

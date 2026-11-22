@@ -1,3 +1,8 @@
+.segmented-box {
+  container-type: inline-size;
+  min-width: 0;
+}
+
 .segmented {
   display: flex;
   gap: 2px;
@@ -56,5 +61,17 @@
     background: Canvas;
     box-shadow: inset 0 0 0 3px Highlight;
     font-weight: 700;
+  }
+}
+
+/* When the options do not fit side by side (large text, narrow screens), they stack. The query is
+   in em of the control's text, so it follows the text size. */
+@container (max-width: 17em) {
+  .segmented {
+    flex-direction: column;
+    border-radius: var(--r-tile);
+  }
+  .segmented__label {
+    white-space: normal;
   }
 }

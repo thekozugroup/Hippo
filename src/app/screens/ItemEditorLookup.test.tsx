@@ -61,7 +61,11 @@ describe('wish editor: link lookup', () => {
     await waitFor(async () => expect((await getSettings(core.db)).seen.linkPreviewHint).toBeTypeOf('number'))
     first.unmount()
 
+    // Reopened in the same tab, the unsaved draft comes back; start over for a new wish.
     await openEditor(core)
+    expect(nameField()).toHaveValue('Steel kettle')
+    await user.click(screen.getByRole('button', { name: 'Start over' }))
+    expect(nameField()).toHaveValue('')
     await pasteLink(user, 'https://other.example/p/teapot')
     expect(nameField()).toHaveValue('Teapot')
     expect(screen.queryAllByText(OFF_HINT)).toHaveLength(0)

@@ -43,7 +43,49 @@ function contentSecurityPolicy(): Plugin {
     apply: 'build',
     transformIndexHtml: {
       order: 'post',
-      handler: (html) => html.replace(/<meta charset="UTF-8" \/>/i, (m) => `${m}\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`),
+      handler: (html) =>
+        html
+          .replace(/<meta charset="UTF-8" \/>/i, (m) => `${m}\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`)
+          // Render-blocking entry: the browser paints nothing before main.tsx has decided the first
+          // screen (src/app/core/boot.ts), so a first visit never shows a light frame before setup.
+          .replace(/<script type="module" crossorigin src=/, '<script type="module" crossorigin blocking="render" src='),
+    },
+  }
+}
+
+/**
+ * Link previews need absolute URLs for og:image and og:url. The deploy workflow passes the Pages
+ * address (the configure-pages step's base_url) as HIPPO_SITE_URL; without it (local builds,
+ * forks that have not set it) those two tags are left out and the card shows without a picture.
+ */
+export function siteUrlFromEnv(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  try {
+    const u = new URL(value)
+    if (u.protocol !== 'https:' || u.username || u.password || u.search || u.hash) return undefined
+    return u.href.endsWith('/') ? u.href : `${u.href}/`
+  } catch {
+    return undefined
+  }
+}
+
+const escapeAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
+
+function openGraphUrls(): Plugin {
+  const site = siteUrlFromEnv(process.env.HIPPO_SITE_URL)
+  return {
+    name: 'hippo-og-urls',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler: (html) =>
+        site
+          ? html.replace(
+              /<meta name="twitter:card"[^>]*\/>/,
+              (m) =>
+                `<meta property="og:url" content="${escapeAttr(site)}" />\n    <meta property="og:image" content="${escapeAttr(`${site}og-image.png`)}" />\n    <meta property="og:image:width" content="1200" />\n    <meta property="og:image:height" content="630" />\n    <meta property="og:image:alt" content="The Hippo logo on blue, with the words: A gift list shared with you." />\n    ${m}`,
+            )
+          : html,
     },
   }
 }
@@ -95,7 +137,7 @@ export default defineConfig({
         // (and are cached) only when a page shows characters that need them.
         // The 512px icons are only for installing and the splash screen; the
         // browser fetches them itself, so they are not precached either.
-        globIgnores: ['**/inter-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2', '**/icon-512.png', '**/icon-maskable-512.png'],
+        globIgnores: ['**/inter-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese}-*.woff2', '**/icon-512.png', '**/icon-maskable-512.png', '**/og-image.png'],
         runtimeCaching: [
           {
             urlPattern: /\/assets\/inter-[a-z-]+-wght-normal-[\w-]+\.woff2$/,
@@ -108,6 +150,7 @@ export default defineConfig({
       },
     }),
     contentSecurityPolicy(),
+    openGraphUrls(),
   ],
   test: {
     environment: 'jsdom',

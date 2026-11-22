@@ -117,6 +117,37 @@ export async function updateItem(db: HippoDb, id: string, patch: ItemPatch, now 
   })
 }
 
+export interface MergeResult {
+  item: Item
+  /** Fields this edit set that had also been changed elsewhere since the form loaded (the edit's value was kept). */
+  changedElsewhere: (keyof ItemPatch)[]
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+}
+
+/**
+ * Saves only the fields an editor changed, merged onto the item as it is stored now, in one
+ * transaction. `base` holds those fields as the editor loaded them: any that differ from the
+ * stored item now were changed elsewhere in the meantime (another tab or window). The editor's
+ * value wins, and they are reported so the person can be told.
+ */
+export async function mergeItemEdit(db: HippoDb, id: string, patch: ItemPatch, base: ItemPatch, now = systemNow()): Promise<MergeResult> {
+  return db.transaction('rw', db.items, db.sharedLists, async () => {
+    const item = await requireItem(db, id)
+    const keys = Object.keys(patch) as (keyof ItemPatch)[]
+    const changedElsewhere = keys.filter((k) => k in base && !sameValue(item[k], base[k]))
+    if (keys.length > 0) {
+      applyFields(item, patch)
+      item.updatedAt = Math.max(now, item.updatedAt + 1)
+      await db.items.put(item)
+      await markListsWithItem(db, id)
+    }
+    return { item, changedElsewhere }
+  })
+}
+
 /** Archived items stay in the wishlist but are left out of published lists. */
 export async function archiveItem(db: HippoDb, id: string, now = systemNow()): Promise<Item> {
   return db.transaction('rw', db.items, db.sharedLists, async () => {
