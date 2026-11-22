@@ -42,6 +42,13 @@ Hippo records pledges; it does not move money. Givers settle up among themselves
 
 There is nothing to configure: no environment variables, no secrets, no database. The build uses relative asset paths, so it works at `https://<you>.github.io/<repo>/` and on a custom domain alike.
 
+### Security notes
+
+- **Give Hippo an origin of its own.** Browsers share storage (IndexedDB, localStorage, service workers) per origin, which is scheme, host and port, not per path. Hippo keeps every list's private keys and secrets in IndexedDB, so any other site on the same origin can read them and act as you. On GitHub Pages, all project sites of one account or organisation share `https://<you>.github.io`. Use a custom domain, or an account or organisation with no other Pages sites.
+- **Your backup file holds every key.** Store it like a password. Importing someone else's file can add their lists; it never replaces the keys, owner key or relays of lists already on your device.
+- **Share links only name public relays.** Links that point at `ws://`, `localhost`, `.local` names or private-network addresses are refused. The `?relays=` developer override accepts loopback relays only, lasts for one browser tab, and the app shows a notice while it is on.
+- **Changing a link (rotation) or deleting a list** keeps the old keys on your device until the relays have accepted the "no longer shared" notice for the old link; Hippo retries on every start.
+
 ## Develop
 
 Requires Node 22 or newer.

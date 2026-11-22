@@ -249,6 +249,41 @@ test('a broken link shows a helpful error', async ({ state }) => {
   await page.getByRole('heading', { level: 1, name: 'This link does not work' }).waitFor()
 })
 
+test('a link that points at a loopback or private-network relay is refused', async ({ state }) => {
+  const { page } = state.third
+  const keys = Buffer.from(state.link.split('#/l/')[1], 'base64url').subarray(1, 65)
+  for (const relay of ['wss://192.168.1.1', 'ws://127.0.0.1:9222', 'wss://printer.local']) {
+    const v2 = Buffer.concat([Buffer.from([2]), keys, Buffer.from(relay)]).toString('base64url')
+    await page.goto(state.link.replace(/#\/l\/.*$/, `#/l/${v2}`))
+    await page.getByRole('heading', { level: 1, name: 'This link does not work' }).waitFor()
+  }
+})
+
+test('the ?relays= test override is loopback-only and lasts for one tab', async ({ browser, baseUrl }) => {
+  const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 })
+  try {
+    const page = await context.newPage()
+    const note = page.getByRole('note').filter({ hasText: 'Test mode' })
+    // A non-loopback relay in the parameter is ignored.
+    await page.goto(`${baseUrl}?relays=${encodeURIComponent('wss://relay.evil.example')}#/`)
+    await page.getByRole('heading', { level: 1 }).waitFor()
+    assert.equal(await note.count(), 0)
+    // A loopback relay switches this tab into test mode, also after a reload...
+    await page.goto(`${baseUrl}?relays=${encodeURIComponent('ws://127.0.0.1:1')}#/`)
+    await note.waitFor()
+    await page.goto(`${baseUrl}#/`)
+    await note.waitFor()
+    assert.equal(await page.evaluate(() => localStorage.getItem('hippo:relays')), null)
+    // ...but not another tab.
+    const other = await context.newPage()
+    await other.goto(`${baseUrl}#/`)
+    await other.getByRole('heading', { level: 1 }).waitFor()
+    assert.equal(await other.getByRole('note').filter({ hasText: 'Test mode' }).count(), 0)
+  } finally {
+    await context.close()
+  }
+})
+
 test('unpublishing tells givers the list is no longer shared', async ({ state }) => {
   const { page, problems } = state.owner
   await page.goto(state.listUrl)

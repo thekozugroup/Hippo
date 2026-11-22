@@ -299,6 +299,21 @@ describe('metadata (finding 4)', () => {
 })
 
 describe('expiry (finding 5)', () => {
+  it('a giver re-signs their own live claim when it is close to expiry, keeping its claim time', async () => {
+    const clock = testClock()
+    const net = network(clock)
+    const { owner, scarf, list, link } = await ownerWithList(net, clock)
+    const g = await openAsGiver(net, link, 'g', clock)
+    const { claim } = await g.session.claim(sharedItemIdFor(list, scarf.id))
+    const first = g.session.getSnapshot().items[0]?.state.rows[0]
+    clock.advance(400 * DAY * 1000)
+    await repairOwnerList(owner, list.id) // keep the list itself alive too
+    await g.session.repair()
+    const ev = net.store.all().find((e) => e.tags.some((t) => t[0] === 'd' && t[1] === claimSlot(g.guest.topic, claim.id)))
+    expect(ev?.created_at).toBe(Math.floor(clock.now() / 1000))
+    expect(g.session.getSnapshot().items[0]?.state.rows[0]?.createdAt).toBe(first?.createdAt)
+  })
+
   it('re-signs own events close to expiry, so an unchanged list stays visible after 400 days', async () => {
     const clock = testClock()
     const net = network(clock)

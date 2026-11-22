@@ -8,10 +8,10 @@ Every expected failure throws `HippoError` with a `code` (`invalid-link`, `own-l
 
 | Function | What it does |
 |---|---|
-| `applyRelayOverrideFromUrl(location.href)` | Copies `?relays=ws://127.0.0.1:7447` (loopback only) into localStorage `hippo:relays`. Call before `createCore`. |
+| `applyRelayOverrideFromUrl(location.href)` | Copies `?relays=ws://127.0.0.1:7447` (loopback only) into sessionStorage `hippo:relays`, so it lasts for this tab only. Call before `createCore`. `readRelayOverride()` returns the active override. |
 | `createCore(options?)` | Returns `{ db, transports, now, forcedRelays?, close() }`, the `deps` every service takes. Nostr relays by default; pass `transport` to use a `MemoryTransport`. |
 
-**End-to-end tests:** start `node src/core/testing/mock-relay.ts` (port from `MOCK_RELAY_PORT`, default 7447; prints `mock relay listening on ws://127.0.0.1:<port>`), then either open the app with `?relays=ws://127.0.0.1:7447` or set localStorage `hippo:relays` with `page.addInitScript`. Every transport, including list and link relays, then uses only those relays. The UI should show when `core.forcedRelays` is set. `startMockRelay(port?)` returns `{ url, port, events, filters, clear(), close() }` for use inside Node tests.
+**End-to-end tests:** start `node src/core/testing/mock-relay.ts` (port from `MOCK_RELAY_PORT`, default 7447; prints `mock relay listening on ws://127.0.0.1:<port>`), then either open the app with `?relays=ws://127.0.0.1:7447` or set sessionStorage `hippo:relays` with `page.addInitScript`. Only loopback relays are honoured. Every transport, including list and link relays, then uses only those relays. The UI should show when `core.forcedRelays` is set. `startMockRelay(port?)` returns `{ url, port, events, filters, clear(), close() }` for use inside Node tests.
 
 ## Wishlist (`db` = `core.db`)
 
@@ -45,10 +45,12 @@ After any item change, call `syncListsForItem(core, itemId)` to republish lists 
 | `syncList(core, id, { force? })` | Republishes only what changed (plus anything no relay accepted yet). No-op unless published. |
 | `syncListsForItem(core, itemId)` / `findListsContainingItem(db, itemId)` | Lists affected by an item change. |
 | `unpublishList(core, id)` | Givers see "no longer shared". `publishList` again re-shares under the same link. |
-| `rotateList(core, id)` | New link; old link is cut off; claims are not migrated. Returns the updated list. |
-| `deleteSharedList(core, id)` | Unpublishes if needed, then deletes. |
-| `repairOwnerList(core, id)` | Call when opening a list: republishes events relays lost. |
+| `rotateList(core, id)` | New link; old link is cut off; claims are not migrated. The old keys stay in `retiredLists` until relays accept the cut-off (`unpublishedOld.ok` is false until then). |
+| `deleteSharedList(core, id)` | Deletes and remembers the topic and owner key (FR-25); cuts off a published link, retried by `repairRetiredLists`. |
+| `repairRetiredLists(core)` | Retries cutting off old links of rotated or deleted lists. Call at startup and when back online. `listRetiredLists(db)` lists them without secrets. |
+| `repairOwnerList(core, id)` | Call when opening a list: republishes events relays lost, re-signs events near expiry, retries this list's retired topics. |
 | `buildShareLink(list, appBaseUrl)` | `https://host/base/#/l/<payload>`. |
+| `sharedItemIdFor(list, localItemId)` / `localItemIdFor(list, sharedId)` | Givers see per-list item ids derived from the local id; these map between them. |
 | `getSharedList`, `listSharedLists`, `topicOfList` | Reads. |
 
 The owner side never reads claims: every request is restricted to the owner's key, and owner code never derives the claims key.
@@ -57,7 +59,8 @@ The owner side never reads claims: every request is restricted to the owner's ke
 
 | Function | What it does |
 |---|---|
-| `addGuestListFromLink(core, linkOrPayload)` | Validates the link, stores the list with a new guest key; throws `own-list` on the owner's device (FR-25). Idempotent. |
+| `addGuestListFromLink(core, linkOrPayload)` | Validates the link, stores the list with a new guest key; throws `own-list` when this device owns, rotated or deleted the list (FR-25). Idempotent. |
+| `buildGuestShareLink(guest, appBaseUrl)` | Rebuilds the share link of a list shared with me. |
 | `listGuestLists(db)` | "Lists shared with me" with cached names. |
 | `removeGuestList(db, topic)` | Forget a list on this device. |
 | `openGuestList(core, topic, opts?)` | Returns a `GiverListSession`; call `start()` and later `stop()`. |
@@ -71,15 +74,15 @@ The owner side never reads claims: every request is restricted to the owner's ke
 
 Claim actions return `{ claim, result: PublishResult }`. They update the view immediately; if `result.ok` is false the claim id stays in `pendingClaimIds` and is retried.
 
-`state` (from `resolveItemState`): `status` (`available`, `partial`, `funded`, `claimed`, `purchased`), `grantedQuantity`, `remainingQuantity`, `pledged`, `target?`, `remainingAmount?`, `surplus`, and `rows[]` with `mine`, `nickname`, `conflict`, `currencyMismatch`. Show "Someone" when `nickname` is missing.
+`state` (from `resolveItemState`): `status` (`available`, `partial`, `funded`, `claimed`, `purchased`), `grantedQuantity`, `remainingQuantity`, `pledged`, `target?`, `remainingAmount?`, `surplus`, and `rows[]` with `mine`, `nickname`, `conflict`, `currencyMismatch`. Show "Someone" when `nickname` is missing. Purchased claims are counted before reserved ones, so `conflict` on my row means another claim was counted first or someone already bought it; word it kindly.
 
 ## Backup and settings
 
 | Function | What it does |
 |---|---|
 | `exportData(db)` | JSON-serialisable object with all data **including private keys**; records the export time. |
-| `importData(db, parsedJson, { mode: 'merge' \| 'replace' })` | Validates everything first; rejects other versions and any bad record. |
-| `getSettings(db)`, `setTheme(db, theme)`, `setRelayOverride(db, relays?)` | Settings; the relay override applies to lists created afterwards. |
+| `importData(db, parsedJson, { mode: 'merge' \| 'replace' })` | Validates everything first; rejects other versions, any bad record, and FR-25 conflicts (`invalid-import`). Merge never replaces lists already on the device (`skippedLists`). |
+| `getSettings(db)`, `setTheme(db, theme)`, `setRelayOverride(db, relays?)` | Settings; the relay override applies to lists created afterwards and accepts public `wss://` relays only (`isRelayUrl`). |
 
 ## Other exports
 
