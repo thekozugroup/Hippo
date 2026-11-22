@@ -11,6 +11,8 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "npm run build && node e2e/run.mjs",
+    "icons": "node scripts/generate-icons.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {

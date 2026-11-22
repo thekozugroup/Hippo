@@ -1,7 +1,6 @@
-import { Gallery } from './ui/index.ts'
+import { App as HippoApp } from './app/App.tsx'
 
-// Temporary: renders the design gallery so it can be reviewed.
-// Routing replaces this; the gallery is then mounted at #/design.
+/** The application shell: routing, providers and screens live in src/app. */
 export default function App() {
-  return <Gallery />
+  return <HippoApp />
 }

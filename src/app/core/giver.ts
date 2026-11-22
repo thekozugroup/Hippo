@@ -47,13 +47,17 @@ async function open(core: Core, source: GiverSource): Promise<GiverListSession> 
 
 export function useGiverSession(source: GiverSource): GiverOpenState {
   const core = useCore()
-  const key = source.kind === 'topic' ? `t:${source.topic}` : `l:${source.payload}`
+  const kind = source.kind
+  const value = source.kind === 'topic' ? source.topic : source.payload
+  const key = `${kind}:${value}`
   const [state, setState] = useState<{ key: string; value: GiverOpenState }>({ key, value: { kind: 'opening' } })
 
   useEffect(() => {
+    const src: GiverSource = kind === 'topic' ? { kind, topic: value } : { kind, payload: value }
+    const key = `${kind}:${value}`
     let cancelled = false
     let session: GiverListSession | null = null
-    open(core, source)
+    open(core, src)
       .then(async (s) => {
         if (cancelled) return
         session = s
@@ -65,7 +69,7 @@ export function useGiverSession(source: GiverSource): GiverOpenState {
         let value: GiverOpenState
         if (isHippoError(e, 'invalid-link')) value = { kind: 'invalid-link' }
         else if (isHippoError(e, 'own-list')) {
-          const listId = await ownListIdFor(core, source)
+          const listId = await ownListIdFor(core, src)
           value = listId ? { kind: 'own-list', listId } : { kind: 'own-list' }
         } else if (isHippoError(e, 'not-found')) value = { kind: 'not-found' }
         else value = { kind: 'error', message: e instanceof Error ? e.message : String(e) }
@@ -75,8 +79,7 @@ export function useGiverSession(source: GiverSource): GiverOpenState {
       cancelled = true
       session?.stop()
     }
-    // `key` captures the source; the object itself changes identity every render.
-  }, [core, key])
+  }, [core, kind, value])
 
   return state.key === key ? state.value : { kind: 'opening' }
 }

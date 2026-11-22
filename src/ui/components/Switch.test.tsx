@@ -14,6 +14,12 @@ describe('Switch', () => {
     expect(screen.getByRole('switch', { name: /Show prices/ })).not.toBeChecked()
   })
 
+  it('keeps the description out of the name and exposes it as a description', () => {
+    render(<Switch label="Show prices" description="Givers see costs" />)
+    const sw = screen.getByRole('switch', { name: 'Show prices' })
+    expect(sw).toHaveAccessibleDescription('Givers see costs')
+  })
+
   it('toggles with a click and with Space', async () => {
     render(<Controlled />)
     const sw = screen.getByRole('switch', { name: 'Show prices' })

@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Chip } from './Chip.tsx'
-import { IconButton } from './IconButton.tsx'
+import { IconButton, IconLink } from './IconButton.tsx'
+import { ImportanceMark } from './ImportanceMark.tsx'
 import { MoneyText } from './MoneyText.tsx'
 import { StatusPill } from './StatusPill.tsx'
 import { TextField } from './TextField.tsx'
@@ -69,5 +70,23 @@ describe('small components', () => {
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Lists' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('IconLink is a named link with the icon-button look', () => {
+    render(<IconLink href="#/" aria-label="Back to home" icon={<svg />} />)
+    const link = screen.getByRole('link', { name: 'Back to home' })
+    expect(link).toHaveAttribute('href', '#/')
+    expect(link).toHaveClass('icon-btn')
+  })
+
+  it('ImportanceMark uses the PRD FR-2 labels', () => {
+    const { container } = render(
+      <>
+        <ImportanceMark level={1} />
+        <ImportanceMark level={2} />
+        <ImportanceMark level={3} />
+      </>,
+    )
+    expect(container.textContent).toBe('Nice to haveWantWould love')
   })
 })

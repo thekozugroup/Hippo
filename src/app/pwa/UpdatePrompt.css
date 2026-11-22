@@ -1,0 +1,30 @@
+.update-prompt {
+  position: fixed;
+  z-index: 40;
+  inset-inline: var(--sp-4);
+  top: calc(var(--sp-3) + env(safe-area-inset-top));
+  max-width: calc(var(--col-max) - 2 * var(--sp-4));
+  margin-inline: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-5);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-nav);
+  color: var(--text);
+}
+
+.update-prompt__text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.update-prompt__actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-inline-start: auto;
+}

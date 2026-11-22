@@ -75,12 +75,6 @@ export function HomeScreen() {
       }
       actions={<IconLink href="#/settings" variant="frost" aria-label="Settings" icon={<Settings />} />}
     >
-      {core.forcedRelays ? (
-        <p className="app-banner" role="note">
-          Test mode: sharing uses a local test server only.
-        </p>
-      ) : null}
-
       <section className="app-stack" aria-labelledby="home-wishlist">
         <div>
           <h2 id="home-wishlist" className="t-label t-muted">
@@ -176,6 +170,11 @@ export function HomeScreen() {
             ))}
           </List>
         </section>
+      ) : null}
+      {core.forcedRelays ? (
+        <p className="app-note" role="note">
+          Test mode: sharing uses a local test server only.
+        </p>
       ) : null}
     </AppScreen>
   )

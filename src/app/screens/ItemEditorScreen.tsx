@@ -308,12 +308,17 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
         {...err('quantity')}
       />
 
-      <SegmentedControl<Importance>
+      <div className="app-stack app-stack--tight">
+        <p className="field__label" aria-hidden="true">
+          How much do you want it?
+        </p>
+        <SegmentedControl<Importance>
         label="How much do you want it?"
         value={f.importance}
         onChange={(v) => set('importance', v)}
         options={IMPORTANCE_LEVELS.map((l) => ({ value: l, label: IMPORTANCE_LABEL[l] }))}
-      />
+        />
+      </div>
 
       <fieldset className="item-form__group">
         <legend className="field__label">Categories</legend>

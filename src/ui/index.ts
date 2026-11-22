@@ -65,4 +65,3 @@ export type { TopBarProps } from './components/TopBar.tsx'
 export { TwoTone } from './components/TwoTone.tsx'
 export type { TwoToneProps } from './components/TwoTone.tsx'
 
-export { Gallery } from './Gallery.tsx'
