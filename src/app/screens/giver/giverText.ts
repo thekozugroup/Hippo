@@ -2,7 +2,7 @@
 // view. Vocabulary: "wish" (an entry on a list), "I'll get this" / "getting
 // this" (a full claim), "chip in" (a partial contribution), "bought".
 
-import { isHippoError, type ClaimRow, type ItemPayload, type ItemState } from '../../../core/index.ts'
+import { isHippoError, type ClaimActionResult, type ClaimRow, type ItemPayload, type ItemState } from '../../../core/index.ts'
 import type { Status } from '../../../ui/index.ts'
 import { moneyText } from '../../lib/format.ts'
 import type { SheetRequest } from './ClaimSheet.tsx'
@@ -11,6 +11,27 @@ import type { SheetRequest } from './ClaimSheet.tsx'
 export const OWNER_HIDDEN_NOTE = 'Hippo hides who is getting what from the list owner. Friends with the link can see it.'
 
 export const OFFLINE_SAVED_NOTE = 'Saved on this device. Hippo keeps trying to send it while this list is open.'
+
+/**
+ * What to tell a giver after a claim action: the success message only when other devices would
+ * accept and count it (the outcome is worked out with their rules), otherwise what happened.
+ */
+export function claimResultMessage(results: readonly ClaimActionResult[], success: string): string {
+  if (results.some((r) => !r.result.ok)) return OFFLINE_SAVED_NOTE
+  for (const { outcome } of results) {
+    if (outcome.kind === 'rejected') {
+      return outcome.reason === 'future'
+        ? 'Others cannot see this because the clock on this device is wrong. Set the correct time in your device settings, then try again.'
+        : 'Others cannot see this. Please try again.'
+    }
+    if (outcome.kind === 'not-counted') {
+      if (outcome.reason === 'taken') return 'Someone else got there first, so yours is not counted. You can take it back.'
+      if (outcome.reason === 'currency') return 'Your amount is in a different currency from the price, so it is not counted.'
+      return 'This wish is no longer on the list, so it is not counted.'
+    }
+  }
+  return success
+}
 
 export function whoName(row: Pick<ClaimRow, 'mine' | 'nickname'>): string {
   return row.mine ? 'You' : (row.nickname ?? 'Someone')

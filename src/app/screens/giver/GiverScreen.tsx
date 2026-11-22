@@ -23,7 +23,7 @@ import { appBaseUrl } from '../../lib/capture-tools.ts'
 import { formatEventDate, plural, possessive } from '../../lib/format.ts'
 import { ClaimSheet, type SheetRequest } from './ClaimSheet.tsx'
 import { GiverItemCard, MyGiftLine } from './GiverItemCard.tsx'
-import { actionErrorMessage, describeRow, itemHeadingId, OFFLINE_SAVED_NOTE, OWNER_HIDDEN_NOTE, requestItemId } from './giverText.ts'
+import { actionErrorMessage, claimResultMessage, describeRow, itemHeadingId, OWNER_HIDDEN_NOTE, requestItemId } from './giverText.ts'
 import './GiverScreen.css'
 
 function Banner({ icon, title, children }: { icon: ReactNode; title: string; children?: ReactNode }) {
@@ -277,7 +277,7 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
     setMarking(row.claimId)
     try {
       const r = await session.markPurchased(row.claimId, purchased)
-      notify(!r.result.ok ? OFFLINE_SAVED_NOTE : purchased ? 'Marked as bought.' : 'Marked as not bought yet.')
+      notify(claimResultMessage([r], purchased ? 'Marked as bought.' : 'Marked as not bought yet.'))
     } catch (e) {
       notify(actionErrorMessage(e))
     } finally {

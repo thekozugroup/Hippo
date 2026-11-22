@@ -10,6 +10,19 @@ export { DEFAULT_RELAYS, RELAY_FORCE_QUERY_PARAM, RELAY_FORCE_STORAGE_KEY } from
 export { isRelayUrl } from './model/validate.ts'
 export { createCore, applyRelayOverrideFromUrl, readRelayOverride, type Core, type CreateCoreOptions } from './context.ts'
 export type { CoreDeps } from './services/deps.ts'
+export {
+  TimeSync,
+  systemClock,
+  systemNow,
+  fixedOffsetClock,
+  offsetFromSample,
+  describeClockOffset,
+  CLOCK_WARN_MS,
+  CLOCK_STORAGE_KEY,
+  type Clock,
+  type DateSample,
+  type TimeSyncOptions,
+} from './clock.ts'
 
 export { HippoDb, openDb, DB_NAME, type CachedEvent } from './db/schema.ts'
 export {
@@ -101,6 +114,7 @@ export {
   type RemovedItemView,
   type GuestListSummary,
   type ClaimActionResult,
+  type ClaimOutcome,
   type GiverSessionOptions,
 } from './services/giver-lists.ts'
 

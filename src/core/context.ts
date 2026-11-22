@@ -1,5 +1,6 @@
 // One-call setup for the app: database, transports and bound services.
 
+import { systemNow, type Clock } from './clock.ts'
 import { RELAY_FORCE_QUERY_PARAM, RELAY_FORCE_STORAGE_KEY } from './config.ts'
 import { openDb, type HippoDb } from './db/schema.ts'
 import { isLoopbackRelayUrl } from './model/validate.ts'
@@ -15,7 +16,10 @@ export interface CreateCoreOptions {
   transport?: Transport | TransportProvider
   /** Force every transport onto these loopback relays (overrides list, link and settings relays). */
   forceRelays?: string[]
+  /** A fixed time source (tests). */
   now?: () => number
+  /** A corrected clock (the app passes a `TimeSync`); takes precedence over `now`. */
+  clock?: Clock
 }
 
 export interface Core extends CoreDeps {
@@ -87,11 +91,16 @@ export function applyRelayOverrideFromUrl(url: string | URL): string[] | undefin
 
 export function createCore(options: CreateCoreOptions = {}): Core {
   const db = options.db ?? openDb(options.dbName)
-  const now = options.now ?? (() => Date.now())
+  const clock = options.clock
+  const now = clock ? () => clock.now() : (options.now ?? systemNow)
+  const withClock = <T extends Core>(c: T): T => {
+    if (clock) c.clockSync = clock
+    return c
+  }
   if (options.transport) {
     const t = options.transport
     const transports: TransportProvider = typeof t === 'function' ? t : () => t
-    return {
+    return withClock({
       db,
       transports,
       now,
@@ -99,7 +108,7 @@ export function createCore(options: CreateCoreOptions = {}): Core {
         if (typeof t !== 'function') t.close()
         db.close()
       },
-    }
+    })
   }
   const forced = options.forceRelays ? sanitizeOverrideRelays(options.forceRelays) : readRelayOverride()
   const nostr = createNostrTransportProvider()
@@ -114,5 +123,5 @@ export function createCore(options: CreateCoreOptions = {}): Core {
     },
   }
   if (forced) core.forcedRelays = forced
-  return core
+  return withClock(core)
 }

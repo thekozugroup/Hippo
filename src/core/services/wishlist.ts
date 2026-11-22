@@ -1,6 +1,7 @@
 // Private wishlist: items and categories (PRD 4.1). Local only; callers
 // republish affected shared lists via owner-lists `syncListsForItem`.
 
+import { systemNow } from '../clock.ts'
 import { randomId } from '../crypto/bytes.ts'
 import type { HippoDb } from '../db/schema.ts'
 import { HippoError } from '../errors.ts'
@@ -69,7 +70,7 @@ function setOpt<K extends 'url' | 'imageUrl' | 'notes' | 'price'>(target: Item, 
   else target[key] = value
 }
 
-export async function createItem(db: HippoDb, input: ItemInput, now = Date.now()): Promise<Item> {
+export async function createItem(db: HippoDb, input: ItemInput, now = systemNow()): Promise<Item> {
   const item: Item = {
     id: randomId(),
     title: '',
@@ -105,7 +106,7 @@ async function markListsWithItem(db: HippoDb, id: string): Promise<void> {
     })
 }
 
-export async function updateItem(db: HippoDb, id: string, patch: ItemPatch, now = Date.now()): Promise<Item> {
+export async function updateItem(db: HippoDb, id: string, patch: ItemPatch, now = systemNow()): Promise<Item> {
   return db.transaction('rw', db.items, db.sharedLists, async () => {
     const item = await requireItem(db, id)
     applyFields(item, patch)
@@ -117,7 +118,7 @@ export async function updateItem(db: HippoDb, id: string, patch: ItemPatch, now 
 }
 
 /** Archived items stay in the wishlist but are left out of published lists. */
-export async function archiveItem(db: HippoDb, id: string, now = Date.now()): Promise<Item> {
+export async function archiveItem(db: HippoDb, id: string, now = systemNow()): Promise<Item> {
   return db.transaction('rw', db.items, db.sharedLists, async () => {
     const item = await requireItem(db, id)
     item.archivedAt = now
@@ -128,7 +129,7 @@ export async function archiveItem(db: HippoDb, id: string, now = Date.now()): Pr
   })
 }
 
-export async function unarchiveItem(db: HippoDb, id: string, now = Date.now()): Promise<Item> {
+export async function unarchiveItem(db: HippoDb, id: string, now = systemNow()): Promise<Item> {
   return db.transaction('rw', db.items, db.sharedLists, async () => {
     const item = await requireItem(db, id)
     delete item.archivedAt
@@ -140,7 +141,7 @@ export async function unarchiveItem(db: HippoDb, id: string, now = Date.now()): 
 }
 
 /** Deletes the item and unlinks it from every shared list. Returns the ids of lists that changed. */
-export async function deleteItem(db: HippoDb, id: string, now = Date.now()): Promise<string[]> {
+export async function deleteItem(db: HippoDb, id: string, now = systemNow()): Promise<string[]> {
   return db.transaction('rw', db.items, db.sharedLists, async () => {
     await db.items.delete(id)
     const changed: string[] = []

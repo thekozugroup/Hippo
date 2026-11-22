@@ -3,7 +3,7 @@ import { BottomSheet, Button, Checkbox, MoneyField, TextField } from '../../../u
 import { LIMITS, type ClaimActionResult, type ClaimRow, type GiverItemView, type GiverListSession } from '../../../core/index.ts'
 import { useNotify } from '../../core/notify.ts'
 import { moneyInputValue, moneyText, parseMoneyInput } from '../../lib/format.ts'
-import { actionErrorMessage, OFFLINE_SAVED_NOTE } from './giverText.ts'
+import { actionErrorMessage, claimResultMessage } from './giverText.ts'
 
 export type SheetRequest =
   | { mode: 'claim'; view: GiverItemView }
@@ -63,7 +63,7 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
 
   const finish = (results: ClaimActionResult[], ok: string) => {
     onDone(true)
-    notify(results.some((r) => !r.result.ok) ? OFFLINE_SAVED_NOTE : ok)
+    notify(claimResultMessage(results, ok))
   }
 
   const submit = async (e: FormEvent) => {

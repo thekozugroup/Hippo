@@ -3,6 +3,7 @@ import { Route, Router, Switch, useLocation } from 'wouter'
 import type { Core } from '../core/index.ts'
 import { Skeleton } from '../ui/index.ts'
 import { useCore } from './core/context.ts'
+import { ClockNotice } from './core/ClockNotice.tsx'
 import { CoreProvider } from './core/CoreProvider.tsx'
 import { useGuestLists, useItems, useSettings, useSharedLists } from './core/data.ts'
 import { NotifyProvider } from './core/NotifyProvider.tsx'
@@ -174,6 +175,7 @@ export function App({ core }: { core?: Core }) {
           <StorageGate>
             <Router hook={useMotionLocation}>
               <ThemeSync />
+              <ClockNotice />
               <RouteFocus />
               <BootFlag />
               <DocumentTitle />

@@ -18,8 +18,11 @@ export interface ReceiveContext {
   contentKey: Uint8Array
   /** Absent on the owner side: claim events are then always rejected. */
   claimsKey?: Uint8Array
-  /** Milliseconds since epoch; used to drop expired events and future-dated claims. Defaults to Date.now. */
-  now?: () => number
+  /**
+   * Milliseconds since epoch (the device's corrected clock, `CoreDeps.now`); used to drop expired
+   * events and future-dated claims. Required, so judging time never falls back to an uncorrected clock.
+   */
+  now: () => number
 }
 
 export type AcceptedEvent =
@@ -94,7 +97,7 @@ export function receiveEvent(raw: unknown, ctx: ReceiveContext): ReceiveResult {
   if (d === null || !slot) return { ok: false, reason: 'bad-slot' }
   if (slot.type !== 'claim' && event.pubkey !== ctx.ownerPubkey) return { ok: false, reason: 'not-owner' }
   if (slot.type === 'claim' && !ctx.claimsKey) return { ok: false, reason: 'no-claims-key' }
-  const now = (ctx.now ?? Date.now)()
+  const now = ctx.now()
   if (event.tags.filter((t) => t[0] === 'expiration').length > 1) return { ok: false, reason: 'malformed' }
   if (isExpired(event, now)) return { ok: false, reason: 'expired' }
   const latest = now + LIMITS.futureSkewMs

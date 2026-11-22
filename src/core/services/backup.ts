@@ -2,6 +2,7 @@
 // keep managing shared lists and claims on a new device, so the UI must
 // tell the user to store it privately.
 
+import { systemNow } from '../clock.ts'
 import { publicKeyOf, topicForSecret } from '../crypto/keys.ts'
 import type { HippoDb } from '../db/schema.ts'
 import { getSettings, sanitizeRelays, setLastExportAt, type Theme } from '../db/settings.ts'
@@ -26,7 +27,7 @@ export interface ExportFile {
   settings: { theme?: Theme; relays?: string[] }
 }
 
-export async function exportData(db: HippoDb, now = Date.now()): Promise<ExportFile> {
+export async function exportData(db: HippoDb, now = systemNow()): Promise<ExportFile> {
   const [items, categories, sharedLists, guestLists, retiredLists, settings] = await Promise.all([
     db.items.toArray(),
     db.categories.toArray(),
@@ -170,7 +171,7 @@ export async function importData(
   options: { mode?: 'merge' | 'replace'; now?: number } = {},
 ): Promise<ImportResult> {
   const file = parseExportFile(value)
-  const now = options.now ?? Date.now()
+  const now = options.now ?? systemNow()
   let skipped = 0
   await db.transaction(
     'rw',

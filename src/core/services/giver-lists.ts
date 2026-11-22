@@ -18,6 +18,7 @@ import { parseListMetaPayload, tryParse } from '../model/validate.ts'
 import { buildClaimEvent, expiresSoon, isExpired, nextCreatedAt } from '../protocol/build.ts'
 import type { AcceptedClaim } from '../protocol/list-state.ts'
 import { ListState } from '../protocol/list-state.ts'
+import { receiveEvent } from '../protocol/receive.ts'
 import { resolveItemState, type ItemState, type ResolveClaim } from '../protocol/resolve.ts'
 import { HIPPO_KIND, claimSlot, metaSlot } from '../protocol/slots.ts'
 import type { EoseInfo, NostrEvent, PublishResult, Transport, Unsubscribe } from '../transport/types.ts'
@@ -161,9 +162,23 @@ export interface GiverListView {
   pendingClaimIds: string[]
 }
 
+/**
+ * What other devices make of a claim I just sent, worked out with the same
+ * rules they use (PROTOCOL.md sections 5 and 6) on everything this device
+ * holds. Show success only for `counted`.
+ */
+export type ClaimOutcome =
+  /** Accepted, and counted: a full claim that fits, a pledge in the item's currency, or a withdrawal. */
+  | { kind: 'counted' }
+  /** Accepted but not counted: another claim was counted first (`taken`), the pledge is in another currency, or the wish is gone. */
+  | { kind: 'not-counted'; reason: 'taken' | 'currency' | 'unavailable' }
+  /** Other devices would drop the event itself, for example because it is dated in the future (`future`). */
+  | { kind: 'rejected'; reason: string }
+
 export interface ClaimActionResult {
   claim: ClaimPayload
   result: PublishResult
+  outcome: ClaimOutcome
 }
 
 export interface GiverSessionOptions {
@@ -203,6 +218,8 @@ export class GiverListSession {
   private stopped = false
   private startPromise: Promise<void> | null = null
   private retryScheduled = false
+  private unwatchClock: (() => void) | null = null
+  private judgedOffset: number | undefined
 
   constructor(deps: CoreDeps, guest: GuestList, options: GiverSessionOptions = {}) {
     this.deps = deps
@@ -238,6 +255,10 @@ export class GiverListSession {
   /** Loads the cache (status stays 'loading'), then subscribes live. Resolves once the cache is shown. */
   start(): Promise<void> {
     this.startPromise ??= (async () => {
+      // Judge dates with the corrected clock: wait (briefly) for its first measurement.
+      await this.deps.clockSync?.ready().catch(() => undefined)
+      if (this.stopped) return
+      this.watchClock()
       const now = this.deps.now()
       const rows = []
       for (const r of await getCachedEvents(this.deps.db, this.topic)) {
@@ -259,10 +280,28 @@ export class GiverListSession {
 
   stop(): void {
     this.stopped = true
+    this.unwatchClock?.()
+    this.unwatchClock = null
     this.unsubscribe?.()
     this.unsubscribe = null
     for (const t of this.timers) clearTimeout(t)
     this.timers.clear()
+  }
+
+  /**
+   * When the clock correction changes by more than a minute, events judged with the old time
+   * (for example a claim dropped as dated in the future) are asked for again.
+   */
+  private watchClock(): void {
+    const clock = this.deps.clockSync
+    if (!clock) return
+    this.judgedOffset = clock.offset()
+    this.unwatchClock = clock.subscribe(() => {
+      const next = clock.offset()
+      if (Math.abs((next ?? 0) - (this.judgedOffset ?? 0)) < 60_000) return
+      this.judgedOffset = next
+      if (!this.stopped && this.startPromise) this.connect()
+    })
   }
 
   private later(ms: number, fn: () => void): void {
@@ -480,8 +519,35 @@ export class GiverListSession {
       } else {
         this.scheduleRetry()
       }
-      return { claim: payload, result }
+      return { claim: payload, result, outcome: this.judge(event, payload) }
     })
+  }
+
+  /**
+   * Runs the receiving rules (validation, slot ownership, last writer wins) and claim
+   * resolution on my event the way another device holding the same events would: a fresh
+   * state is built from everything this device has, with my event added last.
+   */
+  private judge(event: NostrEvent, payload: ClaimPayload): ClaimOutcome {
+    const checked = receiveEvent(event, this.state.ctx)
+    if (!checked.ok) return { kind: 'rejected', reason: checked.reason }
+    const fresh = new ListState(this.state.ctx)
+    fresh.ingestBatch(this.state.all().map((a) => a.event).filter((e) => e.id !== event.id))
+    const r = fresh.ingest(event)
+    if (r.outcome !== 'accepted' && r.outcome !== 'duplicate') return { kind: 'rejected', reason: r.outcome }
+    if (payload.status === 'withdrawn') return { kind: 'counted' }
+    const meta = fresh.meta?.payload
+    const item = fresh.items().get(payload.itemId)?.payload
+    if (!meta || meta.status !== 'published' || !item || !meta.itemIds.includes(payload.itemId)) return { kind: 'not-counted', reason: 'unavailable' }
+    const claims: ResolveClaim[] = fresh
+      .claims()
+      .filter((c) => c.payload.itemId === payload.itemId)
+      .map((c) => ({ eventId: c.event.id, pubkey: c.event.pubkey, eventCreatedAt: c.event.created_at, payload: c.payload }))
+    const row = resolveItemState(item, claims).rows.find((x) => x.claimId === payload.id)
+    if (!row) return { kind: 'not-counted', reason: 'unavailable' }
+    if (row.conflict) return { kind: 'not-counted', reason: 'taken' }
+    if (row.currencyMismatch) return { kind: 'not-counted', reason: 'currency' }
+    return { kind: 'counted' }
   }
 
   private newClaim(itemId: string, fields: Pick<ClaimPayload, 'kind' | 'quantity' | 'amount'>): ClaimPayload {
