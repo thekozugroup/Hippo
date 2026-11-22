@@ -1,0 +1,35 @@
+.importance {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.importance__dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.importance__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dot-dim);
+}
+.importance__dot.is-on {
+  background: var(--text);
+}
+
+.importance__label {
+  font-size: 13px;
+  line-height: 16px;
+  color: var(--text-2);
+}
+
+@media (forced-colors: active) {
+  .importance__dot {
+    background: GrayText;
+  }
+  .importance__dot.is-on {
+    background: CanvasText;
+  }
+}

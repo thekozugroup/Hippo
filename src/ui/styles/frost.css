@@ -1,0 +1,83 @@
+/*
+ * Frost ("Android 17 style"): a uniform blur plus a flat, theme-derived tint,
+ * one inside hairline. No refraction, no specular highlight, no gradient border.
+ * Do not stack frost on frost. Do not animate blur radius.
+ */
+
+.frost {
+  background-color: var(--frost-tint);
+  -webkit-backdrop-filter: var(--frost-filter);
+  backdrop-filter: var(--frost-filter);
+  box-shadow: inset 0 0 0 1px var(--frost-line);
+}
+
+.frost--on-hero {
+  --frost-tint: var(--frost-hero-tint);
+  --frost-filter: var(--frost-hero-filter);
+  --frost-line: var(--frost-hero-line);
+  --frost-solid: var(--frost-hero-solid);
+  --frost-ink: var(--white);
+  color: var(--white);
+}
+
+.frost--panel {
+  --frost-tint: var(--frost-panel-tint);
+  --frost-filter: var(--frost-panel-filter);
+  --frost-line: var(--frost-panel-line);
+  --frost-solid: var(--frost-panel-solid);
+}
+
+.frost--bar {
+  --frost-tint: var(--frost-bar-tint);
+  --frost-filter: var(--frost-bar-filter);
+  --frost-line: var(--frost-bar-line);
+  --frost-solid: var(--frost-bar-solid);
+}
+
+.frost--scrim,
+.frost-backdrop::backdrop {
+  background-color: var(--frost-scrim-tint);
+  -webkit-backdrop-filter: var(--frost-scrim-filter);
+  backdrop-filter: var(--frost-scrim-filter);
+}
+
+/* No backdrop-filter support: opaque nearest solid, stronger border. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .frost {
+    background-color: var(--frost-solid);
+    box-shadow: inset 0 0 0 1.5px var(--frost-solid-line);
+  }
+  .frost--scrim,
+  .frost-backdrop::backdrop {
+    background-color: var(--frost-scrim-solid);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .frost {
+    background-color: var(--frost-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: inset 0 0 0 1.5px var(--frost-solid-line);
+  }
+  .frost--on-hero {
+    --frost-solid-line: var(--white);
+  }
+  .frost--scrim,
+  .frost-backdrop::backdrop {
+    background-color: var(--frost-scrim-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .frost {
+    background-color: Canvas;
+    color: CanvasText;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+    border: 1px solid CanvasText;
+  }
+}

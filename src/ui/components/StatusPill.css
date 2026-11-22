@@ -1,0 +1,60 @@
+.status-pill {
+  --pill-fg: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  border-radius: var(--r-pill);
+  padding: 0 10px 0 8px;
+  background: color-mix(in srgb, var(--pill-fg) var(--pill-tint), var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pill-fg) 22%, transparent);
+  color: var(--pill-fg);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.status-pill__dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-pill--available { --pill-fg: var(--pill-available); }
+.status-pill--partial { --pill-fg: var(--pill-partial); }
+.status-pill--funded { --pill-fg: var(--pill-funded); }
+.status-pill--claimed { --pill-fg: var(--pill-claimed); }
+.status-pill--purchased { --pill-fg: var(--pill-purchased); }
+.status-pill--removed { --pill-fg: var(--pill-removed); }
+.status-pill--conflict { --pill-fg: var(--pill-conflict); }
+.status-pill--draft { --pill-fg: var(--pill-draft); }
+.status-pill--published { --pill-fg: var(--pill-published); }
+
+/* Shape cues beyond colour: a ring for partial, hollow for draft and removed, square for conflict. */
+.status-pill--partial .status-pill__dot {
+  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.status-pill--draft .status-pill__dot,
+.status-pill--removed .status-pill__dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.status-pill--conflict .status-pill__dot {
+  border-radius: 1px;
+}
+.status-pill--removed {
+  text-decoration: line-through;
+}
+
+@media (forced-colors: active) {
+  .status-pill {
+    border: 1px solid CanvasText;
+    color: CanvasText;
+    background: Canvas;
+  }
+}

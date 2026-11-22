@@ -1,0 +1,18 @@
+.big-value {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.big-value__secondary,
+.big-value .money__fraction {
+  color: var(--text-3);
+}
+
+.big-value--on-hero {
+  color: var(--white);
+}
+.big-value--on-hero .big-value__secondary,
+.big-value--on-hero .money__fraction {
+  color: color-mix(in srgb, var(--white) 72%, transparent);
+}

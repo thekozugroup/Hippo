@@ -1,0 +1,142 @@
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-width: var(--h-min);
+  border: 0;
+  border-radius: var(--r-pill);
+  padding: 0 var(--sp-6);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  overflow: hidden;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur) var(--ease),
+    background-color var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
+}
+
+.btn--lg {
+  height: var(--h-lg);
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.btn--md {
+  height: var(--h-md);
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: 0;
+  padding: 0 var(--sp-5);
+}
+
+.btn--full {
+  display: flex;
+  width: 100%;
+}
+
+.btn:active:not(:disabled):not([aria-disabled='true']) {
+  transform: scale(0.98);
+}
+
+.btn__icon,
+.btn__icon svg {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.btn__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Primary: blue gradient pill, light glow only along the bottom edge (label stays on blue-600 or darker). */
+.btn--primary {
+  color: var(--white);
+  background:
+    radial-gradient(55% 38% at 28% 112%, var(--blue-400) 0%, transparent 100%),
+    linear-gradient(100deg, var(--blue-800) 0%, var(--blue-700) 45%, var(--blue-600) 100%);
+}
+
+.btn--secondary {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.btn--secondary:active:not(:disabled):not([aria-disabled='true']) {
+  background: var(--surface-3);
+}
+
+.btn--ghost {
+  color: var(--accent);
+  background: transparent;
+}
+.btn--ghost:hover:not(:disabled) {
+  background: var(--overlay-hover);
+}
+
+.btn--frost {
+  color: var(--white);
+  --focus-ring: var(--white);
+}
+
+.btn--danger {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+}
+
+.btn:disabled,
+.btn[aria-disabled='true']:not(.is-loading) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn.is-loading {
+  cursor: progress;
+}
+
+.btn__spinner {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: btn-spin 700ms linear infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn__spinner {
+    animation: none;
+    border-top-color: color-mix(in srgb, currentColor 30%, transparent);
+    border-right-color: currentColor;
+  }
+}
+
+@media (forced-colors: active) {
+  .btn {
+    border: 1px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+    forced-color-adjust: auto;
+  }
+  .btn:disabled {
+    color: GrayText;
+    border-color: GrayText;
+  }
+}

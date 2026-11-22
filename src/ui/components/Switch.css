@@ -1,0 +1,102 @@
+.switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  min-height: var(--h-min);
+  cursor: pointer;
+}
+
+.switch__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.switch__label {
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.switch__desc {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-2);
+}
+
+/* The native input fills the label so the whole row is the target, and stays keyboard focusable. */
+.switch__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.switch__track {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1.5px var(--control-border);
+  transition: background-color var(--dur) var(--ease);
+}
+
+.switch__thumb {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--control-border);
+  transition:
+    transform var(--dur) var(--ease),
+    background-color var(--dur) var(--ease);
+}
+
+.switch__input:checked + .switch__track {
+  background: var(--accent);
+  box-shadow: none;
+}
+.switch__input:checked + .switch__track .switch__thumb {
+  transform: translateX(20px);
+  background: var(--on-accent);
+}
+[dir='rtl'] .switch__input:checked + .switch__track .switch__thumb {
+  transform: translateX(-20px);
+}
+
+.switch__input:focus-visible + .switch__track {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.switch__input:disabled,
+.switch__input:disabled ~ * {
+  cursor: not-allowed;
+}
+.switch__input:disabled + .switch__track {
+  opacity: 0.45;
+}
+
+@media (forced-colors: active) {
+  .switch__track {
+    border: 1px solid ButtonText;
+    background: Canvas;
+  }
+  .switch__thumb {
+    background: ButtonText;
+  }
+  .switch__input:checked + .switch__track {
+    background: Highlight;
+  }
+  .switch__input:checked + .switch__track .switch__thumb {
+    background: HighlightText;
+  }
+}

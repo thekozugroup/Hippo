@@ -1,0 +1,14 @@
+.two-tone__muted {
+  color: var(--text-2);
+}
+.two-tone__bright {
+  color: var(--text);
+}
+
+/* On the hero the muted half is a soft white that still clears 4.5:1 on the upper hero. */
+.two-tone--on-hero .two-tone__muted {
+  color: color-mix(in srgb, var(--white) 78%, transparent);
+}
+.two-tone--on-hero .two-tone__bright {
+  color: var(--white);
+}

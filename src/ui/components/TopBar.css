@@ -1,0 +1,30 @@
+.top-bar {
+  --focus-ring: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: calc(var(--sp-3) + env(safe-area-inset-top)) calc(var(--gutter) - 4px) var(--sp-3) calc(var(--gutter) - 4px);
+  color: var(--white);
+}
+
+.top-bar__start,
+.top-bar__end {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.top-bar__end {
+  margin-inline-start: auto;
+}
+
+.top-bar__centre {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}

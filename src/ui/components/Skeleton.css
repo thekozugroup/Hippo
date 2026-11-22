@@ -1,0 +1,33 @@
+.skeleton {
+  display: block;
+  max-width: 100%;
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1400ms ease-in-out infinite;
+}
+.skeleton--pill { border-radius: var(--r-pill); }
+.skeleton--tile { border-radius: var(--r-tile); }
+.skeleton--circle { border-radius: 50%; }
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--surface-3);
+  }
+}
+
+@media (forced-colors: active) {
+  .skeleton {
+    background: GrayText;
+    opacity: 0.3;
+  }
+}

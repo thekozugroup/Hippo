@@ -1,0 +1,17 @@
+.sheet {
+  --focus-ring: var(--accent);
+  position: relative;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  box-shadow: var(--shadow-sheet);
+  padding: var(--sp-6) var(--gutter) calc(var(--sp-7) + env(safe-area-inset-bottom));
+  min-width: 0;
+}
+
+@media (forced-colors: active) {
+  .sheet {
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+}

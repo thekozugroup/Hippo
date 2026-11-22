@@ -1,0 +1,36 @@
+.hero-bg {
+  --focus-ring: var(--white);
+  position: absolute;
+  inset: 0;
+  background-color: var(--hero-fill);
+  background-image: var(--hero-bg);
+  isolation: isolate;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hero-bg--dark {
+  background-color: var(--hero-fill-dark);
+  background-image: var(--hero-bg-dark);
+}
+
+/* Film grain: inline SVG turbulence blended over the gradient. */
+.hero-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain);
+  background-size: 240px 240px;
+  mix-blend-mode: overlay;
+  opacity: var(--grain-opacity);
+}
+
+@media (forced-colors: active) {
+  .hero-bg,
+  .hero-bg--dark {
+    background: Canvas;
+  }
+  .hero-bg::after {
+    display: none;
+  }
+}

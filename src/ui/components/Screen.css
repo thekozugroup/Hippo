@@ -1,0 +1,102 @@
+.screen {
+  --hero-h: clamp(200px, 30dvh, 300px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--hero-fill);
+}
+
+.screen--contained {
+  --hero-h: 180px;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--r-card);
+}
+
+/* Full-width hero band; its gradient runs 48px under the sheet so the sheet's rounded corners reveal blue. */
+.screen__top {
+  --focus-ring: var(--white);
+  position: relative;
+  z-index: 0;
+  flex: none;
+  min-height: var(--hero-h);
+  color: var(--white);
+}
+.screen__top > .hero-bg {
+  bottom: -48px;
+  /* Fade into the fill colour so wide screens show no seam. */
+  -webkit-mask-image: linear-gradient(to bottom, var(--black) calc(100% - 56px), transparent);
+  mask-image: linear-gradient(to bottom, var(--black) calc(100% - 56px), transparent);
+}
+
+.screen__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+}
+
+.screen__col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--col-max);
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.screen__body > .screen__col {
+  flex: 1;
+}
+
+.screen__hero {
+  min-height: inherit;
+}
+
+.screen__headline {
+  padding: var(--sp-4) var(--gutter) var(--sp-8);
+}
+
+.screen__sheet {
+  flex: 1;
+}
+
+.screen--contained .screen__sheet {
+  border-radius: var(--r-sheet) var(--r-sheet) var(--r-card) var(--r-card);
+}
+
+/* Floating nav: a zero-height sticky rail; the nav floats up from the bottom edge. */
+.screen__nav {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  height: 0;
+  pointer-events: none;
+}
+
+.screen__nav-inner {
+  position: absolute;
+  inset-inline: 0;
+  bottom: calc(var(--sp-3) + env(safe-area-inset-bottom));
+  display: flex;
+  justify-content: center;
+}
+
+.screen__nav-inner > * {
+  pointer-events: auto;
+}
+
+.screen--contained .screen__nav {
+  position: relative;
+}
+
+.screen--has-nav .screen__sheet {
+  padding-bottom: calc(var(--h-lg) + var(--sp-9) + env(safe-area-inset-bottom));
+}
+
+.screen--dark {
+  --hero-fill: var(--hero-fill-dark);
+}

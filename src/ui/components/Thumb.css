@@ -1,0 +1,25 @@
+.thumb {
+  --thumb-size: 56px;
+  flex: none;
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+  border-radius: var(--r-thumb);
+  object-fit: cover;
+  background: var(--surface-3);
+}
+.thumb--xs { --thumb-size: 28px; border-radius: 9px; }
+.thumb--sm { --thumb-size: 40px; border-radius: 12px; }
+.thumb--lg { --thumb-size: 72px; border-radius: 18px; }
+.thumb--round { border-radius: 50%; }
+
+.thumb--fallback {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent);
+  font-size: calc(var(--thumb-size) * 0.4);
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  user-select: none;
+}

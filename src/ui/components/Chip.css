@@ -1,0 +1,76 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 32px;
+  max-width: 100%;
+  border: 0;
+  border-radius: var(--r-pill);
+  padding: 0 var(--sp-4);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.chip--interactive {
+  min-height: var(--h-min);
+  cursor: pointer;
+}
+
+.chip__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip__avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-inline-start: -10px;
+  overflow: hidden;
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.chip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.chip--neutral {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.chip--neutral.is-selected {
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
+}
+
+.chip--frost {
+  --focus-ring: var(--white);
+  color: var(--white);
+}
+.chip--frost.is-selected {
+  background: var(--white);
+  color: var(--blue-950);
+  box-shadow: none;
+}
+
+@media (forced-colors: active) {
+  .chip {
+    border: 1px solid ButtonText;
+  }
+  .chip.is-selected {
+    box-shadow: inset 0 0 0 3px Highlight;
+    font-weight: 700;
+  }
+}

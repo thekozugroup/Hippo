@@ -1,0 +1,16 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  color: inherit;
+}
+
+.logo svg {
+  flex: none;
+}
+
+.logo__word {
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
