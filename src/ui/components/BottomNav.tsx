@@ -102,7 +102,16 @@ function useSwitchMotion(nav: RefObject<HTMLElement | null>, key: string | undef
     memory.set(key, { active: activeId, live: null, at: performance.now() })
     let running: Animation[] = []
     if (prev && prev.active !== activeId && performance.now() - prev.at <= FRESH_MS && !motionOff()) {
-      running = playSwitch(el, activeId, prev)
+      const mine = playSwitch(el, activeId, prev)
+      running = mine
+      if (mine.length > 0) {
+        // While items resize, the clipped label simply clips (no ellipsis flickering in and out).
+        el.setAttribute('data-switching', '')
+        const done = () => {
+          if (running === mine) el.removeAttribute('data-switching')
+        }
+        void Promise.allSettled(mine.map((a) => a.finished)).then(done)
+      }
     }
     return () => {
       // Leaving mid-motion: remember where each item is, so the next switch carries on from there.
@@ -110,6 +119,7 @@ function useSwitchMotion(nav: RefObject<HTMLElement | null>, key: string | undef
       const live = midway ? new Map(Array.from(el.querySelectorAll<HTMLElement>('[data-nav-id]'), (item) => [item.dataset.navId ?? '', growOf(item)] as const)) : null
       memory.set(key, { active: activeId, live, at: performance.now() })
       for (const a of running) a.cancel()
+      el.removeAttribute('data-switching')
     }
   }, [nav, key, activeId])
 }
