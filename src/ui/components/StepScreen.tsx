@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { cx } from '../cx.ts'
 import { HeroBackground } from './HeroBackground.tsx'
 import { IconButton } from './IconButton.tsx'
-import { Logo } from './Logo.tsx'
+import { LogoIntro } from './LogoIntro.tsx'
 import { StepProgress } from './StepProgress.tsx'
 import './StepScreen.css'
 
@@ -34,6 +34,10 @@ export interface StepScreenProps extends Omit<ComponentPropsWithRef<'div'>, 'tit
    * `main` and `h1`, and does not take part in route transitions.
    */
   contained?: boolean
+  /** Play the one-time logo intro when this step first appears (see `LogoIntro`); only the value at mount counts. */
+  logoIntro?: boolean
+  /** Called when the logo intro starts (or is skipped for reduced motion), so the app can remember it was shown. */
+  onLogoIntro?: () => void
 }
 
 /**
@@ -54,6 +58,8 @@ export function StepScreen({
   busy = false,
   secondaryAction,
   contained = false,
+  logoIntro = false,
+  onLogoIntro,
   className,
   ...rest
 }: StepScreenProps) {
@@ -76,7 +82,7 @@ export function StepScreen({
       <HeroBackground variant="night" />
       <div className="step-screen__col">
         <header className="step-screen__top">
-          <Logo size={28} />
+          <LogoIntro size={28} play={logoIntro} {...(onLogoIntro ? { onPlay: onLogoIntro } : {})} />
           {topEnd ? <div className="step-screen__top-end">{topEnd}</div> : null}
         </header>
         <Main className="step-screen__main">

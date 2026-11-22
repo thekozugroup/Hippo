@@ -1,0 +1,8 @@
+/* While the intro runs the logo is lifted above the step and ignores the pointer, so a tap
+   always reaches the control beneath it. Only transform moves; the layout never changes. */
+.logo--intro {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  will-change: transform;
+}

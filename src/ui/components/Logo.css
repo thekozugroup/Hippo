@@ -14,3 +14,37 @@
   letter-spacing: -0.03em;
   line-height: 1;
 }
+
+/* Blink: the eyes are holes in the glyph's mask, so shrinking them about their own centre closes
+   them. Two blinks with an uneven rhythm: a blink, a pause of about 600 ms, a quicker blink. */
+.logo__eye {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.logo--blink .logo__eye {
+  animation: logo-blink var(--dur-blink) var(--ease) 1 both;
+}
+@keyframes logo-blink {
+  0%,
+  18% {
+    transform: scaleY(1);
+  }
+  22.5% {
+    transform: scaleY(0.06);
+  }
+  29% {
+    transform: scaleY(1);
+  }
+  71.4% {
+    transform: scaleY(1);
+  }
+  74.5% {
+    transform: scaleY(0.06);
+  }
+  79% {
+    transform: scaleY(1);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}

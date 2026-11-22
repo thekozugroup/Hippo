@@ -105,6 +105,11 @@
   --dur-page: 280ms; /* route transitions, the nav indicator, rows moving to a new place */
   --dur-sheet: 320ms; /* sheets and dialogs rising from the bottom */
   --stagger: 18ms; /* delay between dots filling in sequence */
+  /* The logo intro on the first setup step: a one-time brand moment, the one exception to the
+     --dur-sheet limit. The whole intro, the travel at its end, and one pass of the blink pattern. */
+  --dur-intro: 2000ms;
+  --dur-intro-travel: 600ms;
+  --dur-blink: 1400ms;
   --ease: ease-out;
   --ease-in: cubic-bezier(0.4, 0, 1, 1); /* exits: leave quickly, no lingering */
   --ease-move: cubic-bezier(0.3, 0, 0, 1); /* moves on screen: fast start, soft landing, no overshoot */

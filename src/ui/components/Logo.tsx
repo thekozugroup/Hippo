@@ -10,13 +10,19 @@ export interface LogoProps extends Omit<ComponentPropsWithRef<'span'>, 'children
   markOnly?: boolean
   /** Accessible name; the glyph is decorative when the wordmark is shown. */
   label?: string
+  /**
+   * Plays the blink once: the eyes close and open twice with an uneven rhythm (`--dur-blink`). It
+   * is decorative, needs motion to be allowed (reduced motion shows the still glyph) and does not
+   * change the layout. Set it for as long as the blink should run; `LogoIntro` does that.
+   */
+  blink?: boolean
 }
 
-/** Hippo glyph (inline SVG, `currentColor`) with an optional wordmark. */
-export function Logo({ size = 28, markOnly = false, label = 'Hippo', className, style, ...rest }: LogoProps) {
+/** Hippo glyph (inline SVG, `currentColor`) with an optional wordmark. The eyes are separate shapes so they can blink. */
+export function Logo({ size = 28, markOnly = false, label = 'Hippo', blink = false, className, style, ...rest }: LogoProps) {
   const id = useId()
   return (
-    <span {...rest} className={cx('logo', className)} style={{ fontSize: size * 0.82, ...style }}>
+    <span {...rest} className={cx('logo', blink && 'logo--blink', className)} style={{ fontSize: size * 0.82, ...style }}>
       <svg
         width={size}
         height={size}
@@ -26,8 +32,8 @@ export function Logo({ size = 28, markOnly = false, label = 'Hippo', className, 
         <defs>
           <mask id={`${id}-m`}>
             <rect width="48" height="48" style={{ fill: 'var(--white)' }} />
-            <circle cx="15.5" cy="14.5" r="2.4" style={{ fill: 'var(--black)' }} />
-            <circle cx="32.5" cy="14.5" r="2.4" style={{ fill: 'var(--black)' }} />
+            <circle className="logo__eye" cx="15.5" cy="14.5" r="2.4" style={{ fill: 'var(--black)' }} />
+            <circle className="logo__eye" cx="32.5" cy="14.5" r="2.4" style={{ fill: 'var(--black)' }} />
             <ellipse cx="17.5" cy="31" rx="2.6" ry="3.2" style={{ fill: 'var(--black)' }} />
             <ellipse cx="30.5" cy="31" rx="2.6" ry="3.2" style={{ fill: 'var(--black)' }} />
           </mask>

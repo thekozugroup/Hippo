@@ -50,6 +50,7 @@ import {
   type OccasionId,
   type WelcomeStep,
 } from '../../core/onboarding.ts'
+import { markLogoIntroPlayed, shouldPlayLogoIntro } from '../../core/logoIntro.ts'
 import { writeSetupHint } from '../../core/setupHint.ts'
 import { requestPersistentStorage } from '../../core/storage.ts'
 import { historyIndex, returnTo } from '../../layout/motionLocation.ts'
@@ -307,6 +308,9 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
     busy,
     onBack: step === 'start' ? undefined : goBack,
     topEnd: step === 'start' ? undefined : closeButton,
+    // Once per device, on the first step only (not on Back, resume or replay).
+    logoIntro: step === 'start' && shouldPlayLogoIntro(),
+    onLogoIntro: markLogoIntroPlayed,
   }
   const formError = errors.form ? (
     <p className="setup-error" role="alert">
