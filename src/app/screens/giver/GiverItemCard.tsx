@@ -1,9 +1,9 @@
 import { ExternalLink, TriangleAlert } from 'lucide-react'
-import { Button, DotProgress, ImportanceMark, MoneyText, StatusPill, Thumb, type Status } from '../../../ui/index.ts'
+import { Button, DotProgress, ImportanceMark, MoneyText, StatusPill, Thumb } from '../../../ui/index.ts'
 import type { ClaimRow, GiverItemView } from '../../../core/index.ts'
 import { importanceLevel, moneyText, safeUrl } from '../../lib/format.ts'
 import type { SheetRequest } from './ClaimSheet.tsx'
-import { describeRow, fundingProgress } from './giverText.ts'
+import { describeRow, fundingProgress, giverPill, itemHeadingId } from './giverText.ts'
 
 export interface GiverItemCardProps {
   view: GiverItemView
@@ -17,20 +17,23 @@ export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchase
   const href = safeUrl(item.url)
   const myRows = state.rows.filter((r) => r.mine)
   const myConflict = myRows.some((r) => r.conflict)
-  const status: Status = myConflict ? 'conflict' : state.status
+  const pill = giverPill(item, state)
   const funding = fundingProgress(item, state)
   const remainingAmount = state.remainingAmount ?? 0
+  const contributionsOpen = item.allowContributions && item.price !== undefined
   const canClaim = state.pledgeCount === 0 && state.remainingQuantity > 0
-  const canPledge = item.allowContributions && item.price !== undefined && remainingAmount > 0
-  const canCover = state.pledgeCount > 0 && item.price !== undefined && remainingAmount > 0
-  const titleId = `item-${item.id}`
+  const canPledge = contributionsOpen && remainingAmount > 0
+  // "Cover the rest" is a pledge too, so it closes with contributions (the owner switched them off).
+  const canCover = contributionsOpen && state.pledgeCount > 0 && remainingAmount > 0
+  const closedWithPledges = !item.allowContributions && state.pledgeCount > 0
+  const titleId = itemHeadingId(item.id)
 
   return (
     <article className="giver-item" aria-labelledby={titleId}>
       <div className="giver-item__head">
         <Thumb name={item.title} src={safeUrl(item.imageUrl)} size="lg" />
         <div className="giver-item__main">
-          <h3 id={titleId} className="giver-item__title">
+          <h3 id={titleId} className="giver-item__title" tabIndex={-1}>
             {item.title}
           </h3>
           <div className="giver-item__meta">
@@ -43,7 +46,7 @@ export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchase
             ) : null}
           </div>
         </div>
-        <StatusPill status={status} className="giver-item__status" />
+        <StatusPill status={pill.status} label={pill.label} className="giver-item__status" />
       </div>
 
       {item.notes ? <p className="giver-item__notes">{item.notes}</p> : null}
@@ -69,14 +72,20 @@ export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchase
           {state.surplus > 0 && state.target ? (
             <p className="app-note">{`${moneyText({ amount: state.surplus, currency: state.target.currency })} more than needed has been pledged.`}</p>
           ) : null}
-          {!item.allowContributions && state.pledgeCount > 0 ? <p className="app-note">New contributions are closed for this wish.</p> : null}
+          {closedWithPledges ? (
+            <p className="app-note">
+              {remainingAmount > 0
+                ? 'The list owner has closed this wish to new contributions. If you chipped in, you can still lower your amount or take it back.'
+                : 'This wish is closed to new contributions.'}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
       {myConflict ? (
         <div className="app-banner app-banner--warn" role="note">
           <TriangleAlert aria-hidden="true" />
-          <p>Someone else&apos;s mark was counted first (or they have already bought it), so yours is not counted. No harm done: you can take yours back and pick something else.</p>
+          <p>Someone else said they would get this first (or has already bought it), so yours is not counted. No harm done: take yours back and pick something else.</p>
         </div>
       ) : null}
 
@@ -102,7 +111,7 @@ export function GiverItemCard({ view, pendingClaimIds, onRequest, onMarkPurchase
                       Change
                     </Button>
                   ) : null}
-                  <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onRequest({ mode: 'withdraw', title: item.title, claimId: row.claimId })}>
+                  <Button variant="ghost" size="md" aria-describedby={titleId} onClick={() => onRequest({ mode: 'withdraw', title: item.title, claimId: row.claimId, itemId: item.id })}>
                     Take back
                   </Button>
                 </span>

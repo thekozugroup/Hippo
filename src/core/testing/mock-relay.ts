@@ -23,6 +23,9 @@ export interface MockRelay {
   /** Every REQ filter received, for asserting access patterns. */
   readonly filters: Filter[]
   clear(): void
+  /** Simulates an outage: drops every connection and refuses new ones until `resume()`. Stored events are kept. */
+  pause(): void
+  resume(): void
   close(): Promise<void>
 }
 
@@ -53,7 +56,12 @@ export function startMockRelay(port = 0): Promise<MockRelay> {
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg))
   }
 
+  let paused = false
   wss.on('connection', (ws) => {
+    if (paused) {
+      ws.terminate()
+      return
+    }
     subs.set(ws, new Map())
     ws.on('close', () => subs.delete(ws))
     ws.on('message', (data) => {
@@ -142,6 +150,13 @@ export function startMockRelay(port = 0): Promise<MockRelay> {
         },
         filters,
         clear: () => store.clear(),
+        pause: () => {
+          paused = true
+          for (const client of wss.clients) client.terminate()
+        },
+        resume: () => {
+          paused = false
+        },
         close: () =>
           new Promise<void>((done) => {
             for (const client of wss.clients) client.terminate()

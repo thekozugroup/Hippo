@@ -138,6 +138,7 @@ export async function updateSharedList(deps: CoreDeps, id: string, patch: Shared
     const list = await requireList(deps.db, id)
     applyListPatch(list, patch)
     list.updatedAt = Math.max(deps.now(), list.updatedAt + 1)
+    if (list.status === 'published') list.syncPending = true
     await deps.db.sharedLists.put(list)
     return list
   })
@@ -299,12 +300,42 @@ function lockKey(deps: CoreDeps, listId: string): string {
   return `${deps.db.name}:list:${listId}`
 }
 
+/**
+ * Records whether the list's current topic still has events no relay has
+ * accepted (`syncPending`), and clears `linkPending` once a relay has the
+ * list's meta event under the current link. Leaves the record alone if the
+ * list was rotated or deleted in the meantime.
+ */
+async function recordSyncState(deps: CoreDeps, listId: string, topic: string): Promise<void> {
+  const rows = await getCachedEvents(deps.db, topic)
+  const pending = rows.some((r) => r.pending)
+  const meta = rows.find((r) => r.d === metaSlot(topic))
+  const linkLive = meta !== undefined && !meta.pending
+  await deps.db.transaction('rw', deps.db.sharedLists, async () => {
+    const l = await deps.db.sharedLists.get(listId)
+    if (!l || topicForSecret(l.listSecret) !== topic) return
+    const before = `${l.syncPending === true}:${l.linkPending === true}`
+    if (pending) l.syncPending = true
+    else delete l.syncPending
+    if (linkLive || l.status === 'draft') delete l.linkPending
+    if (`${l.syncPending === true}:${l.linkPending === true}` !== before) await deps.db.sharedLists.put(l)
+  })
+}
+
+async function markSyncPending(deps: CoreDeps, listId: string): Promise<void> {
+  await deps.db.sharedLists.update(listId, { syncPending: true })
+}
+
 /** Republishes a published list after local changes. No-op for drafts and unpublished lists. */
 export function syncList(deps: CoreDeps, listId: string, options: { force?: boolean } = {}): Promise<SyncReport> {
   return serialize(lockKey(deps, listId), async () => {
     const list = await requireList(deps.db, listId)
     if (list.status !== 'published') return report(listId, [])
-    return report(listId, await syncPublished(deps, ownerContext(deps, list), list, options.force ?? false))
+    if (!list.syncPending) await markSyncPending(deps, listId)
+    const ctx = ownerContext(deps, list)
+    const events = await syncPublished(deps, ctx, list, options.force ?? false)
+    await recordSyncState(deps, listId, ctx.topic)
+    return report(listId, events)
   })
 }
 
@@ -320,14 +351,20 @@ export function publishList(deps: CoreDeps, listId: string): Promise<SyncReport>
     const list = await deps.db.transaction('rw', deps.db.sharedLists, async () => {
       const l = await requireList(deps.db, listId)
       if (l.status !== 'published') {
+        // A draft's link has never worked; an unpublished list's link shows "no longer shared" until this reaches a relay.
+        if (l.status === 'draft') l.linkPending = true
         l.status = 'published'
         l.publishedAt ??= deps.now()
         l.updatedAt = Math.max(deps.now(), l.updatedAt + 1)
-        await deps.db.sharedLists.put(l)
       }
+      l.syncPending = true
+      await deps.db.sharedLists.put(l)
       return l
     })
-    return report(listId, await syncPublished(deps, ownerContext(deps, list), list, false))
+    const ctx = ownerContext(deps, list)
+    const events = await syncPublished(deps, ctx, list, false)
+    await recordSyncState(deps, listId, ctx.topic)
+    return report(listId, events)
   })
 }
 
@@ -406,11 +443,27 @@ export function unpublishList(deps: CoreDeps, listId: string): Promise<SyncRepor
       if (l.status === 'draft') throw new HippoError('not-published', 'list was never published')
       l.status = 'unpublished'
       l.updatedAt = Math.max(deps.now(), l.updatedAt + 1)
+      l.syncPending = true
+      delete l.linkPending
       await deps.db.sharedLists.put(l)
       return l
     })
     const ctx = ownerContext(deps, list)
-    return report(listId, await publishUnpublished(deps, ctx, unpublishContent(list, ctx.slotKey)))
+    const events = await publishUnpublished(deps, ctx, unpublishContent(list, ctx.slotKey))
+    await recordSyncState(deps, listId, ctx.topic)
+    return report(listId, events)
+  })
+}
+
+/** Resends the cut-off of an unpublished list (idempotent; only what is missing is sent). */
+function resendUnpublished(deps: CoreDeps, listId: string): Promise<SyncReport> {
+  return serialize(lockKey(deps, listId), async () => {
+    const list = await requireList(deps.db, listId)
+    if (list.status !== 'unpublished') return report(listId, [])
+    const ctx = ownerContext(deps, list)
+    const events = await publishUnpublished(deps, ctx, unpublishContent(list, ctx.slotKey))
+    await recordSyncState(deps, listId, ctx.topic)
+    return report(listId, events)
   })
 }
 
@@ -517,13 +570,23 @@ export function rotateList(deps: CoreDeps, listId: string): Promise<{ list: Shar
       listSecret: generateListSecret(),
       updatedAt: Math.max(deps.now(), before.updatedAt + 1),
     }
-    if (after.status === 'published') after.publishedAt = deps.now()
+    delete after.syncPending
+    delete after.linkPending
+    if (after.status === 'published') {
+      after.publishedAt = deps.now()
+      after.syncPending = true
+      after.linkPending = true // the new link works once a relay has it
+    }
     await deps.db.transaction('rw', deps.db.sharedLists, deps.db.retiredLists, async () => {
       await deps.db.retiredLists.put(retired)
       await deps.db.sharedLists.put(after)
     })
-    const published =
-      after.status === 'published' ? report(listId, await syncPublished(deps, ownerContext(deps, after), after, true)) : report(listId, [])
+    let published = report(listId, [])
+    if (after.status === 'published') {
+      const ctx = ownerContext(deps, after)
+      published = report(listId, await syncPublished(deps, ctx, after, true))
+      await recordSyncState(deps, listId, ctx.topic)
+    }
     const unpublishedOld = await cutOffRetired(deps, retired.topic)
     return { list: after, published, unpublishedOld }
   })
@@ -591,10 +654,52 @@ export function repairOwnerList(deps: CoreDeps, listId: string, options: { timeo
       if (!present || row.pending) out.push(await publishAndCache(deps, ctx, row.d, row.event, 'republish'))
     }
     if (list.status === 'published') out.push(...(await syncPublished(deps, ctx, list, false)))
+    await recordSyncState(deps, listId, ctx.topic)
     return report(listId, out)
   })
   return run.then(async (r) => {
     await repairRetiredLists(deps, { listId })
     return r
   })
+}
+
+export interface RetryReport {
+  reports: SyncReport[]
+  /** True while some list or retired link still has changes no relay has accepted. */
+  pending: boolean
+}
+
+/** Whether any owned list (or the cut-off of a retired link) is still waiting for a relay. */
+export async function hasPendingSync(db: HippoDb): Promise<boolean> {
+  const lists = await db.sharedLists.toArray()
+  if (lists.some((l) => l.syncPending === true && l.status !== 'draft')) return true
+  return (await db.retiredLists.toArray()).some((r) => r.pending !== undefined)
+}
+
+/**
+ * One retry pass for everything the owner side has not got onto a relay yet:
+ * published lists with `syncPending` are synced (which resends their pending
+ * events), unpublished lists resend their cut-off, and retired links are cut
+ * off. Only lists that are pending are touched, so calling it often costs
+ * nothing when all is sent. The app calls it at start, when the browser comes
+ * online, when the page becomes visible, and on a backoff timer while
+ * `pending` is true.
+ */
+export async function retryPendingSync(deps: CoreDeps): Promise<RetryReport> {
+  const reports: SyncReport[] = []
+  for (const l of await deps.db.sharedLists.toArray()) {
+    if (!l.syncPending) continue
+    if (l.status === 'published') reports.push(await syncList(deps, l.id))
+    else if (l.status === 'unpublished') reports.push(await resendUnpublished(deps, l.id))
+    else {
+      await deps.db.transaction('rw', deps.db.sharedLists, async () => {
+        const d = await deps.db.sharedLists.get(l.id)
+        if (!d) return
+        delete d.syncPending
+        await deps.db.sharedLists.put(d)
+      })
+    }
+  }
+  reports.push(...(await repairRetiredLists(deps)))
+  return { reports, pending: await hasPendingSync(deps.db) }
 }

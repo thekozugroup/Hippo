@@ -3,14 +3,14 @@ import { BottomSheet, Button, Checkbox, MoneyField, TextField } from '../../../u
 import { LIMITS, type ClaimActionResult, type ClaimRow, type GiverItemView, type GiverListSession } from '../../../core/index.ts'
 import { useNotify } from '../../core/notify.ts'
 import { moneyInputValue, moneyText, parseMoneyInput } from '../../lib/format.ts'
-import { actionErrorMessage } from './giverText.ts'
+import { actionErrorMessage, OFFLINE_SAVED_NOTE } from './giverText.ts'
 
 export type SheetRequest =
   | { mode: 'claim'; view: GiverItemView }
   | { mode: 'pledge'; view: GiverItemView }
   | { mode: 'cover'; view: GiverItemView }
   | { mode: 'edit'; view: GiverItemView; row: ClaimRow }
-  | { mode: 'withdraw'; title: string; claimId: string }
+  | { mode: 'withdraw'; title: string; claimId: string; itemId: string }
   | { mode: 'nickname'; current?: string }
 
 function sheetTitle(r: SheetRequest): string {
@@ -24,7 +24,7 @@ function sheetTitle(r: SheetRequest): string {
     case 'edit':
       return r.row.kind === 'full' ? 'Change how many' : 'Change your amount'
     case 'withdraw':
-      return 'Take back your mark?'
+      return 'Take this back?'
     case 'nickname':
       return 'Your name on this list'
   }
@@ -40,11 +40,11 @@ function sheetDescription(r: SheetRequest): string {
     case 'withdraw':
       return `${r.title}. Others will see it as available again.`
     case 'nickname':
-      return 'Other friends see this next to what you mark. The list owner never sees it.'
+      return 'Other friends with the link see it next to the wishes you are getting or chipping in on. Hippo hides it from the list owner.'
   }
 }
 
-function Body({ request, session, onDone }: { request: SheetRequest; session: GiverListSession; onDone: () => void }) {
+function Body({ request, session, onDone }: { request: SheetRequest; session: GiverListSession; onDone: (succeeded: boolean) => void }) {
   const notify = useNotify()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | undefined>()
@@ -52,6 +52,8 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
   const state = view?.state
   const price = view?.item.price
   const editRow = request.mode === 'edit' ? request.row : null
+  // Once the owner closes contributions, a pledge may be lowered but not raised.
+  const pledgeCap = editRow?.kind === 'pledge' && view && !view.item.allowContributions ? editRow.amount : undefined
 
   const maxQty = request.mode === 'claim' ? (state?.remainingQuantity ?? 1) : editRow?.kind === 'full' ? (state?.remainingQuantity ?? 0) + editRow.quantity : 1
   const [qty, setQty] = useState(String(editRow?.kind === 'full' ? editRow.quantity : 1))
@@ -60,12 +62,13 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
   const [applyExisting, setApplyExisting] = useState(true)
 
   const finish = (results: ClaimActionResult[], ok: string) => {
-    onDone()
-    notify(results.some((r) => !r.result.ok) ? 'Saved on this device. Hippo will send it when you are back online.' : ok)
+    onDone(true)
+    notify(results.some((r) => !r.result.ok) ? OFFLINE_SAVED_NOTE : ok)
   }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    if (busy) return
     setError(undefined)
     try {
       setBusy(true)
@@ -77,7 +80,7 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
             setError(`Choose a number from 1 to ${maxQty}.`)
             break
           }
-          finish([await session.claim(request.view.item.id, q)], `Thank you! Others now see that ${title} is taken care of.`)
+          finish([await session.claim(request.view.item.id, q)], `Thank you! Others now see that you are getting ${title}.`)
           break
         }
         case 'pledge': {
@@ -106,6 +109,10 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
             const m = currency ? parseMoneyInput(amount, currency) : undefined
             if (!m) {
               setError('Enter an amount like 20 or 12.50.')
+              break
+            }
+            if (pledgeCap && m.amount > pledgeCap.amount) {
+              setError(`New contributions are closed, so you can only lower your amount (up to ${moneyText(pledgeCap)}).`)
               break
             }
             finish([await session.updateClaim(request.row.claimId, { amount: m.amount })], `Updated to ${moneyText(m)}.`)
@@ -144,7 +151,7 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
             {...(error ? { error } : {})}
           />
         ) : (
-          <p className="app-note">Others will see that this is taken care of. The list owner will not.</p>
+          <p className="app-note">Other friends with the link will see that you are getting this. Hippo hides it from the list owner.</p>
         )
       ) : null}
 
@@ -185,6 +192,7 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
             currency={request.row.amount?.currency ?? price?.currency ?? 'USD'}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            {...(pledgeCap ? { hint: 'New contributions are closed, so you can lower your amount but not raise it.' } : {})}
             {...(error ? { error } : {})}
           />
         )
@@ -202,7 +210,7 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
             hint="Leave empty to appear as Someone."
             {...(error ? { error } : {})}
           />
-          <Checkbox label="Also show it on gifts I already marked" checked={applyExisting} onChange={(e) => setApplyExisting(e.target.checked)} />
+          <Checkbox label="Also show it on wishes I am already getting or chipping in on" checked={applyExisting} onChange={(e) => setApplyExisting(e.target.checked)} />
         </>
       ) : null}
 
@@ -227,14 +235,21 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
   )
 }
 
-export function ClaimSheet({ request, session, onClose }: { request: SheetRequest | null; session: GiverListSession; onClose: () => void }) {
+export interface ClaimSheetProps {
+  request: SheetRequest | null
+  session: GiverListSession
+  /** `succeeded` is true when the action was saved (the caller moves focus to the wish's card). */
+  onClose: (succeeded: boolean) => void
+}
+
+export function ClaimSheet({ request, session, onClose }: ClaimSheetProps) {
   // Keep the last request so the title stays put while the sheet closes;
   // `n` remounts the form for every new request.
   const [track, setTrack] = useState<{ current: SheetRequest | null; shown: SheetRequest | null; n: number }>({ current: request, shown: request, n: 0 })
   if (request !== track.current) setTrack({ current: request, shown: request ?? track.shown, n: track.n + 1 })
   const shown = request ?? track.shown
   return (
-    <BottomSheet open={request !== null} onClose={onClose} title={shown ? sheetTitle(shown) : ''} {...(shown ? { description: sheetDescription(shown) } : {})}>
+    <BottomSheet open={request !== null} onClose={() => onClose(false)} title={shown ? sheetTitle(shown) : ''} {...(shown ? { description: sheetDescription(shown) } : {})}>
       {request ? <Body key={track.n} request={request} session={session} onDone={onClose} /> : null}
     </BottomSheet>
   )

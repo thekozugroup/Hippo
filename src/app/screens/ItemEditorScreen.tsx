@@ -27,6 +27,7 @@ import {
   IMPORTANCE_LEVELS,
   isHippoError,
   LIMITS,
+  stripTrackingParams,
   unarchiveItem,
   updateItem,
   type DraftItem,
@@ -39,6 +40,7 @@ import { clearCaptureDraft, peekCaptureDraft } from '../core/capture.ts'
 import { useCore } from '../core/context.ts'
 import { useCategories, useItem, useSharedLists } from '../core/data.ts'
 import { useNotify } from '../core/notify.ts'
+import { requestPersistentStorage } from '../core/storage.ts'
 import { AppScreen } from '../layout/AppScreen.tsx'
 import { CURRENCIES, IMPORTANCE_LABEL, moneyInputValue, parseMoneyInput, safeUrl } from '../lib/format.ts'
 import { resyncItem, resyncLists } from '../lib/sync.ts'
@@ -130,14 +132,16 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
   const [newCat, setNewCat] = useState('')
   const [newCatError, setNewCatError] = useState<string | undefined>()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [busy, setBusy] = useState<'archive' | 'delete' | null>(null)
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setF((prev) => ({ ...prev, [key]: value }))
   const onLists = item ? lists.filter((l) => l.itemIds.includes(item.id)) : []
 
   /** FR-7: a pasted shop link fills the address and suggests a name. */
   const takeUrl = (text: string) => {
-    const url = findFirstHttpUrl(text)
-    if (!url) return false
+    const found = findFirstHttpUrl(text)
+    if (!found) return false
+    const url = stripTrackingParams(found)
     setF((prev) => ({ ...prev, url, title: prev.title.trim() ? prev.title : guessTitleFromUrl(url) }))
     return true
   }
@@ -146,13 +150,16 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
     if (takeUrl(e.clipboardData.getData('text'))) e.preventDefault()
   }
 
+  const [addingCat, setAddingCat] = useState(false)
   const addCategory = async () => {
+    if (addingCat) return
     const name = newCat.trim()
     if (!name) {
       setNewCatError('Type a name first.')
       return
     }
     const existing = categories.find((c) => c.name.toLowerCase() === name.toLowerCase())
+    setAddingCat(true)
     try {
       const cat = existing ?? (await createCategory(core.db, name))
       setF((prev) => ({ ...prev, categoryIds: prev.categoryIds.includes(cat.id) ? prev.categoryIds : [...prev.categoryIds, cat.id] }))
@@ -161,11 +168,14 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
       notify(`${cat.name} added and selected`)
     } catch (e) {
       setNewCatError(isHippoError(e, 'invalid-input') ? `Use up to ${LIMITS.categoryName} characters.` : 'Could not add this category.')
+    } finally {
+      setAddingCat(false)
     }
   }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    if (saving) return
     const { errors: errs, price, quantity } = validate(f)
     setErrors(errs)
     if (Object.keys(errs).length > 0) {
@@ -203,6 +213,8 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
           ...(price ? { price } : {}),
         })
         clearCaptureDraft()
+        // Ask the browser to keep Hippo's data now that there is something worth keeping (never awaited).
+        void requestPersistentStorage()
         notify(`Added ${fields.title}`)
       }
       navigate('/wishlist')
@@ -214,24 +226,37 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
   }
 
   const toggleArchive = async () => {
-    if (!item) return
-    if (item.archivedAt === undefined) {
-      await archiveItem(core.db, item.id)
-      notify('Archived. It stays in your wishlist but is left off shared lists.')
-    } else {
-      await unarchiveItem(core.db, item.id)
-      notify('Back in your wishlist')
+    if (!item || busy) return
+    setBusy('archive')
+    try {
+      if (item.archivedAt === undefined) {
+        await archiveItem(core.db, item.id)
+        notify('Archived. It stays in your wishlist but is left off shared lists.')
+      } else {
+        await unarchiveItem(core.db, item.id)
+        notify('Back in your wishlist')
+      }
+      resyncItem(core, item.id, notify)
+    } catch {
+      notify(item.archivedAt === undefined ? 'Could not archive this wish. Please try again.' : 'Could not unarchive this wish. Please try again.')
+    } finally {
+      setBusy(null)
     }
-    resyncItem(core, item.id, notify)
   }
 
   const remove = async () => {
-    if (!item) return
-    const changed = await deleteItem(core.db, item.id)
-    resyncLists(core, changed, notify)
-    setConfirmDelete(false)
-    notify(`Deleted ${item.title}`)
-    navigate('/wishlist')
+    if (!item || busy) return
+    setBusy('delete')
+    try {
+      const changed = await deleteItem(core.db, item.id)
+      resyncLists(core, changed, notify)
+      setConfirmDelete(false)
+      notify(`Deleted ${item.title}`)
+      navigate('/wishlist')
+    } catch {
+      setBusy(null)
+      notify('Could not delete this wish. Please try again.')
+    }
   }
 
   const err = (k: keyof Errors) => (errors[k] ? { error: errors[k] } : {})
@@ -355,7 +380,7 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
             }}
             {...(newCatError ? { error: newCatError } : {})}
           />
-          <Button variant="secondary" size="md" icon={<Plus />} onClick={() => void addCategory()}>
+          <Button variant="secondary" size="md" icon={<Plus />} loading={addingCat} onClick={() => void addCategory()}>
             Add
           </Button>
         </div>
@@ -364,7 +389,7 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
       <div className="app-stack">
         <Switch
           label="Let friends chip in"
-          description="Friends can pledge part of the price instead of buying the whole thing."
+          description="Friends can chip in part of the price instead of buying the whole thing."
           checked={f.allowContributions}
           onChange={(e) => set('allowContributions', e.target.checked)}
           aria-invalid={errors.allowContributions ? true : undefined}
@@ -419,11 +444,13 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
               size="md"
               fullWidth
               icon={item.archivedAt === undefined ? <Archive /> : <ArchiveRestore />}
+              loading={busy === 'archive'}
+              disabled={busy === 'delete'}
               onClick={() => void toggleArchive()}
             >
               {item.archivedAt === undefined ? 'Archive' : 'Unarchive'}
             </Button>
-            <Button variant="danger" size="md" fullWidth icon={<Trash2 />} onClick={() => setConfirmDelete(true)}>
+            <Button variant="danger" size="md" fullWidth icon={<Trash2 />} disabled={busy !== null} onClick={() => setConfirmDelete(true)}>
               Delete
             </Button>
           </div>
@@ -438,7 +465,7 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
           description={`${item.title} will be removed from your wishlist and from any shared list. This cannot be undone.`}
         >
           <div className="app-stack">
-            <Button variant="danger" fullWidth onClick={() => void remove()}>
+            <Button variant="danger" fullWidth loading={busy === 'delete'} onClick={() => void remove()}>
               Delete
             </Button>
             <Button variant="secondary" fullWidth onClick={() => setConfirmDelete(false)}>
@@ -488,3 +515,5 @@ export function ItemEditorScreen({ id }: { id?: string }) {
     </AppScreen>
   )
 }
+
+export default ItemEditorScreen

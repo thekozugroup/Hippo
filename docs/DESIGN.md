@@ -119,7 +119,7 @@ All components are React function components in `src/ui/components/`, each with 
 | `IconButton` | Circle. Variants `frost` (on hero), `neutral` (on sheet), `ghost`. Requires `aria-label`. |
 | `IconLink` | An `<a>` styled as an `IconButton` (same variants and sizes, `href` and `aria-label` required). Use for icon-only navigation such as a back link. |
 | `Chip` | Pill with optional avatar/emoji and trailing dot; selectable (filter) variant with `aria-pressed`; may be a link. A static chip is plain text and takes no ARIA name. |
-| `StatusPill` | Small pill: `available`, `partial`, `funded`, `claimed`, `purchased`, `removed`, `conflict`, `draft`, `published`. Never colour alone: always has a text label. |
+| `StatusPill` | Small pill: `available`, `partial`, `funded`, `claimed`, `purchased`, `removed`, `conflict`, `draft`, `published`. Never colour alone: always has a text label. The app passes labels in its own vocabulary ("Partly covered", "Someone is getting this", "Bought", "Not shared yet"). |
 | `SectionHeader` | Uppercase label left, optional action right ("SEE ALL"). |
 | `List`, `ListRow` | `List` is a `<ul role="list">`. A row has a leading thumb, title, secondary line, trailing value or control; optional as link/button. Title and secondary text wrap to at most two lines (`lines` = 1, 2 or `full`); the full text stays in the DOM. |
 | `Thumb` | Rounded image over a first-letter tile on a tinted background. The tile is always rendered, so a slow, lazy or broken image never leaves a blank square; the letter hides once the image loads. `referrerPolicy="no-referrer"`, `loading="lazy"`. |
@@ -152,7 +152,7 @@ Icons: `lucide-react`, 1.75px stroke, 24px.
 
 | Screen | Hero | Sheet |
 |---|---|---|
-| Home (owner) | Menu button, profile chip, optional two-tone headline | "WISHLIST" label, big item count, `ADD` (primary) and `SHARE` (secondary) pills, recent items list, stat cards for shared lists |
+| Home (owner) | Menu button, profile chip, optional two-tone headline (on first run it says what Hippo is) | "WISHLIST" label, big wish count, `ADD` (primary) and, once there are wishes, `SHARE` (secondary) pills, recent wishes list, stat cards for shared lists |
 | Wishlist | Title, filter chips | Items as `ListRow`s with importance and price |
 | Item editor | Back button, title | Form |
 | Lists | Title | Owned lists with `StatusPill`; "Shared with me" lists |

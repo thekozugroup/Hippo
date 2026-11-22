@@ -1,20 +1,28 @@
-import { lazy, Suspense, useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Route, Router, Switch, useLocation, type BaseLocationHook } from 'wouter'
 import { useHashLocation } from 'wouter/use-hash-location'
 import type { Core } from '../core/index.ts'
 import { Skeleton } from '../ui/index.ts'
+import { useCore } from './core/context.ts'
 import { CoreProvider } from './core/CoreProvider.tsx'
 import { useSettings } from './core/data.ts'
 import { NotifyProvider } from './core/NotifyProvider.tsx'
+import { checkStorage } from './core/storage.ts'
 import { applyTheme } from './core/theme.ts'
-import { GiverScreen } from './screens/giver/GiverScreen.tsx'
+import { ErrorBoundary } from './layout/ErrorBoundary.tsx'
+import { titleFor } from './layout/titles.ts'
 import { HomeScreen } from './screens/HomeScreen.tsx'
-import { ItemEditorScreen } from './screens/ItemEditorScreen.tsx'
-import { ListEditorScreen } from './screens/lists/ListEditorScreen.tsx'
 import { ListsScreen } from './screens/lists/ListsScreen.tsx'
 import { NotFoundScreen } from './screens/NotFoundScreen.tsx'
+import { StorageUnavailableScreen } from './screens/StorageUnavailableScreen.tsx'
 import { WishlistScreen } from './screens/WishlistScreen.tsx'
 
+// Home, wishlist and lists load with the app; editors, the giver view and
+// settings load on first use (and are precached for offline use).
+const ItemEditorScreen = lazy(() => import('./screens/ItemEditorScreen.tsx'))
+const ListEditorScreen = lazy(() => import('./screens/lists/ListEditorScreen.tsx'))
+const GiverScreen = lazy(() => import('./screens/giver/GiverScreen.tsx').then((m) => ({ default: m.GiverScreen })))
+const GiverLinkScreen = lazy(() => import('./screens/giver/GiverScreen.tsx').then((m) => ({ default: m.GiverLinkScreen })))
 const SettingsScreen = lazy(() => import('./screens/settings/SettingsScreen.tsx'))
 const GalleryScreen = lazy(() => import('./screens/GalleryScreen.tsx'))
 const UpdatePrompt = lazy(() => import('./pwa/UpdatePrompt.tsx'))
@@ -43,6 +51,15 @@ function RouteFocus() {
   return null
 }
 
+/** One title per route (WCAG 2.4.2), never including list names or link data. */
+function DocumentTitle() {
+  const [location] = useLocation()
+  useEffect(() => {
+    document.title = titleFor(location)
+  }, [location])
+  return null
+}
+
 function ThemeSync() {
   const settings = useSettings()
   const theme = settings?.theme
@@ -60,6 +77,24 @@ function Loading() {
   )
 }
 
+/** Renders the app only once the on-device database opens; otherwise explains what to do. */
+function StorageGate({ children }: { children: ReactNode }) {
+  const core = useCore()
+  const [state, setState] = useState<'checking' | 'ok' | 'failed'>('checking')
+  useEffect(() => {
+    let cancelled = false
+    void checkStorage(core.db).then((ok) => {
+      if (!cancelled) setState(ok ? 'ok' : 'failed')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [core])
+  if (state === 'checking') return <Loading />
+  if (state === 'failed') return <StorageUnavailableScreen />
+  return children
+}
+
 export function Routes() {
   return (
     <Suspense fallback={<Loading />}>
@@ -71,8 +106,8 @@ export function Routes() {
         <Route path="/lists" component={ListsScreen} />
         <Route path="/list/new">{() => <ListEditorScreen />}</Route>
         <Route path="/list/:id">{(p) => <ListEditorScreen id={p.id} />}</Route>
-        <Route path="/l/:payload">{(p) => <GiverScreen source={{ kind: 'link', payload: p.payload }} />}</Route>
-        <Route path="/g/:topic">{(p) => <GiverScreen source={{ kind: 'topic', topic: p.topic }} />}</Route>
+        <Route path="/l/:payload">{(p) => <GiverLinkScreen payload={p.payload} />}</Route>
+        <Route path="/g/:topic">{(p) => <GiverScreen topic={p.topic} />}</Route>
         <Route path="/settings" component={SettingsScreen} />
         <Route path="/design" component={GalleryScreen} />
         <Route component={NotFoundScreen} />
@@ -85,16 +120,21 @@ export function App({ core }: { core?: Core }) {
   return (
     <CoreProvider {...(core ? { core } : {})}>
       <NotifyProvider>
-        <Router hook={useHashPath}>
-          <ThemeSync />
-          <RouteFocus />
-          <Routes />
-          {import.meta.env.PROD && 'serviceWorker' in navigator ? (
-            <Suspense fallback={null}>
-              <UpdatePrompt />
-            </Suspense>
-          ) : null}
-        </Router>
+        <ErrorBoundary>
+          <StorageGate>
+            <Router hook={useHashPath}>
+              <ThemeSync />
+              <RouteFocus />
+              <DocumentTitle />
+              <Routes />
+              {import.meta.env.PROD && 'serviceWorker' in navigator ? (
+                <Suspense fallback={null}>
+                  <UpdatePrompt />
+                </Suspense>
+              ) : null}
+            </Router>
+          </StorageGate>
+        </ErrorBoundary>
       </NotifyProvider>
     </CoreProvider>
   )

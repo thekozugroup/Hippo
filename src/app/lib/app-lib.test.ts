@@ -75,3 +75,29 @@ describe('capture tools', () => {
     expect(shortcutScript('https://me.github.io/hippo/')).toMatch(/completion\(u\);$/)
   })
 })
+
+describe('capture scripts send a clean page address', () => {
+  function runShortcut(): URL {
+    let out = ''
+    const script = shortcutScript('https://me.github.io/hippo/')
+    new Function('completion', script)((u: string) => {
+      out = u
+    })
+    return new URL(out)
+  }
+
+  afterEach(() => {
+    document.head.innerHTML = ''
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('prefers the canonical link and drops tracking parameters but keeps product ones', () => {
+    document.head.innerHTML = '<link rel="canonical" href="https://shop.example/p/42?color=red&utm_source=news&fbclid=x#reviews">'
+    expect(runShortcut().searchParams.get('url')).toBe('https://shop.example/p/42?color=red')
+  })
+
+  it('without a canonical link, uses the page address without its fragment', () => {
+    window.history.replaceState(null, '', '/item?id=7&gclid=abc#secret-part')
+    expect(runShortcut().searchParams.get('url')).toBe(`${window.location.origin}/item?id=7`)
+  })
+})

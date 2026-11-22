@@ -62,8 +62,8 @@ export function WishlistScreen() {
       nav="wishlist"
       title="Wishlist"
       busy={allItems === undefined}
-      intro={allItems ? <p>{showArchived ? `${plural(archivedCount, 'archived item', 'archived items')}` : `${plural(activeCount, 'item', 'items')}, private to you`}</p> : null}
-      actions={<IconLink href="#/item/new" variant="frost" aria-label="Add item" icon={<Plus />} />}
+      intro={allItems ? <p>{showArchived ? `${plural(archivedCount, 'archived wish', 'archived wishes')}` : `${plural(activeCount, 'wish', 'wishes')}, private to you`}</p> : null}
+      actions={<IconLink href="#/item/new" variant="frost" aria-label="Add a wish" icon={<Plus />} />}
     >
       <section className="app-stack" aria-label="Filter and sort">
         <div className="app-chips" role="group" aria-label="Category">
@@ -107,7 +107,7 @@ export function WishlistScreen() {
         ) : null}
       </section>
 
-      <section aria-label={showArchived ? 'Archived items' : 'Items'} aria-live="polite">
+      <section aria-label={showArchived ? 'Archived wishes' : 'Wishes'} aria-live="polite">
         {allItems === undefined ? (
           <div className="app-stack">
             <Skeleton height={56} shape="tile" />
@@ -133,7 +133,7 @@ export function WishlistScreen() {
               }
             />
           ) : showArchived ? (
-            <p className="app-note">Nothing is archived. Archived items stay here but are left off your shared lists.</p>
+            <p className="app-note">Nothing is archived. Archived wishes stay here but are left off your shared lists.</p>
           ) : (
             <EmptyState
               icon={<Plus />}
@@ -141,7 +141,7 @@ export function WishlistScreen() {
               description="Paste a shop link or type a name. You can add details later."
               action={
                 <LinkButton href="#/item/new" variant="primary" icon={<Plus />}>
-                  Add item
+                  Add a wish
                 </LinkButton>
               }
             />

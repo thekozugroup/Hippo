@@ -14,12 +14,12 @@ export function SyncFeedback({ summary }: { summary: SyncSummary }) {
       <div className="app-banner__body">
         <p className="app-banner__title">
           {none
-            ? 'Not sent yet. Hippo will retry when you are online.'
+            ? 'Not sent yet. Hippo keeps trying in the background.'
             : all
               ? `Saved to ${summary.total === 1 ? 'the sync server' : `all ${summary.total} sync servers`}.`
               : `Saved to ${summary.accepted} of ${summary.total} sync servers.`}
         </p>
-        {!none && !all ? <p>That is enough for friends to see it. Hippo retries the others later.</p> : null}
+        {!none && !all ? <p>That is enough for friends to see it.</p> : null}
         <details className="app-details">
           <summary>Details</summary>
           <ul className="sync-servers">

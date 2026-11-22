@@ -8,7 +8,7 @@ import { decryptJson } from '../crypto/aead.ts'
 import { randomId } from '../crypto/bytes.ts'
 import { deriveListKeys, generateSigningKey, publicKeyOf, topicForSecret, type ListKeys } from '../crypto/keys.ts'
 import { parseShareLink, shareLinkFor } from '../crypto/link.ts'
-import { cacheIfNewer, deleteCachedEvent, deleteCachedTopic, getCachedEvent, getCachedEvents } from '../db/event-cache.ts'
+import { cacheIfNewer, deleteCachedEvent, getCachedEvent, getCachedEvents } from '../db/event-cache.ts'
 import type { HippoDb } from '../db/schema.ts'
 import { HippoError } from '../errors.ts'
 import { codePointLength } from '../model/guards.ts'
@@ -44,6 +44,8 @@ export async function addGuestListFromLink(deps: CoreDeps, link: string): Promis
   return deps.db.transaction('rw', deps.db.guestLists, async () => {
     const existing = await deps.db.guestLists.get(topic)
     if (existing) {
+      // Reopening a link restores a hidden list with the same guest key, so earlier claims are still mine.
+      delete existing.hiddenAt
       existing.lastOpenedAt = deps.now()
       await deps.db.guestLists.put(existing)
       return existing
@@ -79,9 +81,14 @@ export interface GuestListSummary {
   lastOpenedAt: number
 }
 
-/** "Lists shared with me", most recently opened first, with names from the local cache. */
+/** A remembered list shared with me, or `undefined`. Hidden lists are returned too (check `hiddenAt`). */
+export async function getGuestList(db: HippoDb, topic: string): Promise<GuestList | undefined> {
+  return db.guestLists.get(topic)
+}
+
+/** "Lists shared with me", most recently opened first, with names from the local cache. Hidden lists are left out. */
 export async function listGuestLists(db: HippoDb): Promise<GuestListSummary[]> {
-  const guests = await db.guestLists.orderBy('lastOpenedAt').reverse().toArray()
+  const guests = (await db.guestLists.orderBy('lastOpenedAt').reverse().toArray()).filter((g) => g.hiddenAt === undefined)
   return Promise.all(
     guests.map(async (g) => {
       const s: GuestListSummary = { topic: g.topic, unpublished: false, addedAt: g.addedAt, lastOpenedAt: g.lastOpenedAt }
@@ -101,9 +108,20 @@ export async function listGuestLists(db: HippoDb): Promise<GuestListSummary[]> {
   )
 }
 
-export async function removeGuestList(db: HippoDb, topic: string): Promise<void> {
-  await db.guestLists.delete(topic)
-  await deleteCachedTopic(db, topic)
+/**
+ * Removes a list from "Lists shared with me" on this device. The record is
+ * hidden, not deleted: the guest key, nickname and cached events stay, so
+ * opening the same link again (`addGuestListFromLink`) restores the same
+ * identity and my claims can still be changed or taken back. Hidden lists
+ * are not listed, not opened by topic and not synced; backups include them.
+ */
+export async function hideGuestList(deps: Pick<CoreDeps, 'db' | 'now'>, topic: string): Promise<void> {
+  await deps.db.transaction('rw', deps.db.guestLists, async () => {
+    const g = await deps.db.guestLists.get(topic)
+    if (!g || g.hiddenAt !== undefined) return
+    g.hiddenAt = deps.now()
+    await deps.db.guestLists.put(g)
+  })
 }
 
 function cleanNickname(nickname: string | undefined): string | undefined {
@@ -126,6 +144,8 @@ export interface RemovedItemView {
   itemId: string
   /** Last item content seen; null when the owner replaced it with a tombstone. */
   item: ItemPayload | null
+  /** The item's title: from `item`, else the title remembered when I claimed it; undefined if never seen. */
+  title?: string
   myClaims: ClaimPayload[]
 }
 
@@ -182,6 +202,7 @@ export class GiverListSession {
   private emitScheduled = false
   private stopped = false
   private startPromise: Promise<void> | null = null
+  private retryScheduled = false
 
   constructor(deps: CoreDeps, guest: GuestList, options: GiverSessionOptions = {}) {
     this.deps = deps
@@ -229,6 +250,7 @@ export class GiverListSession {
         if (r.unsent) this.unsent.add(r.event.id)
       }
       this.state.ingestBatch(rows.map((r) => r.event))
+      this.rememberTitles()
       this.emit()
       if (!this.stopped) this.connect()
     })()
@@ -278,6 +300,25 @@ export class GiverListSession {
     )
   }
 
+  /**
+   * While some of my claims have not reached a relay, retries them every
+   * `retryMs` for as long as the list is open (in addition to the retry on
+   * reconnecting).
+   */
+  private scheduleRetry(): void {
+    if (this.retryScheduled || this.stopped) return
+    this.retryScheduled = true
+    this.later(this.retryMs, () => {
+      this.retryScheduled = false
+      if (this.pending.size === 0) return
+      void this.repair()
+        .catch(() => undefined)
+        .finally(() => {
+          if (this.pending.size > 0) this.scheduleRetry()
+        })
+    })
+  }
+
   private goOffline(): void {
     if (this.connection === 'live') return
     this.connection = 'offline'
@@ -292,7 +333,34 @@ export class GiverListSession {
     if (!r.accepted) return
     const a = r.accepted
     void cacheIfNewer(this.deps.db, this.topic, a.d, a.event).catch(() => undefined)
+    if (a.type === 'item' || (a.type === 'claim' && a.event.pubkey === this.myPubkey)) this.rememberTitles()
     this.emit()
+  }
+
+  /**
+   * Remembers the titles of items I claimed, so they can still be shown
+   * after the owner removes an item or stops sharing the list (tombstones
+   * carry no title).
+   */
+  private rememberTitles(): void {
+    const items = this.state.items()
+    const known = this.guest.claimTitles ?? {}
+    const next: Record<string, string> = { ...known }
+    let changed = false
+    for (const c of this.myClaims()) {
+      if (c.payload.status === 'withdrawn') continue
+      const title = items.get(c.payload.itemId)?.payload?.title
+      if (title === undefined || next[c.payload.itemId] === title) continue
+      if (!(c.payload.itemId in next) && Object.keys(next).length >= LIMITS.claimTitles) continue
+      next[c.payload.itemId] = title
+      changed = true
+    }
+    if (!changed) return
+    this.guest = { ...this.guest, claimTitles: next }
+    const topic = this.topic
+    void this.deps.db.guestLists
+      .update(topic, { claimTitles: next })
+      .catch(() => undefined)
   }
 
   private emit(): void {
@@ -329,10 +397,12 @@ export class GiverListSession {
     if (meta) {
       for (const c of this.myClaims()) {
         if (c.payload.status === 'withdrawn' || liveSet.has(c.payload.itemId)) continue
-        const entry = removed.get(c.payload.itemId) ?? {
-          itemId: c.payload.itemId,
-          item: itemEvents.get(c.payload.itemId)?.payload ?? null,
-          myClaims: [],
+        let entry = removed.get(c.payload.itemId)
+        if (!entry) {
+          const item = itemEvents.get(c.payload.itemId)?.payload ?? null
+          entry = { itemId: c.payload.itemId, item, myClaims: [] }
+          const title = item?.title ?? this.guest.claimTitles?.[c.payload.itemId]
+          if (title !== undefined) entry.title = title
         }
         entry.myClaims.push(c.payload)
         removed.set(c.payload.itemId, entry)
@@ -399,6 +469,7 @@ export class GiverListSession {
       this.pending.add(event.id)
       if (unsent) this.unsent.add(event.id)
       this.state.ingest(event)
+      this.rememberTitles()
       this.emit()
       const result = await this.transport.publish(event)
       if (result.ok) {
@@ -406,6 +477,8 @@ export class GiverListSession {
         this.unsent.delete(event.id)
         await cacheIfNewer(this.deps.db, this.topic, d, event)
         this.emit()
+      } else {
+        this.scheduleRetry()
       }
       return { claim: payload, result }
     })
@@ -438,9 +511,14 @@ export class GiverListSession {
     return this.publishClaim(this.newClaim(itemId, { kind: 'pledge', amount: { amount, currency: item.price.currency } }), true)
   }
 
-  /** Pledges exactly what is still needed (PRD 4.6). Allowed even if contributions were turned off later. */
+  /**
+   * Pledges exactly what is still needed (PRD 4.6). Like `pledge`, refused
+   * with `contributions-disabled` when the item does not take contributions
+   * (for example after the owner turned them off).
+   */
   async coverTheRest(itemId: string): Promise<ClaimActionResult> {
     const { item, state } = this.liveItem(itemId)
+    if (!item.allowContributions) throw new HippoError('contributions-disabled', 'this item does not accept contributions')
     if (!item.price || state.remainingAmount === undefined) {
       throw new HippoError('contributions-disabled', 'this item has no price; claim it instead')
     }
@@ -470,6 +548,11 @@ export class GiverListSession {
     }
     if (prev.kind === 'pledge' && change.amount !== undefined && prev.amount) {
       this.checkAmount(change.amount)
+      // Once contributions are closed (or the item is gone), a pledge may shrink but never grow.
+      const item = this.state.items().get(prev.itemId)?.payload
+      if (change.amount > prev.amount.amount && !item?.allowContributions) {
+        throw new HippoError('contributions-disabled', 'this item no longer accepts contributions; a pledge can only be lowered')
+      }
       next.amount = { amount: change.amount, currency: prev.amount.currency }
     }
     return this.publishClaim(next)
@@ -578,7 +661,7 @@ export async function openGuestList(deps: CoreDeps, topic: string, options: Give
   if (await isOwnListIdentity(deps.db, { topic, ...(guest ? { ownerPubkey: guest.ownerPubkey } : {}) })) {
     throw new HippoError('own-list', OWN_LIST_MESSAGE)
   }
-  if (!guest) throw new HippoError('not-found', 'list not found on this device')
+  if (!guest || guest.hiddenAt !== undefined) throw new HippoError('not-found', 'list not found on this device')
   guest.lastOpenedAt = deps.now()
   await deps.db.guestLists.put(guest)
   return new GiverListSession(deps, guest, options)

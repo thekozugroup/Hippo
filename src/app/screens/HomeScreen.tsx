@@ -16,14 +16,16 @@ import {
 } from '../../ui/index.ts'
 import type { SharedList } from '../../core/index.ts'
 import { useCore } from '../core/context.ts'
-import { useGuestLists, useItems, useSharedLists } from '../core/data.ts'
+import { useGuestLists, useItems, useSettings, useSharedLists } from '../core/data.ts'
 import { AppScreen } from '../layout/AppScreen.tsx'
-import { formatAdded, formatEventDate, plural, safeUrl } from '../lib/format.ts'
+import { formatAdded, formatEventDate, listStatusLabel, plural, safeUrl } from '../lib/format.ts'
+import { BackupReminder } from './BackupReminder.tsx'
 import './HomeScreen.css'
 
+const GUESTS_SHOWN = 4
+
 function listCaption(list: SharedList, live: number): string {
-  const status = list.status === 'published' ? 'Shared' : list.status === 'draft' ? 'Not shared yet' : 'Sharing stopped'
-  return `${plural(live, 'item', 'items')} · ${status}`
+  return `${plural(live, 'wish', 'wishes')} · ${listStatusLabel(list)}`
 }
 
 function HowItWorks() {
@@ -33,7 +35,7 @@ function HowItWorks() {
       <ol className="app-steps">
         <li>
           <span>
-            <strong>Add things you would love.</strong> Type them in, paste a shop link, or share a page to Hippo from your phone.
+            <strong>Add wishes.</strong> Type them in, paste a shop link, or share a page to Hippo from your phone.
           </span>
         </li>
         <li>
@@ -43,7 +45,7 @@ function HowItWorks() {
         </li>
         <li>
           <span>
-            <strong>Send the link</strong> to family and friends. They mark what they will get or chip in. You will not see who is getting what, so it stays a surprise.
+            <strong>Send the link</strong> to family and friends. They say &quot;I&apos;ll get this&quot; or chip in. Hippo hides who is getting what from you, so it stays a surprise.
           </span>
         </li>
       </ol>
@@ -56,6 +58,7 @@ export function HomeScreen() {
   const items = useItems()
   const lists = useSharedLists()
   const guests = useGuestLists()
+  const settings = useSettings()
   const loading = items === undefined || lists === undefined || guests === undefined
   const count = items?.length ?? 0
   const recent = [...(items ?? [])].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4)
@@ -68,7 +71,7 @@ export function HomeScreen() {
       busy={loading}
       title={
         count === 0 ? (
-          <TwoTone tone="on-hero" muted="Your wishlist," bright="private until you share it" />
+          <TwoTone tone="on-hero" muted="Your private gift wishlist," bright="ready to share with family and friends" />
         ) : (
           <TwoTone tone="on-hero" muted={`${plural(count, 'wish', 'wishes')} saved,`} bright="only on this device" />
         )
@@ -80,17 +83,21 @@ export function HomeScreen() {
           <h2 id="home-wishlist" className="t-label t-muted">
             Wishlist
           </h2>
-          {loading ? <Skeleton width={120} height={60} /> : <BigValue value={String(count)} secondary={count === 1 ? ' item' : ' items'} />}
+          {loading ? <Skeleton width={120} height={60} /> : <BigValue value={String(count)} secondary={count === 1 ? ' wish' : ' wishes'} />}
         </div>
         <div className="app-row app-row--nowrap">
           <LinkButton href="#/item/new" variant="primary" icon={<Plus />} fullWidth>
             Add
           </LinkButton>
-          <LinkButton href={shareHref} variant="secondary" icon={<Share2 />} fullWidth>
-            Share
-          </LinkButton>
+          {count > 0 ? (
+            <LinkButton href={shareHref} variant="secondary" icon={<Share2 />} fullWidth>
+              Share
+            </LinkButton>
+          ) : null}
         </div>
       </section>
+
+      {count > 0 || (lists?.length ?? 0) > 0 ? <BackupReminder lastExportAt={settings?.lastExportAt} /> : null}
 
       {!loading && count === 0 ? (
         <>
@@ -98,7 +105,7 @@ export function HomeScreen() {
             className="home-empty"
             icon={<Gift />}
             title={<TwoTone muted="Nothing here yet." bright="Add the first thing you would love." />}
-            description="Your wishlist is saved on this device only. Nobody sees it until you put items on a list and send the link."
+            description="Your wishlist is saved on this device only. Nobody sees it until you put wishes on a list and send the link."
           />
           <HowItWorks />
         </>
@@ -106,7 +113,7 @@ export function HomeScreen() {
 
       {recent.length > 0 ? (
         <section aria-labelledby="home-recent">
-          <SectionHeader title={<span id="home-recent">Recent items</span>} strong action={{ label: 'See all', href: '#/wishlist' }} />
+          <SectionHeader title={<span id="home-recent">Recent wishes</span>} strong action={{ label: 'See all', href: '#/wishlist' }} />
           <List>
             {recent.map((item) => (
               <ListRow
@@ -156,16 +163,20 @@ export function HomeScreen() {
 
       {guests && guests.length > 0 ? (
         <section aria-labelledby="home-guest">
-          <SectionHeader title={<span id="home-guest">Lists shared with me</span>} strong />
+          <SectionHeader
+            title={<span id="home-guest">Lists shared with me</span>}
+            strong
+            {...(guests.length > GUESTS_SHOWN ? { action: { label: `See all ${guests.length}`, href: '#/lists' } } : {})}
+          />
           <List>
-            {guests.slice(0, 4).map((g) => (
+            {guests.slice(0, GUESTS_SHOWN).map((g) => (
               <ListRow
                 key={g.topic}
                 href={`#/g/${g.topic}`}
                 leading={<Thumb name={g.name ?? 'Shared list'} size="sm" shape="round" />}
                 title={g.name ?? 'Shared list'}
-                secondary={g.unpublished ? 'No longer shared' : g.eventDate ? formatEventDate(g.eventDate) : 'Tap to see what is still available'}
-                trailing={g.unpublished ? <StatusPill status="removed" label="Closed" /> : undefined}
+                secondary={g.unpublished ? 'The owner stopped sharing it' : g.eventDate ? formatEventDate(g.eventDate) : 'Open to see what is still available'}
+                trailing={g.unpublished ? <StatusPill status="draft" label="No longer shared" /> : undefined}
               />
             ))}
           </List>

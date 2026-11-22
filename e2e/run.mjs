@@ -1,10 +1,11 @@
-// End-to-end runner: node e2e/run.mjs [name filter]
+// End-to-end runner: node e2e/run.mjs [name filter, a regular expression]
 // Expects a production build in dist/ (`npm run test:e2e` builds first).
 
 import { existsSync } from 'node:fs'
 import { startMockRelay } from '../src/core/testing/mock-relay.ts'
 import { freePort, loadPlaywright, ROOT, startPreview, tests } from './harness.mjs'
 import './flows.test.mjs'
+import './review.test.mjs'
 
 if (!existsSync(ROOT + 'dist/index.html')) {
   console.error('dist/ is missing: run `npm run build` first (npm run test:e2e does this).')
@@ -12,7 +13,7 @@ if (!existsSync(ROOT + 'dist/index.html')) {
 }
 
 const filter = process.argv[2]
-const selected = filter ? tests.filter((t) => t.name.includes(filter)) : tests
+const selected = filter ? tests.filter((t) => new RegExp(filter).test(t.name)) : tests
 const { chromium } = loadPlaywright()
 
 const relay = await startMockRelay(0)

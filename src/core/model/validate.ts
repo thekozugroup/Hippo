@@ -260,6 +260,8 @@ export function parseSharedList(value: unknown, path = 'sharedList'): SharedList
   assign(out, 'message', readOptionalString(o.message, `${path}.message`, LIMITS.message))
   assign(out, 'eventDate', readOptionalDate(o.eventDate, `${path}.eventDate`))
   assign(out, 'publishedAt', o.publishedAt === undefined ? undefined : readTimestamp(o.publishedAt, `${path}.publishedAt`))
+  if (o.syncPending !== undefined && readBoolean(o.syncPending, `${path}.syncPending`)) out.syncPending = true
+  if (o.linkPending !== undefined && readBoolean(o.linkPending, `${path}.linkPending`)) out.linkPending = true
   return out
 }
 
@@ -275,6 +277,17 @@ export function parseGuestList(value: unknown, path = 'guestList'): GuestList {
     lastOpenedAt: readTimestamp(o.lastOpenedAt, `${path}.lastOpenedAt`),
   }
   assign(out, 'nickname', readOptionalString(o.nickname, `${path}.nickname`, LIMITS.nickname))
+  assign(out, 'hiddenAt', o.hiddenAt === undefined ? undefined : readTimestamp(o.hiddenAt, `${path}.hiddenAt`))
+  if (o.claimTitles !== undefined) {
+    const titles = readObject(o.claimTitles, `${path}.claimTitles`)
+    const entries = Object.entries(titles)
+    if (entries.length > LIMITS.claimTitles) throw new SchemaError(`${path}.claimTitles`, `more than ${LIMITS.claimTitles} entries`)
+    const clean: Record<string, string> = {}
+    for (const [id, title] of entries) {
+      clean[readId(id, `${path}.claimTitles`)] = readString(title, `${path}.claimTitles.${id}`, LIMITS.title, 1)
+    }
+    if (entries.length > 0) out.claimTitles = clean
+  }
   if (topicForSecret(out.listSecret) !== out.topic) throw new SchemaError(`${path}.topic`, 'does not match the list secret')
   return out
 }

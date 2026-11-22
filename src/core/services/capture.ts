@@ -47,6 +47,74 @@ export function findFirstHttpUrl(text: string | null | undefined): string | unde
   return candidate
 }
 
+/**
+ * Query parameters that only identify a campaign, click or mail-out. They are
+ * removed from captured links because a published wish shows its link to
+ * givers. Anything else is kept: product ids and variants often live in the
+ * query string.
+ */
+export const TRACKING_PARAMS: readonly string[] = [
+  'fbclid',
+  'gclid',
+  'gclsrc',
+  'dclid',
+  'gbraid',
+  'wbraid',
+  'gad_source',
+  'msclkid',
+  'yclid',
+  'ttclid',
+  'twclid',
+  'igshid',
+  'li_fat_id',
+  'mc_cid',
+  'mc_eid',
+  '_hsenc',
+  '_hsmi',
+  'mkt_tok',
+  'oly_anon_id',
+  'oly_enc_id',
+  'vero_id',
+  'srsltid',
+  '_ga',
+  '_gl',
+]
+const TRACKING_SET = new Set(TRACKING_PARAMS)
+
+/** True for a query parameter name that is a well-known tracking parameter (`utm_*`, `fbclid`, `gclid`, ...). */
+export function isTrackingParam(name: string): boolean {
+  const n = name.toLowerCase()
+  return n.startsWith('utm_') || TRACKING_SET.has(n)
+}
+
+/**
+ * Removes well-known tracking parameters and a text fragment (`#:~:text=`)
+ * from an http(s) URL. Other parameters and fragments are kept. Returns the
+ * input unchanged when it is not a URL or nothing needs removing.
+ */
+export function stripTrackingParams(url: string): string {
+  let u: URL
+  try {
+    u = new URL(url)
+  } catch {
+    return url
+  }
+  let changed = false
+  for (const key of [...new Set(u.searchParams.keys())]) {
+    if (isTrackingParam(key)) {
+      u.searchParams.delete(key)
+      changed = true
+    }
+  }
+  if (u.hash.startsWith('#:~:')) {
+    u.hash = ''
+    changed = true
+  }
+  if (!changed) return url
+  // Drop a dangling "?" left by removing every parameter.
+  return u.href.replace(/\?(?=#|$)/, '')
+}
+
 const NOISE_SEGMENTS = new Set(['dp', 'gp', 'product', 'products', 'p', 'item', 'items', 'itm', 'ip', 'shop', 'buy', 'pd', 'en', 'us', 'uk', 'de', 'fr', 'html', 'index', 'www'])
 
 function looksLikeId(segment: string): boolean {
@@ -189,7 +257,8 @@ function cleanText(s: string | null | undefined): string {
 
 /** Builds a draft item from share-target or deep-link parameters. */
 export function draftFromCapture(input: CaptureInput): DraftItem {
-  const url = findFirstHttpUrl(input.url) ?? findFirstHttpUrl(input.text)
+  const found = findFirstHttpUrl(input.url) ?? findFirstHttpUrl(input.text)
+  const url = found === undefined ? undefined : stripTrackingParams(found)
   let title = cleanText(input.title)
   if (!title) {
     const textWithoutUrl = cleanText((input.text ?? '').replace(URL_RE, ' '))

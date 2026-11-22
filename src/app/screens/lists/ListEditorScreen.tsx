@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Copy, Link2Off, RefreshCw, Send, Share2, Trash2 } from 'lucide-react'
+import { CloudOff, Copy, Link2Off, RefreshCw, Send, Share2, Trash2 } from 'lucide-react'
 import { useLocation } from 'wouter'
 import {
   BottomSheet,
@@ -32,7 +32,9 @@ import {
 } from '../../../core/index.ts'
 import { useCore } from '../../core/context.ts'
 import { useItems, useSharedList } from '../../core/data.ts'
+import { nudgeSyncRetry } from '../../core/core.ts'
 import { useNotify } from '../../core/notify.ts'
+import { requestPersistentStorage } from '../../core/storage.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { appBaseUrl } from '../../lib/capture-tools.ts'
 import { formatEventDate, plural, summariseSync, type SyncSummary } from '../../lib/format.ts'
@@ -192,7 +194,7 @@ function ShareLinkBox({ list }: { list: SharedList }) {
         readOnly
         value={link}
         onFocus={(e) => e.currentTarget.select()}
-        hint="Anyone with this link can see the list and mark gifts. Send it only to people you trust."
+        hint="Anyone with this link can see the list, say they will get a wish or chip in. Send it only to people you trust."
         data-testid="share-link"
       />
       <div className="app-row app-row--nowrap">
@@ -236,6 +238,7 @@ function ListEditor({ list }: { list: SharedList }) {
   const dirty = details.name !== list.name || details.eventDate !== (list.eventDate ?? '') || details.message !== (list.message ?? '')
 
   const run = async (label: string, fn: () => Promise<void>) => {
+    if (busy !== null && busy !== 'update') return
     setBusy(label)
     try {
       await fn()
@@ -252,7 +255,14 @@ function ListEditor({ list }: { list: SharedList }) {
       if (list.status === 'published') {
         const r = await syncList(core, list.id)
         setSummary(summariseSync([r]))
-        notify(message ? `${message} Friends will see the update.` : 'Updated for friends.')
+        if (!r.ok) nudgeSyncRetry()
+        notify(
+          !r.ok
+            ? `${message ?? 'Saved.'} Hippo will send it to friends when it can reach the sync servers.`
+            : message
+              ? `${message} Friends will see the update.`
+              : 'Updated for friends.',
+        )
       } else if (message) notify(message)
     })
 
@@ -276,7 +286,20 @@ function ListEditor({ list }: { list: SharedList }) {
       const r = await publishList(core, list.id)
       const s = summariseSync([r])
       setSummary(s)
-      notify(s.accepted > 0 ? 'Your list is shared. Copy the link and send it to friends.' : 'Saved. Hippo will finish sharing when you are online.')
+      void requestPersistentStorage()
+      if (!r.ok) nudgeSyncRetry()
+      notify(r.ok ? 'Your list is shared. Copy the link and send it to friends.' : 'Not shared yet. Hippo keeps trying and shows the link once it works.')
+    })
+
+  const retryNow = () =>
+    run('retry', async () => {
+      const r = await syncList(core, list.id)
+      setSummary(summariseSync([r]))
+      if (r.ok) notify('Your list is shared. Copy the link and send it to friends.')
+      else {
+        nudgeSyncRetry()
+        notify('Still could not reach the sync servers. Hippo keeps trying.')
+      }
     })
 
   const unpublish = () =>
@@ -284,7 +307,12 @@ function ListEditor({ list }: { list: SharedList }) {
       setConfirm(null)
       const r = await unpublishList(core, list.id)
       setSummary(summariseSync([r]))
-      notify('Sharing stopped. People with the link now see that the list is no longer shared.')
+      if (!r.ok) nudgeSyncRetry()
+      notify(
+        r.ok
+          ? 'Sharing stopped. People with the link now see that the list is no longer shared.'
+          : 'Sharing stopped on this device. Hippo will tell people with the link once it can reach the sync servers.',
+      )
     })
 
   const rotate = () =>
@@ -292,20 +320,26 @@ function ListEditor({ list }: { list: SharedList }) {
       setConfirm(null)
       const r = await rotateList(core, list.id)
       setSummary(summariseSync([r.published, r.unpublishedOld]))
-      notify('New link ready. The old link no longer works.')
+      if (!r.published.ok || !r.unpublishedOld.ok) nudgeSyncRetry()
+      notify(
+        r.published.ok && r.unpublishedOld.ok
+          ? 'New link ready. The old link no longer works.'
+          : 'New link made. Hippo is still sending it to the sync servers and keeps trying.',
+      )
     })
 
   const remove = () =>
     run('delete', async () => {
       setConfirm(null)
-      await deleteSharedList(core, list.id)
+      const r = await deleteSharedList(core, list.id)
+      if (r && !r.ok) nudgeSyncRetry()
       notify(`Deleted ${list.name}. Your wishes are still in your wishlist.`)
       navigate('/lists')
     })
 
   const toggleItem = (id: string, on: boolean) => {
     const itemIds = on ? [...list.itemIds.filter((x) => x !== id), id] : list.itemIds.filter((x) => x !== id)
-    const title = active.find((i) => i.id === id)?.title ?? 'Item'
+    const title = active.find((i) => i.id === id)?.title ?? 'Wish'
     void change({ itemIds }, on ? `${title} added to the list.` : `${title} taken off the list.`)
   }
 
@@ -316,7 +350,7 @@ function ListEditor({ list }: { list: SharedList }) {
           <h2 id="share-title" className="app-section-title">
             Sharing
           </h2>
-          <ListStatusPill status={list.status} />
+          <ListStatusPill list={list} />
         </div>
         {list.status === 'draft' ? (
           <>
@@ -329,8 +363,28 @@ function ListEditor({ list }: { list: SharedList }) {
               Share list
             </Button>
           </>
+        ) : list.status === 'published' && list.linkPending ? (
+          <>
+            <div className="app-banner app-banner--warn" role="status">
+              <CloudOff aria-hidden="true" />
+              <div className="app-banner__body">
+                <p className="app-banner__title">Not shared yet</p>
+                <p>Hippo could not reach the sync servers, so the link would not work yet. It keeps trying in the background and shows the link here once it works.</p>
+              </div>
+            </div>
+            <Button variant="secondary" fullWidth icon={<RefreshCw />} loading={busy === 'retry'} onClick={() => void retryNow()}>
+              Try again now
+            </Button>
+          </>
         ) : list.status === 'published' ? (
-          <ShareLinkBox list={list} />
+          <>
+            <ShareLinkBox list={list} />
+            {list.syncPending && busy === null ? (
+              <p className="app-note" role="status">
+                Some changes have not reached friends yet. Hippo keeps trying in the background.
+              </p>
+            ) : null}
+          </>
         ) : (
           <>
             <p className="app-note">Sharing is stopped. People with the link see that this list is no longer shared.</p>
@@ -344,8 +398,9 @@ function ListEditor({ list }: { list: SharedList }) {
             Updating…
           </p>
         ) : null}
-        {summary ? <SyncFeedback summary={summary} /> : null}
-        <p className="app-note">Hippo never shows you who is getting what, so your gifts stay a surprise.</p>
+        {/* A "not sent yet" result goes away once the background retry has sent everything. */}
+        {summary && !(summary.accepted === 0 && !summary.empty && !list.syncPending && !list.linkPending) ? <SyncFeedback summary={summary} /> : null}
+        <p className="app-note">Hippo hides who is getting what from you, so your gifts stay a surprise.</p>
       </section>
 
       <form className="list-form app-stack" onSubmit={(e) => void saveDetails(e)} noValidate aria-labelledby="details-title">
@@ -420,7 +475,7 @@ function ListEditor({ list }: { list: SharedList }) {
         open={confirm === 'rotate'}
         onClose={() => setConfirm(null)}
         title="Make a new link?"
-        description="The current link stops working. Anyone who has it will see that the list is no longer shared, and gifts they already marked will not carry over to the new link. You will need to send the new link to everyone again."
+        description="The current link stops working. Anyone who has it will see that the list is no longer shared, and what friends said they would get or chip in on will not carry over to the new link. You will need to send the new link to everyone again."
       >
         <div className="app-stack">
           <Button variant="danger" fullWidth onClick={() => void rotate()}>
@@ -486,3 +541,5 @@ export function ListEditorScreen({ id }: { id?: string }) {
     </AppScreen>
   )
 }
+
+export default ListEditorScreen

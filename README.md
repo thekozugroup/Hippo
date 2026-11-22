@@ -28,7 +28,7 @@ Details are in [`docs/PROTOCOL.md`](docs/PROTOCOL.md). Product scope is in [`doc
 | Relay operators | Encrypted blobs, their size and timing, IP addresses |
 | Anyone without the link | Nothing |
 | People with the link | The list, and each other's claims and pledges (with a nickname only if the giver set one) |
-| You, the list owner | Your list. Not claims or pledges. |
+| You, the list owner | Your list. Not claims or pledges: the app hides them (see below). |
 
 One limit to know about: hiding claims from the owner is enforced by the app, not by cryptography. You created the link, so you could open it in another browser and peek. Hippo will not show you, but it cannot stop you.
 
@@ -47,7 +47,9 @@ There is nothing to configure: no environment variables, no secrets, no database
 - **Give Hippo an origin of its own.** Browsers share storage (IndexedDB, localStorage, service workers) per origin, which is scheme, host and port, not per path. Hippo keeps every list's private keys and secrets in IndexedDB, so any other site on the same origin can read them and act as you. On GitHub Pages, all project sites of one account or organisation share `https://<you>.github.io`. Use a custom domain, or an account or organisation with no other Pages sites.
 - **Your backup file holds every key.** Store it like a password. Importing someone else's file can add their lists; it never replaces the keys, owner key or relays of lists already on your device.
 - **Share links only name public relays.** Links that point at `ws://`, `localhost`, `.local` names or private-network addresses are refused. The `?relays=` developer override accepts loopback relays only, lasts for one browser tab, and the app shows a notice while it is on.
-- **Changing a link (rotation) or deleting a list** keeps the old keys on your device until the relays have accepted the "no longer shared" notice for the old link; Hippo retries on every start.
+- **Changing a link (rotation) or deleting a list** keeps the old keys on your device until the relays have accepted the "no longer shared" notice for the old link. Hippo retries this, and any list change no relay has accepted yet, at start, when the device comes back online, when the app comes back to the foreground, and every few minutes while something is waiting.
+- **Content-Security-Policy is set by a `<meta>` tag**, because GitHub Pages cannot send custom headers. A meta-tag policy cannot set `frame-ancestors`, so it does not stop other sites from framing Hippo. If you host Hippo where you control headers, also send `Content-Security-Policy: frame-ancestors 'none'`. The policy allows plain `ws:` only for loopback addresses (the developer relay override), so test and production builds are identical. `require-trusted-types-for 'script'` is not set: with it, Chromium blocks the service worker registration (a `TrustedScriptURL` sink) unless a Trusted Types policy is added.
+- **Removing a list shared with you** hides it on this device but keeps your guest key, so opening the link again lets you change or take back what you said you would get. Backups include hidden lists.
 
 ## Develop
 

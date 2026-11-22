@@ -20,6 +20,20 @@ function CategoryRow({ category, index, total, all }: { category: Category; inde
   const notify = useNotify()
   const [name, setName] = useState(category.name)
   const [error, setError] = useState<string | undefined>()
+  const [busy, setBusy] = useState(false)
+
+  /** Runs one change at a time and reports failures instead of leaving them unhandled. */
+  const once = async (fn: () => Promise<void>, failure: string) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      await fn()
+    } catch {
+      notify(failure)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const save = async () => {
     const trimmed = name.trim()
@@ -44,14 +58,17 @@ function CategoryRow({ category, index, total, all }: { category: Category; inde
     if (other === undefined) return
     ids[j] = category.id
     ids[index] = other
-    await reorderCategories(db, ids)
-    notify(`${category.name} moved ${delta < 0 ? 'up' : 'down'}`)
+    await once(async () => {
+      await reorderCategories(db, ids)
+      notify(`${category.name} moved ${delta < 0 ? 'up' : 'down'}`)
+    }, `Could not move ${category.name}. Please try again.`)
   }
 
-  const remove = async () => {
-    await deleteCategory(db, category.id)
-    notify(`Deleted ${category.name}. Items in it were kept.`)
-  }
+  const remove = () =>
+    once(async () => {
+      await deleteCategory(db, category.id)
+      notify(`Deleted ${category.name}. Wishes in it were kept.`)
+    }, `Could not delete ${category.name}. Please try again.`)
 
   return (
     <li className="cat-row">
@@ -70,9 +87,9 @@ function CategoryRow({ category, index, total, all }: { category: Category; inde
         {...(error ? { error } : {})}
       />
       <div className="cat-row__actions">
-        <IconButton aria-label={`Move ${category.name} up`} icon={<ArrowUp />} disabled={index === 0} onClick={() => void move(-1)} />
-        <IconButton aria-label={`Move ${category.name} down`} icon={<ArrowDown />} disabled={index === total - 1} onClick={() => void move(1)} />
-        <IconButton aria-label={`Delete ${category.name}`} icon={<Trash2 />} onClick={() => void remove()} />
+        <IconButton aria-label={`Move ${category.name} up`} icon={<ArrowUp />} disabled={index === 0 || busy} onClick={() => void move(-1)} />
+        <IconButton aria-label={`Move ${category.name} down`} icon={<ArrowDown />} disabled={index === total - 1 || busy} onClick={() => void move(1)} />
+        <IconButton aria-label={`Delete ${category.name}`} icon={<Trash2 />} disabled={busy} onClick={() => void remove()} />
       </div>
     </li>
   )
@@ -85,9 +102,11 @@ export function CategoriesSheet({ open, onClose }: { open: boolean; onClose: () 
   const categories = useCategories() ?? []
   const [name, setName] = useState('')
   const [error, setError] = useState<string | undefined>()
+  const [adding, setAdding] = useState(false)
 
   const add = async (e: FormEvent) => {
     e.preventDefault()
+    if (adding) return
     const trimmed = name.trim()
     if (!trimmed) {
       setError('Type a name for the new category.')
@@ -97,6 +116,7 @@ export function CategoriesSheet({ open, onClose }: { open: boolean; onClose: () 
       setError('You already have a category with this name.')
       return
     }
+    setAdding(true)
     try {
       await createCategory(db, trimmed)
       setName('')
@@ -104,11 +124,13 @@ export function CategoriesSheet({ open, onClose }: { open: boolean; onClose: () 
       notify(`Added category ${trimmed}`)
     } catch (err) {
       setError(isHippoError(err, 'invalid-input') ? `Use up to ${LIMITS.categoryName} characters.` : 'Could not add this category.')
+    } finally {
+      setAdding(false)
     }
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Categories" description="Group your wishes. Deleting a category keeps its items.">
+    <BottomSheet open={open} onClose={onClose} title="Categories" description="Group your wishes. Deleting a category keeps its wishes.">
       <form className="cat-add" onSubmit={(e) => void add(e)} noValidate>
         <TextField
           label="New category"
@@ -118,7 +140,7 @@ export function CategoriesSheet({ open, onClose }: { open: boolean; onClose: () 
           onChange={(e) => setName(e.target.value)}
           {...(error ? { error } : {})}
         />
-        <Button type="submit" variant="secondary" size="md">
+        <Button type="submit" variant="secondary" size="md" loading={adding}>
           Add
         </Button>
       </form>

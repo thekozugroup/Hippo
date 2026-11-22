@@ -25,6 +25,8 @@ export const LIMITS = {
   relayUrl: 200,
   /** Distinct claim slots kept per list; further new slots are ignored. */
   claimsPerList: 5000,
+  /** Remembered titles of items I claimed, per list shared with me. */
+  claimTitles: 1000,
   /** Events kept from one fetch or one initial subscription burst. */
   eventsPerFetch: 10_000,
   /** How far in the future a claim may be dated (clock skew allowance), ms. */

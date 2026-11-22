@@ -1,7 +1,7 @@
 // Small pure helpers shared by the screens.
 
 import { currencyDigits, isSafeHttpUrl, parsePrice } from '../../core/index.ts'
-import type { Importance, Money, PublishResult, SyncReport } from '../../core/index.ts'
+import type { Importance, Money, PublishResult, SharedList, SyncReport } from '../../core/index.ts'
 
 export const IMPORTANCE_LABEL: Record<Importance, string> = {
   nice: 'Nice to have',
@@ -121,4 +121,11 @@ export function summariseSync(reports: ReadonlyArray<SyncReport | { events: Read
 
 export function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
+}
+
+/** Plain words for an owned list's sharing state. A published list no relay has accepted yet is not shared yet. */
+export function listStatusLabel(list: Pick<SharedList, 'status' | 'linkPending'>): string {
+  if (list.status === 'published') return list.linkPending ? 'Not shared yet' : 'Shared'
+  if (list.status === 'draft') return 'Not shared yet'
+  return 'Sharing stopped'
 }

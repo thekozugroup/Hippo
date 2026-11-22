@@ -56,8 +56,8 @@ export function ListsScreen() {
                     href={`#/list/${l.id}`}
                     leading={<Thumb name={l.name} size="sm" />}
                     title={l.name}
-                    secondary={[plural(count, 'item', 'items'), l.eventDate ? formatEventDate(l.eventDate) : null].filter(Boolean).join(' · ')}
-                    trailing={<ListStatusPill status={l.status} />}
+                    secondary={[plural(count, 'wish', 'wishes'), l.eventDate ? formatEventDate(l.eventDate) : null].filter(Boolean).join(' · ')}
+                    trailing={<ListStatusPill list={l} />}
                   />
                 )
               })}
@@ -88,8 +88,8 @@ export function ListsScreen() {
                 href={`#/g/${g.topic}`}
                 leading={<Thumb name={g.name ?? 'Shared list'} size="sm" shape="round" />}
                 title={g.name ?? 'Shared list'}
-                secondary={g.unpublished ? 'No longer shared' : g.eventDate ? formatEventDate(g.eventDate) : g.nickname ? `You appear as ${g.nickname}` : 'Open to see what is available'}
-                trailing={g.unpublished ? <StatusPill status="removed" label="Closed" /> : undefined}
+                secondary={g.unpublished ? 'The owner stopped sharing it' : g.eventDate ? formatEventDate(g.eventDate) : g.nickname ? `You appear as ${g.nickname}` : 'Open to see what is available'}
+                trailing={g.unpublished ? <StatusPill status="draft" label="No longer shared" /> : undefined}
               />
             ))}
           </List>

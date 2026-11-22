@@ -3,7 +3,6 @@ import { Bookmark, Copy, Download, ExternalLink, Tags, Upload } from 'lucide-rea
 import { BottomSheet, Button, SectionHeader, SegmentedControl, TextArea } from '../../../ui/index.ts'
 import {
   DEFAULT_RELAYS,
-  exportData,
   importData,
   isHippoError,
   isRelayUrl,
@@ -18,7 +17,9 @@ import { useSettings } from '../../core/data.ts'
 import { useNotify } from '../../core/notify.ts'
 import { applyTheme } from '../../core/theme.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
+import { downloadBackup } from '../../lib/backup-file.ts'
 import { appBaseUrl, bookmarkletCode, shortcutScript } from '../../lib/capture-tools.ts'
+import { BackupReminder } from '../BackupReminder.tsx'
 import { plural } from '../../lib/format.ts'
 import { CategoriesSheet } from '../CategoriesSheet.tsx'
 import './SettingsScreen.css'
@@ -43,9 +44,14 @@ function ThemeSection() {
   const { db } = useCore()
   const settings = useSettings()
   const theme = settings?.theme ?? 'system'
+  const notify = useNotify()
   const change = async (t: Theme) => {
     applyTheme(t)
-    await setTheme(db, t)
+    try {
+      await setTheme(db, t)
+    } catch {
+      notify('Could not save the theme on this device. It applies until you close Hippo.')
+    }
   }
   return (
     <section className="app-stack" aria-labelledby="set-theme">
@@ -74,19 +80,19 @@ function BackupSection() {
   const [pending, setPending] = useState<{ name: string; file: ExportFile } | null>(null)
   const [error, setError] = useState<string | undefined>()
   const [busy, setBusy] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const doExport = async () => {
-    const data = await exportData(db)
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `hippo-backup-${new Date().toISOString().slice(0, 10)}.json`
-    document.body.append(a)
-    a.click()
-    a.remove()
-    window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
-    notify('Backup saved. Keep the file somewhere private.')
+    if (exporting) return
+    setExporting(true)
+    try {
+      await downloadBackup(db)
+      notify('Backup saved. Keep the file somewhere private.')
+    } catch {
+      notify('The backup could not be saved. Please try again.')
+    } finally {
+      setExporting(false)
+    }
   }
 
   const onFile = async (file: File | undefined) => {
@@ -113,7 +119,7 @@ function BackupSection() {
   }
 
   const doImport = async (mode: 'merge' | 'replace') => {
-    if (!pending) return
+    if (!pending || busy) return
     setBusy(true)
     try {
       const r = await importData(db, pending.file, { mode })
@@ -143,11 +149,12 @@ function BackupSection() {
       <p className="app-note">
         <strong>Keep the file private.</strong> It contains the keys to your shared lists.
       </p>
+      <BackupReminder lastExportAt={last} onSettings />
       <div className="app-row app-row--nowrap">
-        <Button variant="secondary" size="md" fullWidth icon={<Download />} onClick={() => void doExport()}>
+        <Button variant="secondary" size="md" fullWidth icon={<Download />} loading={exporting} onClick={() => void doExport()}>
           Export
         </Button>
-        <Button variant="secondary" size="md" fullWidth icon={<Upload />} onClick={() => fileInput.current?.click()}>
+        <Button variant="secondary" size="md" fullWidth icon={<Upload />} disabled={busy} onClick={() => fileInput.current?.click()}>
           Import
         </Button>
       </div>
@@ -292,7 +299,10 @@ function RelaySection() {
   const [error, setError] = useState<string | undefined>()
   const value = text ?? current.join('\n')
 
+  const [saving, setSaving] = useState(false)
+
   const save = async () => {
+    if (saving) return
     const lines = value
       .split(/\s+/)
       .map((s) => s.trim())
@@ -307,16 +317,31 @@ function RelaySection() {
       return
     }
     setError(undefined)
-    await setRelayOverride(core.db, lines)
-    setText(null)
-    notify('Relays saved. New lists will use them.')
+    setSaving(true)
+    try {
+      await setRelayOverride(core.db, lines)
+      setText(null)
+      notify('Relays saved. New lists will use them.')
+    } catch {
+      setError('Could not save the relays. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const reset = async () => {
-    await setRelayOverride(core.db, undefined)
-    setText(null)
-    setError(undefined)
-    notify('Back to the default relays.')
+    if (saving) return
+    setSaving(true)
+    try {
+      await setRelayOverride(core.db, undefined)
+      setText(null)
+      setError(undefined)
+      notify('Back to the default relays.')
+    } catch {
+      setError('Could not reset the relays. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -343,7 +368,7 @@ function RelaySection() {
         {...(error ? { error } : {})}
       />
       <div className="app-row app-row--nowrap">
-        <Button variant="secondary" size="md" fullWidth onClick={() => void save()} disabled={text === null}>
+        <Button variant="secondary" size="md" fullWidth onClick={() => void save()} loading={saving} disabled={text === null}>
           Save relays
         </Button>
         <Button variant="ghost" size="md" fullWidth onClick={() => void reset()} disabled={!settings?.relays && text === null}>
@@ -363,12 +388,14 @@ function AboutSection() {
       <ul className="settings-facts">
         <li>No accounts, no tracking, no ads. Hippo is a free, open-source app (MIT licence).</li>
         <li>Your wishlist is stored only on this device until you share a list.</li>
-        <li>Shared lists and gift marks are end-to-end encrypted. The key is in the link, which is never sent to any server.</li>
-        <li>Friends with the link see each other&apos;s marks and nicknames. You, the owner, do not, so gifts stay a surprise.</li>
-        <li>Pledges are records only. Hippo never handles money.</li>
+        <li>Shared lists, and who is getting or chipping in on what, are end-to-end encrypted. The key is in the link, which is never sent to any server.</li>
+        <li>Friends with the link see who is getting what and each other&apos;s nicknames. Hippo hides this from you, the owner, so gifts stay a surprise.</li>
+        <li>Chipping in is a promise between friends. Hippo never handles money.</li>
         <li>The only other requests Hippo makes are for pictures you attach to wishes.</li>
       </ul>
-      <p className="app-note">Hippo hides gift marks from you, but it cannot stop you from opening your own link in another browser. Please do not peek.</p>
+      <p className="app-note">
+        Hiding gifts from the owner is done by the Hippo app, not by encryption: Hippo cannot stop you from opening your own link in another browser. Please do not peek.
+      </p>
       <div className="app-row">
         <a className="btn btn--secondary btn--md" href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
           <span className="btn__icon" aria-hidden="true">
@@ -377,9 +404,6 @@ function AboutSection() {
           <span className="btn__label">
             Source code<span className="sr-only"> (opens in a new tab)</span>
           </span>
-        </a>
-        <a className="app-text-link" href="#/design">
-          Design gallery
         </a>
       </div>
     </section>

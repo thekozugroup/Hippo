@@ -51,6 +51,18 @@ export interface SharedList {
   createdAt: number
   updatedAt: number
   publishedAt?: number
+  /**
+   * True while the list's latest local state (published content, or the
+   * cut-off after unpublishing) has not been accepted by any relay yet.
+   * `retryPendingSync` retries it.
+   */
+  syncPending?: boolean
+  /**
+   * True from publishing (or rotating) until a relay first accepts the list
+   * under its current link. While true the link does not work yet, so the UI
+   * shows the list as not shared yet and does not offer the link.
+   */
+  linkPending?: boolean
 }
 
 /** A list shared with me. */
@@ -63,6 +75,14 @@ export interface GuestList {
   nickname?: string
   addedAt: number
   lastOpenedAt: number
+  /**
+   * Set when the giver removed the list from this device. The record (and so
+   * the guest key and nickname) is kept so that opening the link again
+   * restores the same identity and the giver's claims stay theirs.
+   */
+  hiddenAt?: number
+  /** Last known titles of items I claimed (shared item id -> title), shown after the owner removes or stops sharing them. */
+  claimTitles?: Record<string, string>
 }
 
 export interface ListMetaPayload {

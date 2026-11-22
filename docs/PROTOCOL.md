@@ -44,6 +44,8 @@ interface SharedList {                 // a list I own
   createdAt: number;
   updatedAt: number;
   publishedAt?: number;
+  syncPending?: boolean;               // latest local state not yet accepted by any relay (section 8)
+  linkPending?: boolean;               // current link never accepted by any relay: not shared yet
 }
 
 interface GuestList {                  // a list shared with me
@@ -55,6 +57,8 @@ interface GuestList {                  // a list shared with me
   nickname?: string;
   addedAt: number;
   lastOpenedAt: number;
+  hiddenAt?: number;                   // removed from this device's list; key kept (section 10)
+  claimTitles?: Record<string, string>; // shared item id -> last title seen, for items I claimed
 }
 
 interface RetiredList {                // a topic this device no longer owns (rotation or deletion)
@@ -236,6 +240,10 @@ Own events whose expiration is less than 60 days away are re-signed with a new `
 
 The owner also retries cutting off retired topics (section 9) on repair and at app start.
 
+Owner sync state: every local change to a published list (list fields, or a linked item) sets `syncPending` in the same transaction; publishing a draft or rotating also sets `linkPending`. After each sync the device clears `syncPending` once no event of the list's current topic is waiting for a relay, and clears `linkPending` once a relay has accepted the meta event under the current link. `retryPendingSync` resends whatever is pending (published lists, the cut-off of unpublished lists, retired topics). The app runs it at start, on the browser's `online` event, when the page becomes visible, and on a backoff timer (8 seconds, doubling, at most 5 minutes) while anything is pending. A list with `linkPending` is shown as not shared yet and its link is not offered.
+
+A giver's open list retries its own unsent claims every 15 seconds while any is pending, besides reconnecting when the relays come back.
+
 ## 9. Rotation, unpublish and delete
 
 - Unpublish: publish an empty tombstone for every item slot (current items plus every item slot this device published) and meta with `status: 'unpublished'` and empty `itemIds`. This is idempotent: what is already cut off is not published again, and what no relay accepted is resent.
@@ -254,8 +262,10 @@ These were settled while implementing `src/core/` and are part of the protocol.
 5. Rotation and delete tombstone the old items as well as unpublishing the old meta.
 6. A replacement event always carries a `created_at` greater than the version it replaces.
 7. Money amounts are limited to 10^11 minor units so sums stay exact. Payload URLs that are not `http:` or `https:` are dropped during validation.
-8. A full claim is refused on an item that already has pledges; clients offer "Cover the rest" instead.
+8. A full claim is refused on an item that already has pledges; clients offer "Cover the rest" instead. "Cover the rest" is a pledge, so like any new pledge it is refused (`contributions-disabled`) when the item does not allow contributions. Once contributions are off, a giver may still lower or withdraw an existing pledge but not raise it.
 9. FR-25: a device refuses to add or open as a guest any list whose topic or owner key belongs to a list it owns, has rotated away from, or has deleted. Backups carry retired lists; importing refuses a file in which a guest list is one of the owned or retired lists (on the device or in the file), or a shared list is one the device holds as a guest.
 10. Import in merge mode never replaces a shared, guest or retired list already on the device (matched by id, list secret or topic); items and categories in the file win. Replace mode records owned lists it drops as deleted retired lists. Imported keys must be valid secp256k1 keys, owner public keys must be curve points, and each guest list's topic must equal the topic derived from its secret.
+11. Removing a list shared with me hides the guest record (`hiddenAt`) instead of deleting it. The guest key, nickname and cached events stay, so opening the same link again unhides it with the same identity and the giver's claims are still theirs. Hidden lists are not listed, not opened by topic and not synced; backups include them.
+12. A giver remembers the title of each item they claimed (`claimTitles`), because tombstones carry no title. It is shown for claims on items the owner removed or after the owner stopped sharing.
 
 Known limitation: claim-slot ownership is "first author seen on this device". A giver who already holds the link could publish a backdated event into another giver's claim slot and win on a device that has not yet seen the original. The effect is limited to hiding or replacing one claim for some viewers, among people the owner already trusted with the link. Closing this would need claim ids bound to the author's key (for example `claimId = H(pubkey || nonce)`), which is planned for protocol v2.

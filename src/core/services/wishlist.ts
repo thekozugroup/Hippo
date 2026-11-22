@@ -91,33 +91,50 @@ async function requireItem(db: HippoDb, id: string): Promise<Item> {
   return item
 }
 
+/**
+ * Flags every published list that links the item as needing a sync, in the
+ * same transaction as the item change, so the change reaches givers even if
+ * the app closes before `syncListsForItem` finishes (`retryPendingSync`).
+ */
+async function markListsWithItem(db: HippoDb, id: string): Promise<void> {
+  await db.sharedLists
+    .toCollection()
+    .filter((l) => l.status === 'published' && l.itemIds.includes(id))
+    .modify((l) => {
+      l.syncPending = true
+    })
+}
+
 export async function updateItem(db: HippoDb, id: string, patch: ItemPatch, now = Date.now()): Promise<Item> {
-  return db.transaction('rw', db.items, async () => {
+  return db.transaction('rw', db.items, db.sharedLists, async () => {
     const item = await requireItem(db, id)
     applyFields(item, patch)
     item.updatedAt = Math.max(now, item.updatedAt + 1)
     await db.items.put(item)
+    await markListsWithItem(db, id)
     return item
   })
 }
 
 /** Archived items stay in the wishlist but are left out of published lists. */
 export async function archiveItem(db: HippoDb, id: string, now = Date.now()): Promise<Item> {
-  return db.transaction('rw', db.items, async () => {
+  return db.transaction('rw', db.items, db.sharedLists, async () => {
     const item = await requireItem(db, id)
     item.archivedAt = now
     item.updatedAt = Math.max(now, item.updatedAt + 1)
     await db.items.put(item)
+    await markListsWithItem(db, id)
     return item
   })
 }
 
 export async function unarchiveItem(db: HippoDb, id: string, now = Date.now()): Promise<Item> {
-  return db.transaction('rw', db.items, async () => {
+  return db.transaction('rw', db.items, db.sharedLists, async () => {
     const item = await requireItem(db, id)
     delete item.archivedAt
     item.updatedAt = Math.max(now, item.updatedAt + 1)
     await db.items.put(item)
+    await markListsWithItem(db, id)
     return item
   })
 }
@@ -131,6 +148,7 @@ export async function deleteItem(db: HippoDb, id: string, now = Date.now()): Pro
       if (list.itemIds.includes(id)) {
         list.itemIds = list.itemIds.filter((x) => x !== id)
         list.updatedAt = Math.max(now, list.updatedAt + 1)
+        if (list.status === 'published') list.syncPending = true
         changed.push(list.id)
       }
     })
