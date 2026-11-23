@@ -1,4 +1,4 @@
-import { handleStartupCapture, peekCaptureDraft, clearCaptureDraft } from '../core/capture.ts'
+import { captureEpoch, captureShared, handleStartupCapture, peekCaptureDraft, clearCaptureDraft, subscribeCapture } from '../core/capture.ts'
 import { bookmarkletCode, shortcutScript } from './capture-tools.ts'
 import { formatEventDate, moneyInputValue, parseMoneyInput, safeUrl, summariseSync } from './format.ts'
 
@@ -28,6 +28,34 @@ describe('startup capture', () => {
     expect(draft).toEqual({ title: 'Hi' })
     handleStartupCapture(fakeLocation('https://x.example/?relays=ws%3A%2F%2F127.0.0.1%3A7447#/wishlist'), { replaceState } as unknown as History)
     expect(replaceState).toHaveBeenLastCalledWith(null, '', 'https://x.example/#/wishlist')
+  })
+})
+
+describe('shared from another app (Android app share target)', () => {
+  afterEach(() => clearCaptureDraft())
+
+  it('goes through the same capture path as the deep link: link found in the text, tracking removed, title kept', () => {
+    const seen = vi.fn()
+    const stop = subscribeCapture(seen)
+    const before = captureEpoch()
+    const draft = captureShared({ title: 'Red wool scarf', text: 'Have a look: https://shop.example/p/scarf?utm_source=android&fbclid=abc&colour=red.' })
+    expect(draft).toEqual({ title: 'Red wool scarf', url: 'https://shop.example/p/scarf?colour=red' })
+    expect(peekCaptureDraft()).toEqual(draft)
+    expect(captureEpoch()).toBe(before + 1)
+    expect(seen).toHaveBeenCalledTimes(1)
+    stop()
+  })
+
+  it('guesses a title from the link when only a link is shared', () => {
+    expect(captureShared({ text: 'https://shop.example/products/blue-ceramic-mug-1234' })).toEqual({ title: 'Blue ceramic mug', url: 'https://shop.example/products/blue-ceramic-mug-1234' })
+  })
+
+  it('refuses unsafe links and non-strings, and caps lengths like the deep link', () => {
+    expect(captureShared({ text: 'javascript:alert(1)' })).toEqual({ title: 'javascript:alert(1)' })
+    expect(captureShared({ title: 7, text: null })).toBeNull()
+    expect(captureShared({})).toBeNull()
+    const long = captureShared({ title: 'x'.repeat(10_000) })
+    expect(long && Array.from(long.title).length).toBeLessThanOrEqual(200)
   })
 })
 

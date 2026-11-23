@@ -4,6 +4,10 @@ import { Button, Skeleton, StatusPill } from '../../../ui/index.ts'
 import { browserDeploymentEnv, checkDeployment, DEFAULT_RELAYS, type DeploymentCheck } from '../../../core/index.ts'
 import { useCore } from '../../core/context.ts'
 import { useSettings } from '../../core/data.ts'
+import { isNativeApp } from '../../native/platform.ts'
+
+/** Inside the Android app the files come from the APK: the address, service worker and storage promise checks are about a browser tab, so they are left out. */
+const NATIVE_SKIP = ['own-origin', 'service-worker', 'persistent-storage'] as const
 
 /** The relay check has its own timeout; this is the cap for anything else that hangs. */
 const GIVE_UP_MS = 12_000
@@ -69,7 +73,7 @@ export function DeploymentChecks({ run }: DeploymentChecksProps) {
     const gaveUp = new Promise<'stuck'>((resolve) => {
       timer = setTimeout(() => resolve('stuck'), GIVE_UP_MS)
     })
-    const job = (run ?? (() => checkDeployment(browserDeploymentEnv(relays))))().catch((): 'stuck' => 'stuck')
+    const job = (run ?? (() => checkDeployment({ ...browserDeploymentEnv(relays), ...(isNativeApp() ? { skip: NATIVE_SKIP } : {}) })))().catch((): 'stuck' => 'stuck')
     void Promise.race([job, gaveUp]).then((r) => {
       clearTimeout(timer)
       if (token.current !== mine) return

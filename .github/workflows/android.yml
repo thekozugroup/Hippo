@@ -1,0 +1,216 @@
+name: Android app
+
+# Builds the Android app (README, "Android app"): the web app in native mode,
+# copied into the Capacitor project, assembled into an APK. Run it by hand
+# (Actions, Android app, Run workflow) or push a version tag such as v1.2.0,
+# which also attaches the APK to a GitHub Release.
+#
+# Signing: with the four ANDROID_* repository secrets the APK is a signed
+# release build. Without them it is a debug build signed with a temporary key
+# that exists only for this run, so a later APK cannot update it in place.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      apk: ${{ steps.apk.outputs.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - run: npm ci
+
+      # The public website that share links made in the app point at. Set the repository variable
+      # HIPPO_SITE_URL for a custom domain; otherwise this repository's GitHub Pages address.
+      - name: Site address
+        env:
+          SITE_VAR: ${{ vars.HIPPO_SITE_URL }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          owner="$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          if [ -n "$SITE_VAR" ]; then
+            site="$SITE_VAR"
+          elif [ "$(printf '%s' "$REPO" | tr '[:upper:]' '[:lower:]')" = "$owner.github.io" ]; then
+            site="https://$owner.github.io/"
+          else
+            site="https://$owner.github.io/$REPO/"
+          fi
+          echo "HIPPO_SITE_URL=$site" >> "$GITHUB_ENV"
+          echo "Site address: $site"
+
+      - name: Version
+        run: |
+          echo "HIPPO_VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "HIPPO_VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build the web app for Android and copy it into the project
+        run: npm run android:sync
+
+      - name: Android SDK platform and build tools
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;35.0.0" > /dev/null
+
+      # The keystore is written to the runner's temporary folder, outside the repository, and
+      # the passwords reach Gradle only as environment variables of the build step.
+      - name: Signing key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/hippo-release.jks"
+            echo "HIPPO_KEYSTORE_FILE=$RUNNER_TEMP/hippo-release.jks" >> "$GITHUB_ENV"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Assemble the APK
+        working-directory: android
+        env:
+          HIPPO_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          HIPPO_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          HIPPO_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            ./gradlew --no-daemon testDebugUnitTest assembleRelease
+          else
+            ./gradlew --no-daemon testDebugUnitTest assembleDebug
+          fi
+
+      - name: Name the APK and write the summary
+        id: apk
+        run: |
+          version="${HIPPO_VERSION_NAME:-$(node -p "require('./package.json').version")}"
+          mkdir -p out
+          if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+            name="hippo-$version.apk"
+            cp android/app/build/outputs/apk/release/app-release.apk "out/$name"
+          else
+            name="hippo-$version-debug-temporary-key.apk"
+            cp android/app/build/outputs/apk/debug/app-debug.apk "out/$name"
+          fi
+          rm -f "$RUNNER_TEMP/hippo-release.jks"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          {
+            echo "## Hippo for Android"
+            echo
+            echo "- File: \`$name\` ($(du -h "out/$name" | cut -f1))"
+            echo "- Version: $version (code $HIPPO_VERSION_CODE)"
+            echo "- Share links point at: $HIPPO_SITE_URL"
+            echo "- SHA-256 of the file: \`$(sha256sum "out/$name" | cut -d' ' -f1)\`"
+            echo "- Signing certificate SHA-256: \`$("$apksigner" verify --print-certs "out/$name" | grep -m1 'SHA-256' | sed 's/.*: //')\`"
+            echo
+            if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
+              echo "Signed release build. Later APKs signed with the same key update it in place."
+            else
+              echo "**This is a debug build signed with a temporary key** that exists only for this run, because the signing secrets are not set."
+              echo "It installs and runs, but no later APK can update it in place: uninstall it first (Export backup in Settings before you do)."
+              echo "To publish signed builds, add the four ANDROID_* secrets described in the README."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: hippo-apk
+          path: out/${{ steps.apk.outputs.name }}
+          if-no-files-found: error
+
+  # Installs the APK on an emulator, starts it, and checks that the web app's first screen
+  # appears (scripts/android-emulator-smoke.sh). Fails when it does not.
+  emulator:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: hippo-apk
+          path: apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Start Hippo on an emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: bash scripts/android-emulator-smoke.sh "apk/${{ needs.build.outputs.apk }}" emulator-smoke
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Emulator check (Android 15)"
+            echo
+            if [ -f emulator-smoke/result.txt ]; then sed 's/^/- /' emulator-smoke/result.txt; else echo "- The emulator did not start."; fi
+            echo
+            echo "Screenshots, the UI dump and the app's log are in the emulator-smoke artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: emulator-smoke
+          path: emulator-smoke
+          if-no-files-found: warn
+
+  # On a version tag: attach the APK to the GitHub Release for that tag (created if needed).
+  release:
+    if: github.ref_type == 'tag'
+    needs: [build, emulator]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: hippo-apk
+          path: apk
+      - name: Attach the APK to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          APK: apk/${{ needs.build.outputs.apk }}
+        run: |
+          case "$APK" in
+            *debug-temporary-key*) note="Debug build signed with a temporary key: it cannot be updated in place by a later APK. Export a backup in Settings before replacing it." ;;
+            *) note="Signed release build. Install it over an earlier signed Hippo APK to update." ;;
+          esac
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "$APK" --repo "$GITHUB_REPOSITORY" --verify-tag --title "Hippo $TAG" --notes "Hippo for Android, $TAG. $note"
+          fi

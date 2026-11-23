@@ -109,6 +109,8 @@ payload = base64url( 0x01 || ownerPubkey(32) || listSecret(32) )            // d
 payload = base64url( 0x02 || ownerPubkey(32) || listSecret(32) || utf8(relays joined by ",") )
 ```
 
+`<host><base>` is the address of the Hippo website that made the link. The Android app has no public address of its own (its pages come from `https://localhost` inside the APK), so links it makes use the public website it was built for (`HIPPO_SITE_URL`); the payload is the same. When Android opens such a link in the app, the app reads the payload only from a link to that website, and the same parsing rules apply.
+
 The payload is in the URL fragment, so it is never sent to the web host. Parsing must reject unknown versions, wrong lengths, non-canonical base64url, payloads over 4,096 characters, an `ownerPubkey` that is not a curve point, and a v2 relay list that is empty, has more than 20 entries, or has any entry that is not a public relay URL.
 
 A public relay URL is `wss://` with no credentials or fragment, at most 200 characters, and a public hostname: not an IP literal in a loopback, private, carrier-grade NAT, link-local, benchmarking, multicast or reserved range (IPv6: only `2000::/3`), not `localhost`, and not a single-label name or one ending in `.localhost`, `.local`, `.localdomain`, `.internal`, `.intranet`, `.lan` or `.home.arpa`. The same rule applies to list relays, the relay setting and backups. `ws://` and loopback relays are allowed only through the developer override (section 7).

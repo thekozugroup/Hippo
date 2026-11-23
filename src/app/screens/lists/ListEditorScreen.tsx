@@ -36,7 +36,8 @@ import { nudgeSyncRetry } from '../../core/core.ts'
 import { useNotify } from '../../core/notify.ts'
 import { requestPersistentStorage } from '../../core/storage.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
-import { appBaseUrl } from '../../lib/capture-tools.ts'
+import { shareBaseUrl } from '../../lib/site-address.ts'
+import { canShareSheet, shareSheet } from '../../native/index.ts'
 import { formatEventDate, plural, summariseSync, type SyncSummary } from '../../lib/format.ts'
 import { SyncFeedback } from './SyncFeedback.tsx'
 import './ListEditorScreen.css'
@@ -161,8 +162,8 @@ function NewListForm() {
 
 function ShareLinkBox({ list, entering }: { list: SharedList; entering: boolean }) {
   const notify = useNotify()
-  const link = buildShareLink(list, appBaseUrl())
-  const canShare = typeof navigator.share === 'function'
+  const link = buildShareLink(list, shareBaseUrl())
+  const canShare = canShareSheet()
   const [copied, setCopied] = useState(0)
   useEffect(() => {
     if (!copied) return
@@ -182,12 +183,8 @@ function ShareLinkBox({ list, entering }: { list: SharedList; entering: boolean 
   }
 
   const share = async () => {
-    try {
-      await navigator.share({ title: list.name, text: `My wishlist: ${list.name}`, url: link })
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return
-      notify('Sharing did not work here. Copy the link instead.')
-    }
+    const outcome = await shareSheet({ title: list.name, text: `My wishlist: ${list.name}`, url: link })
+    if (outcome === 'failed') notify('Sharing did not work here. Copy the link instead.')
   }
 
   return (

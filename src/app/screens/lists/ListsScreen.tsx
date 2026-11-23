@@ -1,8 +1,55 @@
+import { useState, type FormEvent } from 'react'
 import { Plus } from 'lucide-react'
-import { EmptyState, IconLink, LinkButton, List, SectionHeader, Skeleton, TwoTone } from '../../../ui/index.ts'
+import { useLocation } from 'wouter'
+import { Button, EmptyState, IconLink, LinkButton, List, SectionHeader, Skeleton, TextField, TwoTone } from '../../../ui/index.ts'
 import { useGuestLists, useItems, useSharedLists } from '../../core/data.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { GuestListRow, OwnedListRow } from './ListRows.tsx'
+import { payloadFromPastedLink } from '../../lib/site-address.ts'
+import { isNativeApp } from '../../native/platform.ts'
+
+/**
+ * Android app only: a list link received in a chat may open in the browser (Android opens links to
+ * the website in the app only after the person allows it), so it can also be pasted here.
+ */
+function OpenFromLink() {
+  const [, navigate] = useLocation()
+  const [value, setValue] = useState('')
+  const [error, setError] = useState<string | undefined>()
+  const open = (e: FormEvent) => {
+    e.preventDefault()
+    const payload = payloadFromPastedLink(value)
+    if (!payload) {
+      setError('This is not a Hippo list link. Paste the whole link you were sent.')
+      return
+    }
+    setError(undefined)
+    setValue('')
+    navigate(`/l/${payload}`)
+  }
+  return (
+    <form className="app-stack app-stack--tight" onSubmit={open} noValidate>
+      <TextField
+        label="Open a list from a link"
+        type="url"
+        inputMode="url"
+        autoComplete="off"
+        placeholder="https://"
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value)
+          setError(undefined)
+        }}
+        {...(error ? { error } : {})}
+      />
+      <div>
+        <Button type="submit" variant="secondary" size="md">
+          Open list
+        </Button>
+      </div>
+    </form>
+  )
+}
 
 export function ListsScreen() {
   const lists = useSharedLists()
@@ -55,6 +102,7 @@ export function ListsScreen() {
             ))}
           </List>
         )}
+        {isNativeApp() ? <OpenFromLink /> : null}
       </section>
     </AppScreen>
   )

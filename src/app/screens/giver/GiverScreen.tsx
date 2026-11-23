@@ -18,11 +18,12 @@ import { useSettings } from '../../core/data.ts'
 import { useNotify } from '../../core/notify.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { ScreenMessage } from '../../layout/ScreenMessage.tsx'
-import { appBaseUrl } from '../../lib/capture-tools.ts'
+import { shareBaseUrl } from '../../lib/site-address.ts'
+import { canShareSheet, haptic, shareSheet } from '../../native/index.ts'
 import { formatEventDate, plural, possessive } from '../../lib/format.ts'
 import { ClaimSheet, type SheetRequest } from './ClaimSheet.tsx'
 import { GiverItemCard, MyGiftLine } from './GiverItemCard.tsx'
-import { actionErrorMessage, claimResultMessage, describeRow, itemHeadingId, OWNER_HIDDEN_NOTE, requestItemId } from './giverText.ts'
+import { actionErrorMessage, claimResultMessage, describeRow, isCounted, itemHeadingId, OWNER_HIDDEN_NOTE, requestItemId } from './giverText.ts'
 import './GiverScreen.css'
 
 function Banner({ icon, title, children }: { icon: ReactNode; title: string; children?: ReactNode }) {
@@ -175,11 +176,11 @@ function useGiverIntro(): [boolean, () => void] {
 function InviteOthers({ topic, listName }: { topic: string; listName: string }) {
   const core = useCore()
   const notify = useNotify()
-  const canShare = typeof navigator.share === 'function'
+  const canShare = canShareSheet()
 
   const linkFor = async (): Promise<string | null> => {
     const guest = await getGuestList(core.db, topic)
-    return guest ? buildGuestShareLink(guest, appBaseUrl()) : null
+    return guest ? buildGuestShareLink(guest, shareBaseUrl()) : null
   }
 
   const copy = async () => {
@@ -194,14 +195,9 @@ function InviteOthers({ topic, listName }: { topic: string; listName: string }) 
   }
 
   const share = async () => {
-    try {
-      const link = await linkFor()
-      if (!link) throw new Error('missing')
-      await navigator.share({ title: listName, url: link })
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return
-      notify('Sharing did not work here. Copy the link instead.')
-    }
+    const link = await linkFor().catch(() => null)
+    const outcome = link ? await shareSheet({ title: listName, url: link }) : 'failed'
+    if (outcome === 'failed') notify('Sharing did not work here. Copy the link instead.')
   }
 
   return (
@@ -261,6 +257,7 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
     try {
       const r = await session.markPurchased(row.claimId, purchased)
       notify(claimResultMessage([r], purchased ? 'Marked as bought.' : 'Marked as not bought yet.'))
+      if (purchased && isCounted([r])) haptic('confirm')
     } catch (e) {
       notify(actionErrorMessage(e))
     } finally {

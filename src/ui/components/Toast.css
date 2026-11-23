@@ -1,7 +1,7 @@
 .toast-region {
   position: fixed;
   inset-inline: 0;
-  inset-block-end: calc(var(--h-lg) + var(--sp-9) + env(safe-area-inset-bottom));
+  inset-block-end: calc(var(--h-lg) + var(--sp-9) + var(--inset-bottom));
   z-index: 50;
   display: flex;
   justify-content: center;

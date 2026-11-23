@@ -1,0 +1,108 @@
+import groovy.json.JsonSlurper
+
+apply plugin: 'com.android.application'
+
+// The public website (HIPPO_SITE_URL). Share links made in the app point at it, and its links may
+// open in the app (the VIEW intent filter in AndroidManifest.xml). The value comes from the
+// environment, else from the web build inside the APK (vite.config.ts writes hippo-site-url.txt
+// into dist-native, and `cap sync` copies it here), so Android Studio builds after
+// `npm run android:sync` need no extra setting. The two must agree.
+def bundledSiteFile = file('src/main/assets/public/hippo-site-url.txt')
+def bundledSite = bundledSiteFile.exists() ? bundledSiteFile.text.trim() : ''
+def envSite = (System.getenv('HIPPO_SITE_URL') ?: '').trim()
+def siteProblem = null
+def siteUri = null
+def siteText = envSite ?: bundledSite
+if (!siteText) {
+    siteProblem = 'No site address. Build the web assets first with HIPPO_SITE_URL set (npm run android:sync), for example HIPPO_SITE_URL=https://owner.github.io/Hippo/'
+} else {
+    try {
+        siteUri = new URI(siteText)
+        if (siteUri.scheme != 'https' || !siteUri.host) siteProblem = "HIPPO_SITE_URL must be an https address, not ${siteText}"
+    } catch (URISyntaxException e) {
+        siteProblem = "HIPPO_SITE_URL is not a valid address: ${siteText}"
+    }
+    def norm = { String s -> s.endsWith('/') ? s : s + '/' }
+    if (!siteProblem && envSite && bundledSite && norm(envSite) != norm(bundledSite)) {
+        siteProblem = "HIPPO_SITE_URL (${envSite}) differs from the address the web assets were built with (${bundledSite}). Run npm run android:sync again."
+    }
+}
+def siteHost = siteProblem ? 'site-address-not-set.invalid' : siteUri.host
+def sitePath = siteProblem ? '/' : (siteUri.path ?: '/')
+if (!sitePath.endsWith('/')) sitePath = sitePath + '/'
+
+// Version: the name from package.json (or HIPPO_VERSION_NAME, set from the tag in CI), the code
+// from HIPPO_VERSION_CODE (the workflow run number in CI; it must only ever grow).
+def packageVersion = new JsonSlurper().parse(file('../../package.json')).version
+def appVersionName = System.getenv('HIPPO_VERSION_NAME') ?: packageVersion
+def appVersionCode = (System.getenv('HIPPO_VERSION_CODE') ?: '1').toInteger()
+
+// Release signing, only when all four values are present (README, "Android app"). CI writes the
+// keystore from a repository secret to a temporary file outside the repository.
+def keystoreFile = System.getenv('HIPPO_KEYSTORE_FILE')
+def canSignRelease = keystoreFile && System.getenv('HIPPO_KEYSTORE_PASSWORD') && System.getenv('HIPPO_KEY_ALIAS') && System.getenv('HIPPO_KEY_PASSWORD')
+
+android {
+    namespace = "io.github.thekozugroup.hippo"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        // Confirm before the first release: Android treats another id as another app.
+        applicationId "io.github.thekozugroup.hippo"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode appVersionCode
+        versionName appVersionName
+        manifestPlaceholders = [hippoSiteHost: siteHost, hippoSitePath: sitePath]
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (canSignRelease) {
+            release {
+                storeFile file(keystoreFile)
+                storePassword System.getenv('HIPPO_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('HIPPO_KEY_ALIAS')
+                keyPassword System.getenv('HIPPO_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            // Release builds are not debuggable, so Capacitor leaves WebView debugging off.
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (canSignRelease) signingConfig signingConfigs.release
+        }
+    }
+}
+
+// The site address is checked when building, not when Android Studio syncs the project.
+tasks.named('preBuild').configure {
+    doFirst {
+        if (siteProblem) throw new GradleException(siteProblem)
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'

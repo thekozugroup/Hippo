@@ -57,6 +57,7 @@ import { installHeading, installPlacement, ownStorageReason, whyInstall } from '
 import { InstallGuide } from '../../pwa/InstallGuide.tsx'
 import { useCopyLink, useInstallAction, useInstallGuide } from '../../pwa/useInstall.ts'
 import { isStandalone, wasInstalledHere } from '../../pwa/install.ts'
+import { isNativeApp } from '../../native/platform.ts'
 import { captureMethodFor, hostOf, parseWish, wishError } from './flow.ts'
 import { ensureSetupList, ensureSetupWish, persistFlow } from './store.ts'
 import './OnboardingScreen.css'
@@ -549,7 +550,8 @@ function InstallStep({ common, onNext }: { common: CommonProps; onNext: () => vo
 
 function CaptureStep({ common, flow, onFinish, onSettings }: { common: CommonProps; flow: Flow; onFinish: () => void; onSettings: () => void }) {
   const lists = useSharedLists()
-  const method = captureMethodFor({ userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints || 0 })
+  // The Android app is in the share sheet from the start.
+  const method = isNativeApp() ? 'share' : captureMethodFor({ userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints || 0 })
   const linkRef = useRef<HTMLAnchorElement>(null)
   const bookmarklet = bookmarkletCode(appBaseUrl())
   useEffect(() => {
@@ -575,7 +577,7 @@ function CaptureStep({ common, flow, onFinish, onSettings }: { common: CommonPro
     )
   } else if (method === 'share') {
     how =
-      isStandalone() || wasInstalledHere() ? (
+      isNativeApp() || isStandalone() || wasInstalledHere() ? (
         <p>Use Share in any shop or browser and pick Hippo.</p>
       ) : (
         <p>Once Hippo is on your home screen, use Share in any shop or browser and pick Hippo. Settings shows how to add it.</p>

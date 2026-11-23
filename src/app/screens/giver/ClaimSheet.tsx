@@ -3,7 +3,8 @@ import { BottomSheet, Button, Checkbox, MoneyField, TextField } from '../../../u
 import { LIMITS, type ClaimActionResult, type ClaimRow, type GiverItemView, type GiverListSession } from '../../../core/index.ts'
 import { useNotify } from '../../core/notify.ts'
 import { moneyInputValue, moneyText, parseMoneyInput, priceExample } from '../../lib/format.ts'
-import { actionErrorMessage, claimResultMessage } from './giverText.ts'
+import { actionErrorMessage, claimResultMessage, isCounted } from './giverText.ts'
+import { haptic } from '../../native/index.ts'
 
 export type SheetRequest =
   | { mode: 'claim'; view: GiverItemView }
@@ -64,6 +65,8 @@ function Body({ request, session, onDone }: { request: SheetRequest; session: Gi
   const finish = (results: ClaimActionResult[], ok: string) => {
     onDone(true)
     notify(claimResultMessage(results, ok))
+    // A gift marked (Android app only): a light tap once other devices will count it.
+    if ((request.mode === 'claim' || request.mode === 'pledge' || request.mode === 'cover') && isCounted(results)) haptic('confirm')
   }
 
   const submit = async (e: FormEvent) => {

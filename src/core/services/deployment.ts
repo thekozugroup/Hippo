@@ -42,6 +42,8 @@ export interface DeploymentEnv {
   }
   /** Opens and closes a scratch database; resolves true when that worked. Omit when IndexedDB is missing. */
   probeIndexedDb?: (() => Promise<boolean>) | undefined
+  /** Checks to leave out, for example the browser-only ones inside the Android app. */
+  skip?: readonly DeploymentCheckId[] | undefined
   /** Creates a WebSocket for a relay URL. Omit when the environment has none. */
   createWebSocket?: ((url: string) => ProbeSocket) | undefined
   relays: readonly string[]
@@ -247,8 +249,9 @@ async function checkRelays(env: DeploymentEnv): Promise<DeploymentCheck> {
 
 /**
  * Runs every check. Order is fixed: https, own-origin, not-framed,
- * service-worker, indexeddb, persistent-storage, relays. Never throws and
- * never waits longer than the relay timeout.
+ * service-worker, indexeddb, persistent-storage, relays, less any listed in
+ * `env.skip` (those are not run at all). Never throws and never waits longer
+ * than the relay timeout.
  */
 export async function checkDeployment(env: DeploymentEnv): Promise<DeploymentCheck[]> {
   const guard = async (id: DeploymentCheckId, run: () => DeploymentCheck | Promise<DeploymentCheck>): Promise<DeploymentCheck> => {
@@ -258,15 +261,17 @@ export async function checkDeployment(env: DeploymentEnv): Promise<DeploymentChe
       return { id, status: 'unknown', finding: 'This check could not run.', fix: 'Reload the page and try again.' }
     }
   }
-  return Promise.all([
-    guard('https', () => checkHttps(env)),
-    guard('own-origin', () => checkOwnOrigin(env)),
-    guard('not-framed', () => checkNotFramed(env)),
-    guard('service-worker', () => checkServiceWorker(env)),
-    guard('indexeddb', () => checkIndexedDb(env)),
-    guard('persistent-storage', () => checkPersistence(env)),
-    guard('relays', () => checkRelays(env)),
-  ])
+  const all: Array<[DeploymentCheckId, () => DeploymentCheck | Promise<DeploymentCheck>]> = [
+    ['https', () => checkHttps(env)],
+    ['own-origin', () => checkOwnOrigin(env)],
+    ['not-framed', () => checkNotFramed(env)],
+    ['service-worker', () => checkServiceWorker(env)],
+    ['indexeddb', () => checkIndexedDb(env)],
+    ['persistent-storage', () => checkPersistence(env)],
+    ['relays', () => checkRelays(env)],
+  ]
+  const skip = new Set(env.skip ?? [])
+  return Promise.all(all.filter(([id]) => !skip.has(id)).map(([id, run]) => guard(id, run)))
 }
 
 function browserProbeSocket(url: string): ProbeSocket {

@@ -18,8 +18,8 @@ Status: v1 in development. License: MIT.
 - Payment processing or moving money. Pledges are records only; givers settle among themselves.
 - Accounts, email, passwords, notifications by email or push.
 - Price tracking, affiliate links, store integrations.
-- Native apps. Hippo is an installable PWA.
-- Automatic fetching of product pages by the app itself (not possible from a static app because of CORS). The only automatic lookup is the opt-in link preview in FR-10a, which asks a third-party service.
+- App-store distribution. Hippo is an installable PWA, and an Android app built from the same code (FR-10d) that is published as an APK on GitHub Releases. There is no iOS app.
+- Automatic fetching of product pages by the website itself (not possible from a static site because of CORS). On the website the only automatic lookup is the opt-in link preview in FR-10a, which asks a third-party service. The Android app reads the page on the phone instead (FR-10e).
 
 ## 3. Personas
 
@@ -51,6 +51,8 @@ Status: v1 in development. License: MIT.
 - FR-10c Installing. There is no app-store app: the browser's own install makes Hippo an app with an icon and its own window (on Android, also a place in the share sheet). Setup has a "Put Hippo on your home screen" step with the steps for this device and browser, in the words the device shows (two or three numbered actions with a plain icon each): the browser's install prompt as one "Install Hippo" button where it is offered (Android and desktop Chromium); the browser menu route for Chrome, Samsung Internet and Firefox on Android (generic wording for other Android browsers); Share, Add to Home Screen, Add in Safari on iPhone and iPad, and Share in the address bar for Chrome and Firefox on iOS; File, Add to Dock in Safari on a Mac; the menu route in Chrome and Edge on a computer; a bookmark in Firefox on a computer, which cannot install. Links opened inside another app (Instagram, Facebook, Messenger, the Google app and similar web views) are told to open Hippo in Safari or Chrome first, with "Copy link" (Hippo's own address, never a share link). Detection is a pure function of the user agent, client hint brands, touch points, whether Hippo runs installed and whether the prompt was offered, and falls back to generic wording when unsure.
   - Order: an app added to the Home Screen on iPhone and iPad (and to the Dock from Safari on a Mac) keeps its own storage, separate from the browser's, so there the step comes straight after the opening screen, says so in one sentence, and offers "Carry on in the browser"; the installed app starts setup afresh. In-app browsers also get it first. On Android and other computers the browser and installed app share storage, so the step comes just before "add wishes from anywhere". Running installed, there is no install step and it is not counted in the progress.
   - Later: the Home "Get set up" checklist includes the install task where installing is possible on the device (not Firefox on a computer), ticked once Hippo runs installed or the browser reports it installed; it opens the same steps in a sheet. Settings has an "Install Hippo" section with the same steps and, where the installed app keeps its own copy, how to move wishes across (Export backup in the browser, Import backup in the app). Nothing about installing is shown to givers, and nothing pops up on its own.
+- FR-10d Android app. The same web app inside a Capacitor shell, with its files in the APK and its data in the app's own WebView storage (separate from the browser's; moved with a backup file). It adds: Hippo in Android's share sheet (ACTION_SEND, text/plain), handled at a cold start and while running, through the same capture path as FR-9; Back and the predictive back gesture closing an open sheet first, then going back in history, then leaving from a top-level screen; edge-to-edge layout with safe-area insets and system bar icons that follow the screen; a splash screen and an adaptive launcher icon from the hippo glyph; light haptic feedback when a gift is marked, a switch is turned or a deletion is confirmed (none under reduced motion or with touch feedback off); the system share sheet for share links and for saving a backup file. Every link the app makes or copies points at the public website (`HIPPO_SITE_URL` at build time), because the app's own address is local. Links to that website can open in the app where Android allows it (the person turns it on under Open by default; a GitHub Pages project site cannot publish the verification file), and Lists has "Open a list from a link" for a pasted link. There is no install step, install task or service worker in the app. Its data is excluded from Android cloud backup and device transfer, because it holds list keys. The only permission is Internet.
+- FR-10e Reading shop pages (Android app only, on by default, a switch in Settings under Shop pages with the sentence "Hippo opens the shop page from your phone to read its name, picture and price; nothing is sent to anyone else."). For a link that was pasted, shared or prefilled, when the name, picture or price is empty, the phone fetches the page itself: `https` and public hosts only, every redirect and every resolved address checked, 8 seconds, 1.5 MB, no cookies, HTML only. Open Graph and product meta tags and JSON-LD `Product`/`Offer` data are read from an inert parsed copy, validated like any other input, and fill only empty fields; a newer link cancels the lookup. Microlink (FR-10a) is not offered in the app.
 - FR-10a Link preview (opt-in, off by default). For a wish added by pasting a link or through the Android share sheet, Hippo can ask one third-party service (Microlink, `api.microlink.io`) for the page's title and picture. It runs only after the user turns it on in Settings, sends only the link (tracking parameters and fragment removed, https only), times out after a few seconds, and fills only fields the user has left empty. Answers are validated like any other untrusted input. The bookmarklet and Shortcut read the page themselves and need no third party; they remain the recommended method.
 
 ### 4.3 Shared lists (owner)
@@ -71,7 +73,7 @@ Status: v1 in development. License: MIT.
 - FR-21 A giver may set a nickname for a list. It is shown to other givers next to their claims and pledges. Without one, they appear as "Someone".
 - FR-22 Item states for givers: available, partly funded, fully funded, claimed, purchased, removed by owner.
 - FR-23 If two givers claim the same item at the same time, the earliest claim wins and the later giver sees a conflict notice on their own claim. A giver is told their claim worked only when other devices would accept and count it.
-- FR-23a A device whose clock is wrong must not change who is getting what. The app measures the device clock against its own web host's `Date` header and uses the corrected time for every date it writes or checks (PROTOCOL.md section 10, note 13), and says once, plainly, when the clock is more than about two minutes off.
+- FR-23a A device whose clock is wrong must not change who is getting what. The app measures the device clock against its own web host's `Date` header (in the Android app, the public website's, through native HTTP) and uses the corrected time for every date it writes or checks (PROTOCOL.md section 10, note 13), and says once, plainly, when the clock is more than about two minutes off.
 - FR-24 Opened lists are remembered on the giver's device under "Lists shared with me". Removing one hides it but keeps the giver's identity, so opening the link again lets them change or take back their claims. After a list is opened, the share link's secret is replaced in the address bar by the remembered list's address; givers can copy the link from the list to invite others.
 - FR-25 If the giver is also the owner of that list on this device, the app refuses to show claim state and explains why.
 
@@ -79,9 +81,9 @@ Status: v1 in development. License: MIT.
 
 - FR-26 List content and claims are end-to-end encrypted. The decryption key travels only in the URL fragment of the share link. Relays store ciphertext.
 - FR-27 Only the owner's key can publish or change list content. Only a claim's author can change or withdraw that claim.
-- FR-28 The app makes no requests to third parties except the configured relays, item images that the owner chose to attach (loaded with `referrerpolicy="no-referrer"`, from any `https` host), and, only after the owner opts in (FR-10a), the link preview service. Its own host is asked for the time (a HEAD request to the app's address).
-- FR-29 Hippo refuses to run inside another site's frame (GitHub Pages cannot send `frame-ancestors`): before the app starts it shows a message with a link that opens Hippo in its own tab.
-- FR-30 Settings can show deployment checks: HTTPS, an origin of its own, not framed, service worker, storage, persistent storage and relay reachability, each with a plain-language finding and fix.
+- FR-28 The app makes no requests to third parties except the configured relays, item images that the owner chose to attach (loaded with `referrerpolicy="no-referrer"`, from any `https` host), and, only after the owner opts in (FR-10a), the link preview service. Its own host is asked for the time (a HEAD request to the app's address). The Android app also asks the public website for the time, and fetches the shop pages of links the person adds unless that is turned off (FR-10e); it never contacts Microlink.
+- FR-29 Hippo refuses to run inside another site's frame (GitHub Pages cannot send `frame-ancestors`): before the app starts it shows a message with a link that opens Hippo in its own tab. The Android app is never framed and skips the check.
+- FR-30 Settings can show deployment checks: HTTPS, an origin of its own, not framed, service worker, storage, persistent storage and relay reachability, each with a plain-language finding and fix. The Android app leaves out the origin, service worker and persistent storage checks.
 
 Threat model:
 
@@ -112,11 +114,12 @@ Known limitation: hiding claims from the owner is enforced by the app, not by cr
 - Accessibility: WCAG 2.2 AA. Keyboard operable, visible focus, 44px minimum touch targets, respects `prefers-reduced-motion`, `prefers-reduced-transparency` and `prefers-contrast`.
 - Performance: initial JS under 200 kB gzip; interactive in under 2 s on a mid-range phone.
 - Privacy: no analytics, no third-party fonts or scripts.
-- Browser support: current Chrome, Edge, Firefox, Safari (desktop and mobile).
+- Browser support: current Chrome, Edge, Firefox, Safari (desktop and mobile). Android app: Android 7.0 (API 24) and later, built against API 36.
 
 ## 6. Architecture summary
 
 - Static PWA: React + TypeScript + Vite, deployed to GitHub Pages by a GitHub Actions workflow.
+- Android app: the same build in native mode (`vite build --mode native`) inside Capacitor 8, built into an APK by the Android workflow. Native-only code is in `src/app/native/`, loaded with dynamic imports and left out of the website build; the app's three small plugins (share target, page fetch, haptics) are Java in `android/`.
 - Local data: IndexedDB via Dexie.
 - Sync: end-to-end encrypted events on public Nostr relays, behind a `Transport` interface so another backend can replace relays. See `PROTOCOL.md`.
 - Design system: see `DESIGN.md`.
@@ -127,7 +130,8 @@ Code layout:
 |---|---|
 | `src/core/` | Framework-free TypeScript: model, crypto, protocol, transports, database, services |
 | `src/ui/` | Design system: tokens, styles, components |
-| `src/app/` | Screens, routing, hooks that bind `core` to `ui` |
+| `src/app/` | Screens, routing, hooks that bind `core` to `ui`; `src/app/native/` for the Android app |
+| `android/` | The Capacitor Android project |
 | `e2e/` | Playwright end-to-end tests |
 | `docs/` | This document, protocol, design system |
 
@@ -141,4 +145,5 @@ Code layout:
 | M3 | Claims, pledges, conflicts, owner-side hiding, device clock correction | Done |
 | M4 | Share target, deep link, bookmarklet, iOS Shortcut recipe | Done; the Shortcut recipe has not been checked on every iOS version |
 | M5 | Recovery code, multi-device sync, optional self-hosted relay | Planned |
+| M6 | Android app: Capacitor shell, share target, on-device page reading, system bars, back, haptics, signed APK on Releases | Built; the APK compiles. The workflow's emulator check and behaviour on real phones are not yet confirmed |
 | M5a | Weekly relay health check (`relay-health` workflow) with 1, 4 and 12 week retention probes | Done; needs several months of runs before retention numbers mean anything |

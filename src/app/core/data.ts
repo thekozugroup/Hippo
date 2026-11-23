@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import {
   getItem,
   getLinkPreviewEnabled,
+  getPageLookupEnabled,
   getSettings,
   getSharedList,
   listCategories,
@@ -59,4 +60,10 @@ export function useSettings(): Settings | undefined {
 export function useLinkPreviewEnabled(): boolean | undefined {
   const { db } = useCore()
   return useLiveQuery(() => getLinkPreviewEnabled(db), [db])
+}
+
+/** The Android app's "Read shop pages" setting (on unless turned off). */
+export function usePageLookupEnabled(): boolean | undefined {
+  const { db } = useCore()
+  return useLiveQuery(() => getPageLookupEnabled(db), [db])
 }

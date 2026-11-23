@@ -50,6 +50,14 @@ For wishes added from a pasted link or the share sheet. Off by default; see the 
 
 The UI toggle must show this sentence, unchanged (`LINK_PREVIEW_DISCLOSURE`): "Hippo will send each link you add to Microlink (api.microlink.io), a third-party service, so it can look up the page's title and picture. Nothing else is sent." Call `lookupLinkPreview` only for a link the user just added, never for links read from lists. A price is returned only if the service supplies one; Microlink usually does not.
 
+### Reading shop pages on the device (Android app; shown as "Shop pages" in Settings)
+
+| Function | What it does |
+|---|---|
+| `getPageLookupEnabled(db)`, `setPageLookupEnabled(db, enabled)` | On unless turned off: key `PAGE_LOOKUP_SETTING_KEY` (`'pageLookup'`) holds `false` when off. Not in backups (a per-device choice). The switch must show `PAGE_LOOKUP_DISCLOSURE` unchanged. |
+| `lookupPageOnDevice(url, { db, fetchPage, parseHtml?, timeoutMs?, signal? })` | Never throws; the same results as `lookupLinkPreview`. Fetches the cleaned link (as `previewRequestUrl`) through `fetchPage` (the app's native page fetch) with `PAGE_MAX_BYTES` (1.5 MB) and `PAGE_TIMEOUT_MS` (8 s), checks the address after redirects again (`isAcceptablePageUrl`), reads HTML only. `fetchPage` reports refusals with `PageFetchError` (`blocked`, `timeout`, `network`). |
+| `metadataFromHtml(html, pageUrl, parseHtml?)` | Pure: name, picture and price from JSON-LD `Product`/`Offer` (also inside `@graph` and arrays), Open Graph and product meta tags, then the page title. Parses an inert copy with DOMParser; relative pictures resolve against the page; values are validated with `LIMITS` and `parsePrice`. |
+
 ## Shared lists I own (`core` as deps)
 
 | Function | What it does |
@@ -101,7 +109,7 @@ Claim actions return `{ claim, result: PublishResult, outcome }`. `outcome` is w
 |---|---|
 | `isFramed(window)` | True when `window.top !== window.self` (or reading it throws). |
 | `blockIfFramed(window, document, location.href)` | Used by `src/main.tsx` before anything starts. When framed, replaces the page with a plain message and a link that opens Hippo in its own tab, and returns `true`. |
-| `checkDeployment(env)` | Returns `Promise<DeploymentCheck[]>`. Never throws; waits at most the relay timeout (default 4 s). |
+| `checkDeployment(env)` | Returns `Promise<DeploymentCheck[]>`. Never throws; waits at most the relay timeout (default 4 s). `env.skip` lists checks to leave out (the Android app skips `own-origin`, `service-worker` and `persistent-storage`). |
 | `browserDeploymentEnv(relays)` | Builds `env` from the real `window`, `navigator`, `indexedDB` and `WebSocket`. Settings (the **Deployment checks** row, at the bottom) calls `checkDeployment(browserDeploymentEnv(relays))` with the forced test relays, else `getSettings(db).relays`, else `DEFAULT_RELAYS`. |
 
 ```ts
@@ -114,7 +122,7 @@ interface DeploymentCheck {
 }
 ```
 
-The list always has these seven entries in this order. `unknown` means the browser or the situation gave no answer (for example the storage API is missing, or the device is offline), not that something is wrong. The `relays` finding reads "N of M relays answered." Show `problem` first, then `warning`, then `unknown`; show `fix` only when it is not empty. Tests inject `env` (`location`, `framed`, `navigator`, `probeIndexedDb`, `createWebSocket`, `relays`, `relayTimeoutMs`).
+The list has these seven entries in this order, less any in `env.skip`. `unknown` means the browser or the situation gave no answer (for example the storage API is missing, or the device is offline), not that something is wrong. The `relays` finding reads "N of M relays answered." Show `problem` first, then `warning`, then `unknown`; show `fix` only when it is not empty. Tests inject `env` (`location`, `framed`, `navigator`, `probeIndexedDb`, `createWebSocket`, `relays`, `relayTimeoutMs`).
 
 ## Backup and settings
 
@@ -128,4 +136,4 @@ The list always has these seven entries in this order. `unknown` means the brows
 
 ## Other exports
 
-`resolveItemState`, `parseShareLink`, `isSafeHttpUrl` (check before rendering any URL as a link or image), `LIMITS`, `DEFAULT_RELAYS`, `MemoryTransport`/`MemoryNetwork`, `NostrTransport`, `createNostrTransportProvider`, `staticTransport`, `HippoDb`/`openDb`, and the model types.
+`resolveItemState`, `parseShareLink`, `extractSharePayload`, `isSafeHttpUrl` (check before rendering any URL as a link or image), `LIMITS`, `DEFAULT_RELAYS`, `MemoryTransport`/`MemoryNetwork`, `NostrTransport`, `createNostrTransportProvider`, `staticTransport`, `HippoDb`/`openDb`, and the model types.

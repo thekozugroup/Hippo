@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Files other apps may open through the app's FileProvider: only backup files the person chose
+     to share (src/app/native/share.ts writes them to the cache folder "backups"). -->
+<paths>
+    <cache-path name="backups" path="backups/" />
+</paths>

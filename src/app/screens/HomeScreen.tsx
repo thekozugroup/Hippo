@@ -5,6 +5,7 @@ import { useGuestLists, useItems, useSettings, useSharedLists } from '../core/da
 import { AppScreen } from '../layout/AppScreen.tsx'
 import { setupChecklist } from '../core/onboarding.ts'
 import { useInstallGuide } from '../pwa/useInstall.ts'
+import { isNativeApp } from '../native/platform.ts'
 import { formatAdded, safeUrl } from '../lib/format.ts'
 import { BackupReminder } from './BackupReminder.tsx'
 import { GuestListRow, OwnedListRow } from './lists/ListRows.tsx'
@@ -49,7 +50,8 @@ export function HomeScreen() {
           wishes: count,
           sharedLists: (lists ?? []).filter((l) => l.status === 'published').length,
           lastExportAt: settings.lastExportAt,
-          install: { possible: guide.canInstall, done: installed },
+          // The Android app is already installed: no install task.
+          install: { possible: guide.canInstall && !isNativeApp(), done: installed },
         })
       : null
 

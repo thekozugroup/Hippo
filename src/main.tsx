@@ -8,10 +8,12 @@ import { getAppCore } from './app/core/core.ts'
 import { handleStartupCapture } from './app/core/capture.ts'
 import { applyTheme, readStoredTheme } from './app/core/theme.ts'
 import { blockIfFramed } from './core/services/frame-guard.ts'
+import { isNativeApp, startNativeShell } from './app/native/index.ts'
 
 // GitHub Pages cannot send frame-ancestors, so refuse to run inside another
 // site's frame: show a message and start nothing (no database, no relays).
-if (!blockIfFramed(window, document, window.location.href)) {
+// The Android app's WebView is never framed, so the check is skipped there.
+if (isNativeApp() || !blockIfFramed(window, document, window.location.href)) {
   // Before the first render: pinned theme (no flash), relay override, then
   // share-target / deep-link capture, which also strips the query string.
   applyTheme(readStoredTheme())
@@ -28,4 +30,6 @@ if (!blockIfFramed(window, document, window.location.href)) {
       <App />
     </StrictMode>,
   )
+  // Inside the Android app: back button, system bars, share target and the rest (src/app/native/).
+  startNativeShell()
 }

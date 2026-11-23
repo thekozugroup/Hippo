@@ -84,7 +84,7 @@
 .screen__nav-inner {
   position: absolute;
   inset-inline: 0;
-  inset-block-end: calc(var(--sp-3) + env(safe-area-inset-bottom));
+  inset-block-end: calc(var(--sp-3) + var(--inset-bottom));
   display: flex;
   justify-content: center;
 }
@@ -98,7 +98,7 @@
 }
 
 .screen--has-nav .screen__sheet {
-  padding-block-end: calc(var(--h-lg) + var(--sp-9) + env(safe-area-inset-bottom));
+  padding-block-end: calc(var(--h-lg) + var(--sp-9) + var(--inset-bottom));
 }
 
 .screen--dark {

@@ -2,7 +2,7 @@
   position: fixed;
   z-index: 40;
   inset-inline: var(--sp-4);
-  top: calc(var(--sp-3) + env(safe-area-inset-top));
+  top: calc(var(--sp-3) + var(--inset-top));
   max-width: calc(var(--col-max) - 2 * var(--sp-4));
   margin-inline: auto;
   display: flex;

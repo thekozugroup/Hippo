@@ -32,6 +32,8 @@ export interface SyncRetryOptions {
 export interface SyncRetry {
   /** Schedule a pass after the base delay (unless one is due already), e.g. after a local change failed to send. */
   nudge(): void
+  /** Conditions changed (the Android app came back to the foreground): run a pass now, as for `online`. */
+  resume(): void
   stop(): void
 }
 
@@ -106,6 +108,7 @@ export function startSyncRetry(run: () => Promise<RetryPass>, options: SyncRetry
   void pass()
 
   return {
+    resume: () => onEvent(),
     nudge: () => {
       // A change just failed to send: try again after the base delay (not at once, which would fail the same way).
       if (running || timer !== null) return

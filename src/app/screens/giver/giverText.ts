@@ -16,6 +16,11 @@ export const OFFLINE_SAVED_NOTE = 'Saved on this device. Hippo keeps trying to s
  * What to tell a giver after a claim action: the success message only when other devices would
  * accept and count it (the outcome is worked out with their rules), otherwise what happened.
  */
+/** Every action reached a relay and other devices will count it. */
+export function isCounted(results: readonly ClaimActionResult[]): boolean {
+  return results.length > 0 && results.every((r) => r.result.ok && r.outcome.kind === 'counted')
+}
+
 export function claimResultMessage(results: readonly ClaimActionResult[], success: string): string {
   if (results.some((r) => !r.result.ok)) return OFFLINE_SAVED_NOTE
   for (const { outcome } of results) {

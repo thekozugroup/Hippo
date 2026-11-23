@@ -9,8 +9,10 @@ import {
   isRelayUrl,
   LIMITS,
   LINK_PREVIEW_DISCLOSURE,
+  PAGE_LOOKUP_DISCLOSURE,
   parseExportFile,
   setLinkPreviewEnabled,
+  setPageLookupEnabled,
   setOnboarding,
   setOwnerName,
   setRelayOverride,
@@ -19,7 +21,7 @@ import {
   type Theme,
 } from '../../../core/index.ts'
 import { useCore } from '../../core/context.ts'
-import { useLinkPreviewEnabled, useSettings, useSharedLists } from '../../core/data.ts'
+import { useLinkPreviewEnabled, usePageLookupEnabled, useSettings, useSharedLists } from '../../core/data.ts'
 import { useNotify } from '../../core/notify.ts'
 import { applyTheme } from '../../core/theme.ts'
 import { newFlow, toStored } from '../../core/onboarding.ts'
@@ -35,6 +37,7 @@ import { moveWishesNote, whyInstall } from '../../pwa/guide.ts'
 import { InstallGuide } from '../../pwa/InstallGuide.tsx'
 import { useInstallGuide } from '../../pwa/useInstall.ts'
 import { DeploymentChecks } from './DeploymentChecks.tsx'
+import { isNativeApp } from '../../native/platform.ts'
 import './SettingsScreen.css'
 
 const SOURCE_URL = 'https://github.com/thekozugroup/Hippo'
@@ -190,8 +193,9 @@ function BackupSection() {
     if (exporting) return
     setExporting(true)
     try {
-      await downloadBackup(db, core.now())
-      notify('Backup saved. Keep the file somewhere private.')
+      const outcome = await downloadBackup(db, core.now())
+      if (outcome === 'saved') notify('Backup saved. Keep the file somewhere private.')
+      else if (outcome === 'shared') notify('Backup file ready. Keep it somewhere private.')
     } catch {
       notify('The backup could not be saved. Please try again.')
     } finally {
@@ -270,7 +274,7 @@ function BackupSection() {
       <input
         ref={fileInput}
         type="file"
-        accept="application/json,.json"
+        accept={isNativeApp() ? 'application/json,.json,text/plain,application/octet-stream' : 'application/json,.json'}
         className="sr-only"
         tabIndex={-1}
         aria-hidden="true"
@@ -320,6 +324,19 @@ function InstallSection() {
       <InstallGuide guide={guide} installed={installedHere}>
         {move ? <p className="install-guide__note">{move}</p> : null}
       </InstallGuide>
+    </section>
+  )
+}
+
+/** Inside the Android app, Hippo is in the share sheet; the bookmarklet and Shortcut are for other devices. */
+function AppCaptureSection() {
+  return (
+    <section className="app-stack" aria-labelledby="set-capture">
+      <h2 id="set-capture" className="app-section-title">
+        Add from other apps
+      </h2>
+      <p className="app-note">In any shop or browser, use Share and pick Hippo. The wish form opens with the link filled in.</p>
+      <p className="app-note">You can also paste a link into Add a wish.</p>
     </section>
   )
 }
@@ -413,6 +430,34 @@ function CaptureSection() {
           </Button>
         </div>
       </div>
+    </section>
+  )
+}
+
+/** The Android app reads shop pages itself, on the phone. On by default; the sentence is core's, unchanged. */
+function PageLookupSection() {
+  const { db } = useCore()
+  const notify = useNotify()
+  const enabled = usePageLookupEnabled()
+  const change = async (on: boolean) => {
+    try {
+      await setPageLookupEnabled(db, on)
+    } catch {
+      notify('Could not save this setting. Please try again.')
+    }
+  }
+  return (
+    <section className="app-stack" aria-labelledby="set-lookup">
+      <h2 id="set-lookup" className="app-section-title">
+        Shop pages
+      </h2>
+      <Switch
+        label="Fill in the name, picture and price"
+        description={PAGE_LOOKUP_DISCLOSURE}
+        checked={enabled === true}
+        disabled={enabled === undefined}
+        onChange={(e) => void change(e.target.checked)}
+      />
     </section>
   )
 }
@@ -549,7 +594,11 @@ function AboutSection() {
         <li>Shared lists, and who is getting or chipping in on what, are end-to-end encrypted. The key is in the link, which is never sent to any server.</li>
         <li>Hiding gifts from you, the owner, is done by the Hippo app, not by encryption: Hippo cannot stop you from opening your own link in another browser. Please do not peek.</li>
         <li>Chipping in is a promise between friends. Hippo never handles money.</li>
-        <li>The only other requests Hippo makes are for pictures you attach to wishes, and for link lookups if you turn them on.</li>
+        <li>
+          {isNativeApp()
+            ? 'The only other requests Hippo makes are for pictures you attach to wishes, for the shop pages of links you add (if that is on), and to the Hippo website to check the time.'
+            : 'The only other requests Hippo makes are for pictures you attach to wishes, and for link lookups if you turn them on.'}
+        </li>
       </ul>
       <div className="app-row">
         <a className="btn btn--secondary btn--md" href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
@@ -581,10 +630,10 @@ export default function SettingsScreen() {
           </Button>
         </div>
       </section>
-      <InstallSection />
+      {isNativeApp() ? null : <InstallSection />}
       <BackupSection />
-      <CaptureSection />
-      <LinkLookupSection />
+      {isNativeApp() ? <AppCaptureSection /> : <CaptureSection />}
+      {isNativeApp() ? <PageLookupSection /> : <LinkLookupSection />}
       <RelaySection />
       <AboutSection />
       <DeploymentChecks />

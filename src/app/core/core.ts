@@ -3,6 +3,8 @@
 
 import { applyRelayOverrideFromUrl, createCore, retryPendingSync, TimeSync, type Core } from '../../core/index.ts'
 import { startSyncRetry, type SyncRetry } from '../lib/sync-retry.ts'
+import { PUBLIC_SITE_URL } from '../lib/site-address.ts'
+import { clockFetch, isNativeApp } from '../native/index.ts'
 
 let instance: Core | null = null
 let retry: SyncRetry | null = null
@@ -22,10 +24,16 @@ function localStore(): Storage | null {
 /**
  * The corrected clock: the `Date` header of a HEAD request to the app's own address (the host that
  * serves Hippo, never a third party). Measured at start, every 30 minutes, when the page becomes
- * visible again, and when the device clock jumps.
+ * visible again, and when the device clock jumps. Inside the Android app the page's own origin has no
+ * server, so the request goes to the public website through native HTTP; without an answer the
+ * device clock is used, as on the website.
  */
 function startTimeSync(): TimeSync {
-  const sync = new TimeSync({ url: new URL('./', window.location.href), storage: localStore() })
+  const nativeFetch = clockFetch()
+  const sync =
+    nativeFetch && PUBLIC_SITE_URL
+      ? new TimeSync({ url: PUBLIC_SITE_URL, fetch: nativeFetch, storage: localStore() })
+      : new TimeSync({ url: new URL('./', window.location.href), storage: localStore() })
   void sync.ready()
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void sync.refreshIfOlderThan(VISIBLE_REFRESH_MS)
@@ -46,6 +54,16 @@ export function getAppCore(): Core {
     retry = startSyncRetry(() => retryPendingSync(core))
   }
   return instance
+}
+
+/**
+ * The Android app came back to the foreground (its WebView may not report it as a visibility
+ * change): retry pending sync and measure the clock again if the last answer is old.
+ */
+export function appResumed(): void {
+  if (!isNativeApp()) return
+  retry?.resume()
+  void timeSync?.refreshIfOlderThan(VISIBLE_REFRESH_MS)
 }
 
 /** Asks the background retry to run soon, e.g. after a change could not be sent. No-op in tests that pass their own core. */

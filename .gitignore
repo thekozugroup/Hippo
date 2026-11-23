@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Android app: web assets built for the app (npm run android:web)
+dist-native

@@ -100,7 +100,8 @@ export function previewServiceRequest(cleanedUrl: string): string {
 // Titles that anti-bot pages return instead of the real page.
 const BLOCK_PAGE_TITLES = /^(just a moment|access denied|attention required|robot check|are you a robot|captcha|403 forbidden|404|page not found|error|blocked|verify you are human)/i
 
-function cleanTitle(value: unknown): string | undefined {
+/** A page title as untrusted input: control and bidi characters removed, block-page titles refused, cut to the title limit. */
+export function cleanTitle(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
   // Control characters and bidi overrides have no place in a title.
   const flat = value.replace(/[\p{Cc}\p{Cf}]/gu, ' ').replace(/\s+/g, ' ').trim()
@@ -109,7 +110,8 @@ function cleanTitle(value: unknown): string | undefined {
   return cps.length > LIMITS.title ? cps.slice(0, LIMITS.title).join('').trim() : flat
 }
 
-function cleanImageUrl(value: unknown): string | undefined {
+/** A picture address as untrusted input: https only, no credentials, within the URL limit. */
+export function cleanImageUrl(value: unknown): string | undefined {
   const raw = typeof value === 'string' ? value : isRecord(value) && typeof value.url === 'string' ? value.url : undefined
   if (raw === undefined || raw.length === 0 || raw.length > LIMITS.url) return undefined
   try {

@@ -24,7 +24,7 @@
   width: 100%;
   max-width: var(--col-max);
   min-width: 0;
-  padding: calc(var(--sp-3) + env(safe-area-inset-top)) var(--gutter) calc(var(--sp-4) + env(safe-area-inset-bottom));
+  padding: calc(var(--sp-3) + var(--inset-top)) var(--gutter) calc(var(--sp-4) + var(--inset-bottom));
 }
 
 .step-screen__top {

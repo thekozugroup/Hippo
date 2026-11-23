@@ -15,7 +15,7 @@ html {
 /* The floating bottom nav must not hide a focused control (WCAG 2.4.11): leave room for it
    when the browser scrolls focus into view. */
 html:has(.screen--has-nav) {
-  scroll-padding-block-end: calc(var(--h-lg) + var(--sp-9) + env(safe-area-inset-bottom));
+  scroll-padding-block-end: calc(var(--h-lg) + var(--sp-9) + var(--inset-bottom));
 }
 
 /* Modal bottom sheet open: the page behind does not scroll. */
@@ -145,4 +145,47 @@ html[data-boot='setup'] {
 }
 html[data-boot='setup'] body {
   background: transparent;
+}
+
+/* Android app (html[data-native], set by src/app/native/). None of this applies on the website.
+   The page runs edge to edge under the system bars. The status bar's icons are always light
+   (src/app/native/logic.ts), so once the page scrolls under it a backdrop in the hero's top
+   colour fades in behind it, and its icons stay readable over the white sheet. */
+html[data-native] body::before {
+  content: '';
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 40;
+  height: var(--inset-top);
+  background: var(--system-bar-fill);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+}
+html[data-native][data-scrolled] body::before {
+  opacity: 1;
+}
+/* Setup's night field is dark in both themes. */
+html[data-native][data-field='night'] body::before {
+  background: var(--slate-950);
+}
+
+/* While the keyboard is open the floating navigation steps aside, so the focused field and the
+   form's own actions have the room above the keyboard. */
+html[data-native][data-keyboard] .screen__nav {
+  visibility: hidden;
+}
+
+/* Touch behaves like an app: no grey flash on tap, no text selection or callout when a control
+   or a label is pressed for long, no sideways rubber band. Text in fields, notes and code can
+   still be selected and copied. */
+html[data-native] {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-x: none;
+}
+html[data-native] :is(a, button, label, summary, h1, h2, h3, nav, .top-bar, .list-row, .chip, .switch, .segmented, .app-section-title, img, svg) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }

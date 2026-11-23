@@ -7,7 +7,7 @@ Keep one private wishlist. Link items from it into shared lists for each occasio
 - No accounts. No sign-up for you or for the people you share with.
 - No backend. Hippo is a static web app. Your wishlist lives on your device.
 - End-to-end encrypted sharing. Shared lists and claims are stored as ciphertext on public relays; the key is in the link you send.
-- Installable. There is no app-store app: your browser installs Hippo as an app with its own icon. Setup shows the steps for your phone or computer, and Settings has them under Install Hippo.
+- Installable. Your browser installs Hippo as an app with its own icon. Setup shows the steps for your phone or computer, and Settings has them under Install Hippo. On Android there is also an app (see [Android app](#android-app)), built from the same code.
 - MIT licensed.
 
 ## How it works
@@ -41,6 +41,64 @@ Details are in [`docs/PROTOCOL.md`](docs/PROTOCOL.md). Product scope is in [`doc
 One limit to know about: hiding claims from the owner is enforced by the app, not by cryptography. You created the link, so you could open it in another browser and peek. Hippo will not show you, but it cannot stop you.
 
 Hippo records pledges; it does not move money. Givers settle up among themselves.
+
+## Android app
+
+Hippo also comes as an Android app. It is the same app as the website, inside a native Android shell, with its files in the APK. Lists you share from it open on the website, so family and friends still need only a browser.
+
+What the app adds:
+
+- Hippo is in Android's share sheet from the start. In a shop or browser, tap Share, then Hippo, and Add a wish opens with the link.
+- It reads the name, picture and price of a shop page itself, on your phone, and fills the fields you left empty. Nothing is sent to anyone else. You can turn this off in Settings, under Shop pages.
+- The Back button and the back gesture close an open sheet first, then go back.
+- It draws under the status and navigation bars, has a splash screen and its own icon, and gives light haptic feedback when a gift is marked, a switch is turned or a deletion is confirmed (not under reduced motion, and not when touch feedback is off in Android settings).
+- Share buttons open Android's share sheet, and Export backup saves the file through it (to Files, Drive or email).
+
+Your data stays on the phone, in the app's own storage, separate from the browser's. To move wishes between them, use Export backup in one and Import backup in the other. Android's cloud backup leaves Hippo's data out, because it holds the keys of your shared lists. Use Export backup.
+
+### Get the APK
+
+1. Open the repository's **Releases** page and download `hippo-<version>.apk` under **Assets**.
+2. Open the file on the phone. Allow installing from that source when Android asks.
+
+A file named `...-debug-temporary-key.apk` was built without the signing key. It works, but a later APK cannot update it: export a backup, uninstall it, then install the new one.
+
+Links to the website open in the browser. To open them in the app instead, go to **App info, Open by default, Add link** and tick the website. Android only does this on its own for sites that publish a verification file at the root of their domain, which a GitHub Pages project site cannot do. Inside the app, **Lists** also has **Open a list from a link**, where you can paste a link.
+
+### Build it yourself
+
+You need Node 22, JDK 21 and the Android SDK with platform 36 (Android Studio installs it).
+
+```
+export ANDROID_HOME=$HOME/Android/Sdk
+export HIPPO_SITE_URL=https://<owner>.github.io/<repo>/
+npm run android:apk    # android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+`npm run android:sync` builds the web app for the app (into `dist-native/`) and copies it into `android/`. Open `android/` in Android Studio to run it on a phone. `npm run icons:android` draws the launcher icon and the splash mark again from the hippo glyph.
+
+**The site address.** `HIPPO_SITE_URL` is the public website that share links made in the app point at. The build stops without it. The Android workflow uses this repository's GitHub Pages address; set a repository variable named `HIPPO_SITE_URL` (Settings, Secrets and variables, Actions, Variables) to use a custom domain. Choose it before you share lists from the app, because the links contain it.
+
+### Signing
+
+Android updates an installed app only with an APK signed by the same key. Make the key once and keep it safe; if it is lost, everyone has to uninstall to update.
+
+```
+keytool -genkeypair -v -keystore hippo-release.jks -alias hippo -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Then add four repository secrets (Settings, Secrets and variables, Actions):
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | The output of `base64 -w0 hippo-release.jks` (macOS: `base64 -i hippo-release.jks`) |
+| `ANDROID_KEYSTORE_PASSWORD` | The keystore password you chose |
+| `ANDROID_KEY_ALIAS` | `hippo` |
+| `ANDROID_KEY_PASSWORD` | The key password (the same as the keystore password unless you chose another) |
+
+Never commit the keystore. Run **Actions, Android app, Run workflow** to build an APK (it is under the run's Artifacts), or push a tag such as `v0.2.0` to attach it to a GitHub Release. Without the secrets the workflow builds a debug APK and says so in the run summary. Each run also starts the APK on an emulator and fails if Hippo's first screen does not appear.
+
+The application id is `io.github.thekozugroup.hippo`. A fork that publishes its own app should change it (in `capacitor.config.ts` and `android/app/build.gradle`) before its first release; it cannot change afterwards without losing updates in place.
 
 ## Run your own copy
 
@@ -96,7 +154,7 @@ Open your site, go to **Settings**, scroll to the bottom and open **Deployment c
 | Storage | The browser can store data, and has promised not to delete it. |
 | Relays | How many of the configured relays answered a test connection. |
 
-"Unknown" means the browser did not give an answer. It does not mean something is wrong.
+"Unknown" means the browser did not give an answer. It does not mean something is wrong. In the Android app the address, service worker and storage checks are left out, because they are about a browser tab.
 
 ### 7. Watch the relays
 
@@ -127,6 +185,7 @@ GitHub switches off scheduled workflows after 60 days without any activity in th
 - **Device clocks.** Claims are ordered by time, and a device whose clock is wrong would disagree with everyone else about who is getting a gift. Hippo measures the device clock against the `Date` header of a request to its own address (never a third party) and uses the corrected time; it tells the person once when the clock is more than about two minutes off. Without an answer (offline on a first visit) it uses the device clock.
 - **Content-Security-Policy is set by a `<meta>` tag**, because GitHub Pages cannot send custom headers. The policy allows plain `ws:` only for loopback addresses (the developer relay override), so test and production builds are identical. `require-trusted-types-for 'script'` is not set: with it, Chromium blocks the service worker registration (a `TrustedScriptURL` sink) unless a Trusted Types policy is added.
 - **Link lookup is off by default.** If you turn on **Link lookup** in Settings, Hippo sends the link of each wish you add to Microlink (`api.microlink.io`), a third-party service, so it can look up the page's title and picture. Only the link is sent, after tracking parameters and the part after `#` are removed, and only for `https` links to public sites. Microlink sees the link and your IP address, as any web server would. Nothing is sent to it while the setting is off. Besides the relays and Hippo's own address, the content policy allows two kinds of outside requests: this one host, and pictures over `https` from any host, because a wish's picture can come from any shop (PRD FR-28).
+- **Android app.** The app asks for one permission, Internet. Its content policy is the website's without the parts it does not use (no service worker, no manifest, no Microlink). WebView debugging is off in release builds, and Capacitor's logging is off in every build, so share links and shared text never reach the device log. Reading a shop page fetches only `https` pages on public hosts, checks every redirect and every address the host name resolves to (no loopback, private, link-local or reserved ranges), stops after 8 seconds and 1.5 MB, sends no cookies, and reads only HTML. The page is parsed without running it, and only the name, picture and price are kept, validated like any other input. One limit: a host that gives a different DNS answer to the check and to the connection is not caught. Android's cloud backup and device-to-device transfer leave Hippo's data out.
 - **Removing a list shared with you** hides it on this device but keeps your guest key, so opening the link again lets you change or take back what you said you would get. Backups include hidden lists.
 
 ## Develop
@@ -141,6 +200,7 @@ npm run lint
 npm run typecheck
 npm run build      # production build in dist/
 npm run relay-health  # test the default relays (needs internet)
+npm run android:apk   # Android debug APK (see Android app)
 ```
 
 Source layout:
@@ -149,7 +209,8 @@ Source layout:
 |---|---|
 | `src/core/` | Framework-free TypeScript: data model, crypto, protocol, transports, database, services |
 | `src/ui/` | Design system: tokens, styles, components |
-| `src/app/` | Screens and routing |
+| `src/app/` | Screens and routing; `src/app/native/` holds everything specific to the Android app |
+| `android/` | The Android project (Capacitor), with the app's small native plugins |
 | `e2e/` | Playwright end-to-end tests |
 | `scripts/` | Maintainer scripts: icons, the link preview picture (`node scripts/generate-og-image.mjs`), relay health check |
 
@@ -161,6 +222,7 @@ Source layout:
 | Share sheet (Android, with Hippo installed) | Title and link, whatever the sharing app provides | None |
 | Pasting a link | A title guessed from the link | None |
 | Pasting a link or using the share sheet, with Link lookup turned on | Title and picture looked up for you | Microlink, see security notes |
+| Android app: the share sheet or a pasted link | Title, picture and price, read from the shop page by your phone | None |
 
 The bookmarklet and the Shortcut run inside the page you are viewing, so they can read its picture and price. They hand these to Hippo in the address, and no other site is contacted. This is the method that works without any third party. A static site cannot read another site's page by itself, which is why the other methods need either the sharing app's help or the optional Link lookup.
 

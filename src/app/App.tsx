@@ -26,9 +26,11 @@ import { welcomeStepsFor } from './core/onboarding.ts'
 import { setWelcomeOrder } from './layout/routeMotion.ts'
 import { installGuideFor, installPlacement, readInstallEnv } from './pwa/guide.ts'
 import { isStandalone, onInstallChange, wasInstalledHere } from './pwa/install.ts'
+import { isNativeApp } from './native/platform.ts'
 
 // Setup's step order depends on where installing fits on this device; it is fixed for the page's life.
-setWelcomeOrder(welcomeStepsFor(installPlacement(installGuideFor(readInstallEnv(false)))))
+// Inside the Android app Hippo is already an app: there is no install step.
+setWelcomeOrder(welcomeStepsFor(isNativeApp() ? 'none' : installPlacement(installGuideFor(readInstallEnv(false)))))
 
 // Home, wishlist and lists load with the app; editors, the giver view,
 // settings and first-run setup load on first use (and are precached for
@@ -101,7 +103,8 @@ function DocumentTitle() {
 function InstallRecorder() {
   const core = useCore()
   const settings = useSettings()
-  const known = settings === undefined || settings.seen.appInstalled !== undefined
+  // The Android app is not the installed website, so it records nothing here.
+  const known = settings === undefined || settings.seen.appInstalled !== undefined || isNativeApp()
   useEffect(() => {
     if (known) return
     const record = () => {
@@ -215,7 +218,7 @@ export function App({ core }: { core?: Core }) {
               <BootFlag />
               <DocumentTitle />
               <Routes />
-              {import.meta.env.PROD && 'serviceWorker' in navigator ? (
+              {import.meta.env.PROD && !__HIPPO_NATIVE__ && 'serviceWorker' in navigator ? (
                 <Suspense fallback={null}>
                   <UpdatePrompt />
                 </Suspense>

@@ -5,7 +5,7 @@
   color: var(--text);
   border-radius: var(--r-sheet) var(--r-sheet) 0 0;
   box-shadow: var(--shadow-sheet);
-  padding: var(--sp-7) var(--gutter) calc(var(--sp-8) + env(safe-area-inset-bottom));
+  padding: var(--sp-7) var(--gutter) calc(var(--sp-8) + var(--inset-bottom));
   min-width: 0;
 }
 

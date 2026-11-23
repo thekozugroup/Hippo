@@ -124,7 +124,7 @@ export {
 export { exportData, importData, parseExportFile, type ExportFile, type ImportResult } from './services/backup.ts'
 
 export { resolveItemState, effectiveClaimTime, type ItemState, type ItemStatus, type ClaimRow, type ResolveClaim } from './protocol/resolve.ts'
-export { parseShareLink, type SharePayload } from './crypto/link.ts'
+export { parseShareLink, extractSharePayload, type SharePayload } from './crypto/link.ts'
 
 export type { Transport, TransportProvider, PublishResult, RelayResult, EoseInfo, Unsubscribe } from './transport/types.ts'
 export { staticTransport } from './transport/types.ts'
@@ -156,3 +156,19 @@ export {
   type LinkPreviewDeps,
   type LinkPreviewCurrent,
 } from './services/link-preview.ts'
+export {
+  lookupPageOnDevice,
+  metadataFromHtml,
+  isAcceptablePageUrl,
+  getPageLookupEnabled,
+  setPageLookupEnabled,
+  PageFetchError,
+  PAGE_LOOKUP_SETTING_KEY,
+  PAGE_LOOKUP_DISCLOSURE,
+  PAGE_MAX_BYTES,
+  PAGE_TIMEOUT_MS,
+  type FetchedPage,
+  type PageFetcher,
+  type PageFetchErrorCode,
+  type PageLookupDeps,
+} from './services/page-metadata.ts'

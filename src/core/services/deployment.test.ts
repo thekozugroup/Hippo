@@ -56,6 +56,18 @@ describe('checkDeployment', () => {
     }
   })
 
+  it('leaves out skipped checks without running them (the Android app skips the browser-only ones)', async () => {
+    const all = await checkDeployment(
+      good({
+        location: { protocol: 'https:', hostname: 'localhost', pathname: '/' },
+        navigator: { onLine: true, serviceWorker: { controller: null }, storage: { persisted: () => Promise.resolve(false) } },
+        skip: ['own-origin', 'service-worker', 'persistent-storage'],
+      }),
+    )
+    expect(all.map((c) => c.id)).toEqual(['https', 'not-framed', 'indexeddb', 'relays'])
+    expect(all.every((c) => c.status === 'ok')).toBe(true)
+  })
+
   describe('https', () => {
     it('ok on https', async () => expect((await check(good(), 'https')).status).toBe('ok'))
     it.each(['localhost', '127.0.0.1', '[::1]', 'app.localhost'])('ok on http %s', async (hostname) => {

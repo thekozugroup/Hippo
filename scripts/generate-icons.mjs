@@ -1,5 +1,6 @@
-// Renders Hippo's PWA icons from an inline SVG of the hippo glyph (the same
-// shapes as public/favicon.svg and src/ui/components/Logo.tsx) to PNG files
+// Renders Hippo's PWA icons from an inline SVG of the hippo glyph
+// (scripts/hippo-glyph.mjs, the same shapes as public/favicon.svg and
+// src/ui/components/Logo.tsx) to PNG files
 // in public/. Uses Playwright's Chromium, which only needs to be present when
 // the icons are regenerated:  npm run icons
 //
@@ -7,10 +8,13 @@
 //   public/icon-192.png, public/icon-512.png  rounded tile, purpose "any"
 //   public/icon-maskable-512.png              full-bleed, glyph inside the 80% safe zone
 //   public/apple-touch-icon.png (180)         full-bleed; iOS rounds the corners
+//
+// The Android app's icons and splash come from scripts/generate-android-icons.mjs.
 
 import { createRequire } from 'node:module'
 import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { BLUE_700, BLUE_900, GLYPH } from './hippo-glyph.mjs'
 
 const require = createRequire(import.meta.url)
 let chromium
@@ -20,26 +24,6 @@ try {
   ;({ chromium } = require('playwright-core'))
 }
 
-// Tailwind blue-700, blue-800 and blue-900, as in src/ui/styles/tokens.css.
-const BLUE_700 = '#1D4ED8'
-const BLUE_800 = '#1E40AF'
-const BLUE_900 = '#1E3A8A'
-
-/** The 48x48 glyph: white head with eyes and nostrils in the hero blue. */
-const GLYPH = `
-  <g fill="#fff">
-    <circle cx="5.5" cy="19" r="3.6"/>
-    <circle cx="42.5" cy="19" r="3.6"/>
-    <circle cx="15.5" cy="14.5" r="6.2"/>
-    <circle cx="32.5" cy="14.5" r="6.2"/>
-    <path d="M5 28c0-8 8-14 19-14s19 6 19 14v4c0 7-8 11-19 11S5 39 5 32z"/>
-  </g>
-  <g fill="${BLUE_800}">
-    <circle cx="15.5" cy="14.5" r="2.4"/>
-    <circle cx="32.5" cy="14.5" r="2.4"/>
-    <ellipse cx="17.5" cy="31" rx="2.6" ry="3.2"/>
-    <ellipse cx="30.5" cy="31" rx="2.6" ry="3.2"/>
-  </g>`
 
 /**
  * @param {number} size output pixels

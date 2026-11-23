@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Hippo keeps its data in the WebView's IndexedDB, which holds the keys of every shared list.
+         It is excluded from cloud backup and device transfer (res/xml/*_rules.xml); the app's own
+         backup file is the way to move to a new phone. -->
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
+        android:theme="@style/AppTheme.NoActionBar"
+        tools:targetApi="33">
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Share from another app (a browser or shop app): opens Add a wish with the shared
+                 title and link (SharedTextPlugin). Text only. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
+            <!-- Links to the public website (HIPPO_SITE_URL, see app/build.gradle). Android opens
+                 them in the app only once verified (a Digital Asset Links file at the domain root,
+                 which a GitHub Pages project site cannot serve) or after the person allows it under
+                 App info, Open by default. Otherwise they open in the browser. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="${hippoSiteHost}" />
+                <data android:pathPrefix="${hippoSitePath}" />
+            </intent-filter>
+
+        </activity>
+
+        <!-- Lets the share sheet hand a backup file to another app (res/xml/file_paths.xml). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+    <!-- The only permission Hippo asks for: relays, pictures, shop pages and the clock check. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

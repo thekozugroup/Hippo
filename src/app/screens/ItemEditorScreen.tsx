@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type Dispatch, type FormEvent, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ClipboardEvent, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import { Archive, ArchiveRestore, Plus, Trash2 } from 'lucide-react'
 import { useLocation } from 'wouter'
 import {
@@ -25,6 +25,7 @@ import {
   fillEmptyFields,
   findFirstHttpUrl,
   getLinkPreviewEnabled,
+  getPageLookupEnabled,
   getSettings,
   guessTitleFromUrl,
   IMPORTANCE_LEVELS,
@@ -42,7 +43,7 @@ import {
   type ItemPatch,
   type Money,
 } from '../../core/index.ts'
-import { clearCaptureDraft, peekCaptureDraft } from '../core/capture.ts'
+import { captureEpoch, clearCaptureDraft, peekCaptureDraft, subscribeCapture } from '../core/capture.ts'
 import { useCore } from '../core/context.ts'
 import { useCategories, useItem, useSharedLists } from '../core/data.ts'
 import { useNotify } from '../core/notify.ts'
@@ -50,6 +51,7 @@ import { requestPersistentStorage } from '../core/storage.ts'
 import { AppScreen } from '../layout/AppScreen.tsx'
 import { CURRENCIES, IMPORTANCE_LABEL, moneyInputValue, parseMoneyInput, priceExample, safeUrl } from '../lib/format.ts'
 import { clearFormDraft, readFormDraft, writeFormDraft } from '../lib/form-draft.ts'
+import { isNativeApp, lookupOnDevice } from '../native/index.ts'
 import { resyncItem, resyncLists } from '../lib/sync.ts'
 import './ItemEditorScreen.css'
 
@@ -200,6 +202,13 @@ const FAILURE_TEXT: Record<'rate-limited' | 'other', string> = {
   other: 'Could not look up this link. You can add the title and picture yourself.',
 }
 
+/** Inside the Android app the page is read on the phone, and a price can come with it. */
+const DEVICE_TEXT = {
+  pending: 'Reading the shop page\u2026',
+  nothing: 'No name, picture or price found on this page. You can add them yourself.',
+  failed: 'Could not read this page. You can add the details yourself.',
+} as const
+
 /** Words for what a lookup filled in. */
 function filledText(patch: { title?: string; imageUrl?: string; price?: Money }): string {
   const parts = [patch.title ? 'title' : '', patch.imageUrl ? 'picture' : '', patch.price ? 'price' : ''].filter(Boolean)
@@ -209,9 +218,11 @@ function filledText(patch: { title?: string; imageUrl?: string; price?: Money })
 }
 
 /**
- * Opt-in link lookup for the wish form. `start` is called for a link the user just pasted or was
- * handed (never for one read from a saved wish), and only asks the service when the setting is on
- * and the title or picture is still empty. The result fills empty fields only. A newer link, an
+ * Link lookup for the wish form. On the website it is the opt-in Microlink lookup; inside the
+ * Android app the phone reads the shop page itself (on unless turned off in Settings), and an empty
+ * price also counts as something to fill. `start` is called for a link the user just pasted or was
+ * handed (never for one read from a saved wish), and only looks up when the setting is on
+ * and the title or picture (or, in the app, the price) is still empty. The result fills empty fields only. A newer link, an
  * edit of the link field or leaving the screen cancels the lookup (its answer is dropped); nothing
  * is retried. With the setting off nothing is sent, and a pasted link without a picture gets one
  * quiet hint, once per device.
@@ -232,9 +243,10 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
     setNote(undefined)
   }
 
+  const onDevice = isNativeApp()
   const start = (url: string, now: FormState, pasted: boolean) => {
     const titleBlank = !now.title.trim() || now.title === guessTitleFromUrl(url)
-    if (!titleBlank && now.imageUrl.trim()) return
+    if (!titleBlank && now.imageUrl.trim() && (!onDevice || now.price.trim())) return
     if (run.current.url === url) return // one lookup per link, never a retry
     const id = run.current.id + 1
     run.current.controller?.abort()
@@ -242,8 +254,10 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
     run.current = { id, url, controller }
     setNote(undefined)
     void (async () => {
-      const on = await getLinkPreviewEnabled(core.db)
+      const on = onDevice ? await getPageLookupEnabled(core.db) : await getLinkPreviewEnabled(core.db)
       if (run.current.id !== id) return
+      // Turned off in the app's Settings: nothing is fetched and nothing is said.
+      if (!on && onDevice) return
       if (!on) {
         if (pasted && !now.imageUrl.trim()) {
           const seen = await getSettings(core.db).then((st) => st.seen.linkPreviewHint !== undefined, () => true)
@@ -253,8 +267,8 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
         }
         return
       }
-      setNote({ kind: 'pending', text: 'Looking up the title and picture\u2026' })
-      const result = await lookupLinkPreview(url, { db: core.db, signal: controller.signal })
+      setNote({ kind: 'pending', text: onDevice ? DEVICE_TEXT.pending : 'Looking up the title and picture\u2026' })
+      const result = onDevice ? await lookupOnDevice(url, { db: core.db, signal: controller.signal }) : await lookupLinkPreview(url, { db: core.db, signal: controller.signal })
       if (run.current.id !== id || result.kind === 'cancelled') return
       if (result.kind === 'found') {
         const prev = latest.current
@@ -276,9 +290,9 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
         const filled = filledText(patch)
         setNote(filled ? { kind: 'done', text: filled } : undefined)
       } else if (result.kind === 'nothing-found') {
-        setNote({ kind: 'done', text: 'No title or picture found for this link. You can add them yourself.' })
+        setNote({ kind: 'done', text: onDevice ? DEVICE_TEXT.nothing : 'No title or picture found for this link. You can add them yourself.' })
       } else if (result.kind === 'failed') {
-        setNote({ kind: 'done', text: FAILURE_TEXT[result.reason === 'rate-limited' ? 'rate-limited' : 'other'] })
+        setNote({ kind: 'done', text: onDevice ? DEVICE_TEXT.failed : FAILURE_TEXT[result.reason === 'rate-limited' ? 'rate-limited' : 'other'] })
       } else {
         setNote(undefined)
       }
@@ -726,7 +740,13 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
   )
 }
 
+/** A share that arrives while Add a wish is open (Android app) replaces the form with a fresh one. */
 export function ItemEditorScreen({ id }: { id?: string }) {
+  const epoch = useSyncExternalStore(subscribeCapture, captureEpoch, captureEpoch)
+  return <ItemEditor key={id === undefined ? `new-${epoch}` : id} {...(id === undefined ? {} : { id })} />
+}
+
+function ItemEditor({ id }: { id?: string }) {
   const item = useItem(id)
   const [draft] = useState<DraftItem | null>(() => (id ? null : peekCaptureDraft()))
 
