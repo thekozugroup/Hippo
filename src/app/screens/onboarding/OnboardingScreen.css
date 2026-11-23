@@ -143,3 +143,12 @@
     border: 1px solid ButtonText;
   }
 }
+
+/* A live region that takes no space until it has something to say (never display: none, so it is announced). */
+.setup-status:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

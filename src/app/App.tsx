@@ -21,7 +21,14 @@ import { ListsScreen } from './screens/lists/ListsScreen.tsx'
 import { NotFoundScreen } from './screens/NotFoundScreen.tsx'
 import { StorageUnavailableScreen } from './screens/StorageUnavailableScreen.tsx'
 import { WishlistScreen } from './screens/WishlistScreen.tsx'
-import './pwa/install.ts'
+import { markSeen } from '../core/index.ts'
+import { welcomeStepsFor } from './core/onboarding.ts'
+import { setWelcomeOrder } from './layout/routeMotion.ts'
+import { installGuideFor, installPlacement, readInstallEnv } from './pwa/guide.ts'
+import { isStandalone, onInstallChange, wasInstalledHere } from './pwa/install.ts'
+
+// Setup's step order depends on where installing fits on this device; it is fixed for the page's life.
+setWelcomeOrder(welcomeStepsFor(installPlacement(installGuideFor(readInstallEnv(false)))))
 
 // Home, wishlist and lists load with the app; editors, the giver view,
 // settings and first-run setup load on first use (and are precached for
@@ -87,6 +94,22 @@ function DocumentTitle() {
   useEffect(() => {
     document.title = titleFor(location)
   }, [location])
+  return null
+}
+
+/** Remembers that Hippo was installed (running installed, or the browser said so), so the checklist can tick it later in the browser too. */
+function InstallRecorder() {
+  const core = useCore()
+  const settings = useSettings()
+  const known = settings === undefined || settings.seen.appInstalled !== undefined
+  useEffect(() => {
+    if (known) return
+    const record = () => {
+      if (isStandalone() || wasInstalledHere()) void markSeen(core.db, 'appInstalled', core.now()).catch(() => undefined)
+    }
+    record()
+    return onInstallChange(record)
+  }, [known, core])
   return null
 }
 
@@ -186,6 +209,7 @@ export function App({ core }: { core?: Core }) {
           <StorageGate>
             <Router hook={useMotionLocation}>
               <ThemeSync />
+              <InstallRecorder />
               <ClockNotice />
               <RouteFocus />
               <BootFlag />

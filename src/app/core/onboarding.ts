@@ -5,9 +5,38 @@
 // the flow); the flow's screens are a separate chunk.
 
 import type { OnboardingState } from '../../core/index.ts'
-import { WELCOME_STEPS, type WelcomeStep } from '../layout/routeMotion.ts'
+import { WELCOME_STEPS, welcomeOrder, type WelcomeStep } from '../layout/routeMotion.ts'
+import type { InstallPlacement } from '../pwa/guide.ts'
 
-export { WELCOME_STEPS, type WelcomeStep }
+export { WELCOME_STEPS, welcomeOrder, type WelcomeStep }
+
+/**
+ * The steps in the order shown. Where the installed app keeps its own storage (iPhone, iPad, Safari
+ * on a Mac, in-app browsers), installing comes straight after the opening screen, before any answer
+ * that would be left behind in the browser. Elsewhere it comes before "add wishes from anywhere",
+ * which can then count on it. Once Hippo runs installed there is no install step.
+ */
+export function welcomeStepsFor(placement: InstallPlacement): readonly WelcomeStep[] {
+  switch (placement) {
+    case 'first':
+      return ['start', 'install', 'name', 'occasion', 'wish', 'capture']
+    case 'late':
+      return ['start', 'name', 'occasion', 'wish', 'install', 'capture']
+    case 'none':
+      return ['start', 'name', 'occasion', 'wish', 'capture']
+  }
+}
+
+/** A saved step that this device's order leaves out (install, once running installed) resumes at the next step that exists. */
+export function resolveStep(step: WelcomeStep, steps: readonly WelcomeStep[] = welcomeOrder()): WelcomeStep {
+  if (steps.includes(step)) return step
+  const all = welcomeStepsFor('late')
+  for (let i = all.indexOf(step) + 1; i < all.length; i++) {
+    const s = all[i]
+    if (s && steps.includes(s)) return s
+  }
+  return steps[steps.length - 1] ?? 'start'
+}
 
 export const OCCASIONS = ['christmas', 'birthday', 'wedding', 'baby', 'justbecause', 'other'] as const
 export type OccasionId = (typeof OCCASIONS)[number]
@@ -38,10 +67,12 @@ export type FlowEvent =
   | { type: 'answer'; patch: Partial<Answers> }
   | { type: 'created'; listId?: string; itemId?: string }
 
-export const STEP_COUNT = WELCOME_STEPS.length
+export function stepCount(steps: readonly WelcomeStep[] = welcomeOrder()): number {
+  return steps.length
+}
 
-export function stepNumber(step: WelcomeStep): number {
-  return WELCOME_STEPS.indexOf(step) + 1
+export function stepNumber(step: WelcomeStep, steps: readonly WelcomeStep[] = welcomeOrder()): number {
+  return steps.indexOf(step) + 1
 }
 
 export function isWelcomeStep(s: string): s is WelcomeStep {
@@ -96,20 +127,20 @@ export function toStored(f: Flow, now: number): OnboardingState {
   }
 }
 
-export function reduceFlow(f: Flow, e: FlowEvent): Flow {
-  const i = WELCOME_STEPS.indexOf(f.step)
+export function reduceFlow(f: Flow, e: FlowEvent, steps: readonly WelcomeStep[] = welcomeOrder()): Flow {
+  const i = steps.indexOf(f.step)
   switch (e.type) {
     case 'answer':
       return { ...f, answers: { ...f.answers, ...e.patch } }
     case 'created':
       return { ...f, ...(e.listId ? { listId: e.listId } : {}), ...(e.itemId ? { itemId: e.itemId } : {}) }
     case 'back':
-      return i > 0 ? { ...f, step: WELCOME_STEPS[i - 1] ?? 'start' } : f
+      return i > 0 ? { ...f, step: steps[i - 1] ?? 'start' } : f
     case 'dismiss':
       return { ...f, status: 'dismissed' }
     case 'next':
     case 'skip': {
-      const next = WELCOME_STEPS[i + 1]
+      const next = steps[i + 1]
       return next ? { ...f, step: next } : { ...f, status: 'completed' }
     }
   }
@@ -129,7 +160,7 @@ export interface GateInput {
  * never pass through here.
  */
 export function onboardingStepFor({ stored, items, lists, guests }: GateInput): WelcomeStep | null {
-  if (stored) return stored.status === 'active' ? (WELCOME_STEPS[stored.step] ?? 'start') : null
+  if (stored) return stored.status === 'active' ? resolveStep(WELCOME_STEPS[stored.step] ?? 'start') : null
   return items === 0 && lists === 0 && guests === 0 ? 'start' : null
 }
 
@@ -202,10 +233,12 @@ export interface ChecklistInput {
   wishes: number
   sharedLists: number
   lastExportAt: number | undefined
+  /** Installing: left out where it is not possible on this device; done once Hippo runs installed or was installed. */
+  install?: { possible: boolean; done: boolean }
 }
 
 export interface ChecklistTask {
-  id: 'wishes' | 'share' | 'backup'
+  id: 'install' | 'wishes' | 'share' | 'backup'
   done: boolean
 }
 
@@ -215,6 +248,7 @@ export const CHECKLIST_WISHES = 3
 export function setupChecklist(c: ChecklistInput): ChecklistTask[] | null {
   if (!c.stored || c.stored.status === 'active' || c.hiddenAt !== undefined) return null
   const tasks: ChecklistTask[] = [
+    ...(c.install?.possible ? [{ id: 'install' as const, done: c.install.done }] : []),
     { id: 'wishes', done: c.wishes >= CHECKLIST_WISHES },
     { id: 'share', done: c.sharedLists > 0 },
     { id: 'backup', done: c.lastExportAt !== undefined },

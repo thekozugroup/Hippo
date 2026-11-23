@@ -193,6 +193,16 @@ test('no serious accessibility violations on the main screens (axe, WCAG 2.2 AA)
     // floating navigation (mid-scroll, content passes under it by design, which axe reports as target-size).
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
     await page.waitForTimeout(100)
+    // Let finite animations (a toast fading in or out, a row rising in) finish first: axe measures
+    // contrast on the frame it sees, and a half-faded toast is not the state people read.
+    await page.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+          .map((a) => a.finished.catch(() => {})),
+      ),
+    )
     const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
     const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
     assert.deepEqual(

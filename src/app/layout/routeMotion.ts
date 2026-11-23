@@ -15,9 +15,23 @@ export type NavKind = 'push' | 'pop-back' | 'pop-forward' | 'replace' | 'initial
 /** Bottom-navigation destinations, in their visual order. */
 export const TAB_PATHS: readonly string[] = ['/', '/wishlist', '/lists', '/settings']
 
-/** Onboarding steps, in order (the path is `/welcome/<step>`). */
-export const WELCOME_STEPS = ['start', 'name', 'occasion', 'wish', 'capture'] as const
+/**
+ * Every onboarding step (the path is `/welcome/<step>`). Saved progress stores a step's index in
+ * this list, so new steps are only ever appended. The order a person sees is `welcomeOrder()`.
+ */
+export const WELCOME_STEPS = ['start', 'name', 'occasion', 'wish', 'capture', 'install'] as const
 export type WelcomeStep = (typeof WELCOME_STEPS)[number]
+
+let order: readonly WelcomeStep[] = ['start', 'name', 'occasion', 'wish', 'capture']
+
+/** The steps in the order shown on this device: set once at start from where installing fits (without an install step until then). */
+export function welcomeOrder(): readonly WelcomeStep[] {
+  return order
+}
+
+export function setWelcomeOrder(steps: readonly WelcomeStep[]): void {
+  order = steps
+}
 
 export interface RouteInfo {
   /** 0 for bottom-navigation destinations, 1 for anything opened from them. */
@@ -32,7 +46,7 @@ export function routeInfo(path: string): RouteInfo {
   if (tab >= 0) return { level: 0, tab }
   const m = /^\/welcome\/([a-z]+)$/.exec(clean)
   if (m) {
-    const step = (WELCOME_STEPS as readonly string[]).indexOf(m[1] ?? '')
+    const step = (order as readonly string[]).indexOf(m[1] ?? '')
     if (step >= 0) return { level: 1, step }
   }
   return { level: 1 }

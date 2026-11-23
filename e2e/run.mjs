@@ -7,6 +7,7 @@ import { freePort, loadPlaywright, ROOT, startPreview, tests } from './harness.m
 import './flows.test.mjs'
 import './review.test.mjs'
 import './onboarding.test.mjs'
+import './install.test.mjs'
 import './wire.test.mjs'
 import './clock.test.mjs'
 import './fixes.test.mjs'

@@ -15,7 +15,7 @@
 // - It never shows again once finished or closed; Settings can replay it.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Bookmark, Download, X } from 'lucide-react'
+import { Bookmark, X } from 'lucide-react'
 import { useLocation } from 'wouter'
 import { Chip, HeroBackground, IconButton, StepScreen, TextField, TwoTone } from '../../../ui/index.ts'
 import {
@@ -34,11 +34,12 @@ import {
   occasionPhrase,
   OCCASIONS,
   reduceFlow,
-  STEP_COUNT,
+  resolveStep,
+  stepCount,
   stepNumber,
   suggestedDate,
   toStored,
-  WELCOME_STEPS,
+  welcomeOrder,
   type Answers,
   type Flow,
   type OccasionId,
@@ -52,8 +53,11 @@ import { historyIndex, returnTo } from '../../layout/motionLocation.ts'
 import { appBaseUrl, bookmarkletCode } from '../../lib/capture-tools.ts'
 import { possessive } from '../../lib/format.ts'
 import { resyncLists } from '../../lib/sync.ts'
-import { canPromptInstall, isStandalone, onInstallChange, promptInstall } from '../../pwa/install.ts'
-import { captureMethodFor, hostOf, parseWish, wishError, type CaptureMethod } from './flow.ts'
+import { installHeading, installPlacement, ownStorageReason, whyInstall } from '../../pwa/guide.ts'
+import { InstallGuide } from '../../pwa/InstallGuide.tsx'
+import { useCopyLink, useInstallAction, useInstallGuide } from '../../pwa/useInstall.ts'
+import { isStandalone, wasInstalledHere } from '../../pwa/install.ts'
+import { captureMethodFor, hostOf, parseWish, wishError } from './flow.ts'
 import { ensureSetupList, ensureSetupWish, persistFlow } from './store.ts'
 import './OnboardingScreen.css'
 
@@ -96,7 +100,12 @@ export default function OnboardingScreen({ step }: { step: string }) {
     if (!settings) return
     if (!isWelcomeStep(step)) {
       // An address that is not a step: go to the step in progress (or the first one).
-      navigate(`/welcome/${initial?.step ?? (stored?.status === 'active' ? (fromStored(stored)?.step ?? 'start') : 'start')}`, { replace: true })
+      navigate(`/welcome/${resolveStep(initial?.step ?? (stored?.status === 'active' ? (fromStored(stored)?.step ?? 'start') : 'start'))}`, { replace: true })
+      return
+    }
+    if (resolveStep(step) !== step) {
+      // A step this device skips (installing, once Hippo runs installed): the next one instead.
+      navigate(`/welcome/${resolveStep(step)}`, { replace: true })
       return
     }
     if (initial) return
@@ -112,7 +121,7 @@ export default function OnboardingScreen({ step }: { step: string }) {
     }
   }, [initial, settings, stored, step, core, navigate])
 
-  if (!initial || !isWelcomeStep(step)) {
+  if (!initial || !isWelcomeStep(step) || resolveStep(step) !== step) {
     return (
       <div className="step-screen step-screen--blank" data-theme="dark" aria-busy="true" aria-label="Loading">
         <HeroBackground variant="night" />
@@ -174,8 +183,8 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
   }
 
   const goNext = () => {
-    const i = WELCOME_STEPS.indexOf(step)
-    const next = WELCOME_STEPS[i + 1]
+    const steps = welcomeOrder()
+    const next = steps[steps.indexOf(step) + 1]
     if (next) goTo(next)
   }
 
@@ -190,8 +199,8 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
   }
 
   const goBack = () => {
-    const i = WELCOME_STEPS.indexOf(step)
-    const prev = WELCOME_STEPS[i - 1]
+    const steps = welcomeOrder()
+    const prev = steps[steps.indexOf(step) - 1]
     if (!prev || busyRef.current) return
     if (flowBase !== null && historyIndex() > flowBase) window.history.back()
     else navigate(`/welcome/${prev}`, { replace: true })
@@ -304,7 +313,7 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
   const closeButton = <IconButton variant="frost" aria-label="Close setup" icon={<X />} onClick={close} />
   const common = {
     step: stepNumber(step),
-    total: STEP_COUNT,
+    total: stepCount(),
     busy,
     onBack: step === 'start' ? undefined : goBack,
     topEnd: step === 'start' ? undefined : closeButton,
@@ -325,7 +334,7 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
         <StepScreen
           {...common}
           title={<TwoTone tone="on-hero" muted="Make a wishlist, share one link," bright="and friends pick gifts without spoiling the surprise." />}
-          description={<p>No account and nothing to install. Setting up takes about a minute.</p>}
+          description={<p>No account needed. Setting up takes about a minute.</p>}
           continueLabel="Get started"
           onContinue={goNext}
           secondaryAction={{ label: 'Skip setup', onClick: () => void leave('dismissed') }}
@@ -443,6 +452,9 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
       )
     }
 
+    case 'install':
+      return <InstallStep common={common} onNext={goNext} />
+
     case 'capture':
       return <CaptureStep common={common} flow={flow} onFinish={() => void leave('completed')} onSettings={() => void leave('completed', '/settings')} />
   }
@@ -477,23 +489,67 @@ interface CommonProps {
   topEnd: ReactNode
 }
 
-function useCanInstall(): boolean {
-  const [can, setCan] = useState(canPromptInstall)
-  useEffect(() => onInstallChange(() => setCan(canPromptInstall())), [])
-  return can
+/**
+ * Putting Hippo on the home screen, with this device's own steps. Where the installed app keeps
+ * its own storage this is the second step, and its main button only confirms it was added (setup
+ * then starts in the installed app); "Carry on in the browser" continues here. Elsewhere it sits
+ * before "add wishes from anywhere": the main button installs where the browser offers it.
+ */
+function InstallStep({ common, onNext }: { common: CommonProps; onNext: () => void }) {
+  const { guide, installedHere } = useInstallGuide()
+  const { install, busy } = useInstallAction(guide)
+  const copyLink = useCopyLink()
+  const [added, setAdded] = useState(false)
+  const first = installPlacement(guide) === 'first'
+  const heading = installHeading(guide)
+  const reason = first ? ownStorageReason(guide) : undefined
+  const installed = installedHere || guide.kind === 'installed'
+
+  let main: { label: string; run: () => void }
+  let secondary: { label: string; onClick: () => void }
+  if (installed) {
+    main = { label: 'Continue', run: onNext }
+    secondary = { label: 'Skip', onClick: onNext }
+  } else if (guide.kind === 'in-app') {
+    main = { label: 'Copy link', run: () => void copyLink(guide) }
+    secondary = { label: 'Carry on here', onClick: onNext }
+  } else if (guide.kind === 'prompt') {
+    main = { label: 'Install Hippo', run: () => void install() }
+    secondary = { label: 'Skip', onClick: onNext }
+  } else if (first) {
+    main = { label: 'I added it', run: () => setAdded(true) }
+    secondary = { label: 'Carry on in the browser', onClick: onNext }
+  } else {
+    main = { label: 'Continue', run: onNext }
+    secondary = { label: 'Skip', onClick: onNext }
+  }
+
+  return (
+    <StepScreen
+      {...common}
+      busy={common.busy || busy}
+      title={<TwoTone tone="on-hero" muted={heading.muted} bright={heading.bright} />}
+      description={
+        <>
+          <p>{whyInstall(guide)}</p>
+          {reason ? <p>{reason}</p> : null}
+        </>
+      }
+      continueLabel={main.label}
+      onContinue={main.run}
+      secondaryAction={secondary}
+    >
+      <InstallGuide guide={guide} installed={installedHere} tone="hero" actions={false} />
+      <p className="setup-saved setup-status" role="status">
+        {added ? `Now open Hippo from your ${guide.place}. Setup starts there, and you can close this page.` : ''}
+      </p>
+    </StepScreen>
+  )
 }
 
 function CaptureStep({ common, flow, onFinish, onSettings }: { common: CommonProps; flow: Flow; onFinish: () => void; onSettings: () => void }) {
-  const notify = useNotify()
-  const canInstall = useCanInstall()
   const lists = useSharedLists()
-  const [installing, setInstalling] = useState(false)
-  const method: CaptureMethod = captureMethodFor({
-    userAgent: navigator.userAgent,
-    maxTouchPoints: navigator.maxTouchPoints || 0,
-    canInstall,
-    standalone: isStandalone(),
-  })
+  const method = captureMethodFor({ userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints || 0 })
   const linkRef = useRef<HTMLAnchorElement>(null)
   const bookmarklet = bookmarkletCode(appBaseUrl())
   useEffect(() => {
@@ -504,16 +560,6 @@ function CaptureStep({ common, flow, onFinish, onSettings }: { common: CommonPro
   const wish = parseWish(flow.answers.wish)
   const list = flow.listId ? lists?.find((l) => l.id === flow.listId) : undefined
   const saved = flow.itemId && wish ? (list ? `“${wish.title}” is on your list ${list.name}.` : `“${wish.title}” is in your wishlist.`) : list ? `Your list ${list.name} is ready.` : null
-
-  const install = async () => {
-    setInstalling(true)
-    try {
-      const ok = await promptInstall()
-      if (ok) notify('Hippo is installed. Share any product page to it to add a wish.')
-    } finally {
-      setInstalling(false)
-    }
-  }
 
   let how: ReactNode
   if (method === 'shortcut') {
@@ -527,24 +573,13 @@ function CaptureStep({ common, flow, onFinish, onSettings }: { common: CommonPro
         </div>
       </>
     )
-  } else if (method === 'install') {
-    how = (
-      <>
-        <p>Install Hippo, then use Share in any shop or browser and pick Hippo.</p>
-        <div>
-          <button type="button" className="setup-action" onClick={() => void install()} aria-busy={installing || undefined}>
-            <Download aria-hidden="true" size={20} />
-            Install Hippo
-          </button>
-        </div>
-      </>
-    )
   } else if (method === 'share') {
-    how = isStandalone() ? (
-      <p>Use Share in any shop or browser and pick Hippo.</p>
-    ) : (
-      <p>Add Hippo to your home screen from the browser menu. Then use Share in any shop or browser and pick Hippo.</p>
-    )
+    how =
+      isStandalone() || wasInstalledHere() ? (
+        <p>Use Share in any shop or browser and pick Hippo.</p>
+      ) : (
+        <p>Once Hippo is on your home screen, use Share in any shop or browser and pick Hippo. Settings shows how to add it.</p>
+      )
   } else {
     how = (
       <>

@@ -20,20 +20,16 @@ describe('the wish answer', () => {
 })
 
 describe('the capture method for this device', () => {
-  const base = { maxTouchPoints: 0, canInstall: false, standalone: false }
+  const base = { maxTouchPoints: 0 }
   it('offers the Shortcut on iPhone and iPad (including iPad in desktop mode)', () => {
     expect(captureMethodFor({ ...base, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' })).toBe('shortcut')
     expect(captureMethodFor({ ...base, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', maxTouchPoints: 5 })).toBe('shortcut')
   })
-  it('offers installing on Android when the browser can, else the share sheet', () => {
-    const android = 'Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140'
-    expect(captureMethodFor({ ...base, userAgent: android, canInstall: true })).toBe('install')
-    expect(captureMethodFor({ ...base, userAgent: android })).toBe('share')
-    expect(captureMethodFor({ ...base, userAgent: android, standalone: true, canInstall: true })).toBe('share')
+  it('offers the share sheet on Android: setup asks to install just before', () => {
+    expect(captureMethodFor({ ...base, userAgent: 'Mozilla/5.0 (Linux; Android 15; Pixel 9) Chrome/140' })).toBe('share')
   })
-  it('offers installing on a computer whose browser can, else the bookmarklet', () => {
-    const mac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/140'
-    expect(captureMethodFor({ ...base, userAgent: mac, canInstall: true })).toBe('install')
+  it('offers the bookmarklet on a computer: installing has its own step', () => {
+    expect(captureMethodFor({ ...base, userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/140' })).toBe('bookmarklet')
     expect(captureMethodFor({ ...base, userAgent: 'Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0' })).toBe('bookmarklet')
   })
 })

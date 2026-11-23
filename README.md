@@ -7,7 +7,7 @@ Keep one private wishlist. Link items from it into shared lists for each occasio
 - No accounts. No sign-up for you or for the people you share with.
 - No backend. Hippo is a static web app. Your wishlist lives on your device.
 - End-to-end encrypted sharing. Shared lists and claims are stored as ciphertext on public relays; the key is in the link you send.
-- Installable. Add it to your home screen and share product pages to it from other apps (Android and desktop Chromium; see below for iOS).
+- Installable. There is no app-store app: your browser installs Hippo as an app with its own icon. Setup shows the steps for your phone or computer, and Settings has them under Install Hippo.
 - MIT licensed.
 
 ## How it works
@@ -158,15 +158,15 @@ Source layout:
 | Method | What you get | Third party involved |
 |---|---|---|
 | Bookmarklet (desktop) or Shortcut (iOS) | Title, link, picture and price, read from the page you are looking at | None |
-| Share sheet (Android, desktop Chrome or Edge, with Hippo installed) | Title and link, whatever the sharing app provides | None |
+| Share sheet (Android, with Hippo installed) | Title and link, whatever the sharing app provides | None |
 | Pasting a link | A title guessed from the link | None |
 | Pasting a link or using the share sheet, with Link lookup turned on | Title and picture looked up for you | Microlink, see security notes |
 
 The bookmarklet and the Shortcut run inside the page you are viewing, so they can read its picture and price. They hand these to Hippo in the address, and no other site is contacted. This is the method that works without any third party. A static site cannot read another site's page by itself, which is why the other methods need either the sharing app's help or the optional Link lookup.
 
-- Android, and desktop Chrome or Edge: install Hippo, then use the system share sheet from any browser or shopping app and pick Hippo.
-- iOS: Safari does not let web apps appear in the share sheet. Use the Shortcut recipe or paste the link into Hippo. Both are described in the app under Settings.
-- Desktop: use the bookmarklet from Settings.
+- Android: install Hippo (setup shows how: "Install Hippo" when Chrome offers it, otherwise ⋮ then Add to home screen), then use the system share sheet from any browser or shopping app and pick Hippo.
+- iPhone and iPad: add Hippo to the Home Screen from Safari (Share, then Add to Home Screen, then Add). Setup asks for this first, because the Home Screen app keeps its own copy of your wishes, separate from Safari's; to move wishes added in Safari, export a backup there and import it in the app. Web apps do not appear in the iOS share sheet, so use the Shortcut recipe or paste the link into Hippo. Both are described in the app under Settings.
+- Computer: install Hippo from Chrome or Edge, or add it to the Dock from Safari (File, Add to Dock), and use the bookmarklet from Settings to add the page you are looking at.
 
 ## Status
 

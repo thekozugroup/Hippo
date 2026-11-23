@@ -31,6 +31,9 @@ import { appBaseUrl, bookmarkletCode, shortcutScript } from '../../lib/capture-t
 import { plural, possessive } from '../../lib/format.ts'
 import { resyncLists } from '../../lib/sync.ts'
 import { CategoriesSheet } from '../CategoriesSheet.tsx'
+import { moveWishesNote, whyInstall } from '../../pwa/guide.ts'
+import { InstallGuide } from '../../pwa/InstallGuide.tsx'
+import { useInstallGuide } from '../../pwa/useInstall.ts'
 import { DeploymentChecks } from './DeploymentChecks.tsx'
 import './SettingsScreen.css'
 
@@ -303,6 +306,24 @@ function BackupSection() {
   )
 }
 
+/** This device's way to install Hippo (or that it is installed), and for Home Screen apps, how to move wishes across. */
+function InstallSection() {
+  const { guide, installedHere } = useInstallGuide()
+  const move = moveWishesNote(guide)
+  const installed = guide.kind === 'installed' || installedHere
+  return (
+    <section className="app-stack" aria-labelledby="set-install">
+      <h2 id="set-install" className="app-section-title">
+        Install Hippo
+      </h2>
+      {installed ? null : <p className="app-note">{whyInstall(guide)}</p>}
+      <InstallGuide guide={guide} installed={installedHere}>
+        {move ? <p className="install-guide__note">{move}</p> : null}
+      </InstallGuide>
+    </section>
+  )
+}
+
 function CaptureSection() {
   const notify = useNotify()
   const appUrl = appBaseUrl()
@@ -322,7 +343,7 @@ function CaptureSection() {
         Add from other apps
       </h2>
       <p className="app-note">
-        On Android and in Chrome or Edge on a computer, install Hippo (Add to Home screen or Install app), then use the Share button in any shop or browser and pick Hippo.
+        On Android, once Hippo is installed (see Install Hippo above), use the Share button in any shop or browser and pick Hippo.
       </p>
 
       <div className="app-stack app-stack--tight">
@@ -560,6 +581,7 @@ export default function SettingsScreen() {
           </Button>
         </div>
       </section>
+      <InstallSection />
       <BackupSection />
       <CaptureSection />
       <LinkLookupSection />

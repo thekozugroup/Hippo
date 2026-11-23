@@ -8,7 +8,10 @@ import {
   occasionPhrase,
   onboardingStepFor,
   reduceFlow,
+  resolveStep,
   setupChecklist,
+  stepNumber,
+  welcomeStepsFor,
   suggestedDate,
   toStored,
   type Flow,
@@ -119,5 +122,66 @@ describe('the Get set up checklist', () => {
   it('does not show before or during setup, or for people who never had setup', () => {
     expect(setupChecklist({ stored: undefined, hiddenAt: undefined, wishes: 0, sharedLists: 0, lastExportAt: undefined })).toBeNull()
     expect(setupChecklist({ stored: stored({}), hiddenAt: undefined, wishes: 0, sharedLists: 0, lastExportAt: undefined })).toBeNull()
+  })
+})
+
+describe('where the install step goes', () => {
+  it('straight after the opening screen where the installed app keeps its own storage, before any question', () => {
+    const first = welcomeStepsFor('first')
+    expect(first).toEqual(['start', 'install', 'name', 'occasion', 'wish', 'capture'])
+    expect(first.indexOf('install')).toBeLessThan(first.indexOf('name'))
+  })
+  it('before "add wishes from anywhere" where browser and app share storage', () => {
+    expect(welcomeStepsFor('late')).toEqual(['start', 'name', 'occasion', 'wish', 'install', 'capture'])
+  })
+  it('nowhere, and not counted in the progress, once Hippo runs installed', () => {
+    const none = welcomeStepsFor('none')
+    expect(none).not.toContain('install')
+    expect(none).toHaveLength(5)
+    expect(stepNumber('capture', none)).toBe(5)
+    expect(stepNumber('capture', welcomeStepsFor('late'))).toBe(6)
+  })
+  it('moves through the steps in the device’s order, and Back returns the same way', () => {
+    const order = welcomeStepsFor('first')
+    const start = newFlow({ today: NOV })
+    const next = reduceFlow(start, { type: 'next' }, order)
+    expect(next.step).toBe('install')
+    expect(reduceFlow(next, { type: 'skip' }, order).step).toBe('name')
+    expect(reduceFlow({ ...start, step: 'name' }, { type: 'back' }, order).step).toBe('install')
+    const late = welcomeStepsFor('late')
+    expect(reduceFlow({ ...start, step: 'wish' }, { type: 'next' }, late).step).toBe('install')
+    expect(reduceFlow({ ...start, step: 'install' }, { type: 'next' }, late).step).toBe('capture')
+  })
+  it('resumes a saved install step at the next step when this device has none', () => {
+    expect(resolveStep('install', welcomeStepsFor('none'))).toBe('capture')
+    expect(resolveStep('install', welcomeStepsFor('first'))).toBe('install')
+    expect(resolveStep('name', welcomeStepsFor('none'))).toBe('name')
+  })
+  it('keeps saved progress from before the install step meaning the same step', () => {
+    // Step indexes are stored; "capture" was index 4 before installing had a step, and still is.
+    expect(fromStored(stored({ step: 4 }))?.step).toBe('capture')
+    expect(toStored({ ...newFlow({ today: NOV }), step: 'install' }, 1).step).toBe(5)
+    expect(fromStored(stored({ step: 5 }))?.step).toBe('install')
+  })
+})
+
+describe('the install task on the checklist', () => {
+  const done = stored({ status: 'completed', step: 4 })
+  const base = { stored: done, hiddenAt: undefined, wishes: 0, sharedLists: 0, lastExportAt: undefined }
+  it('comes first where installing is possible, ticked once installed', () => {
+    expect(setupChecklist({ ...base, install: { possible: true, done: false } })?.[0]).toEqual({ id: 'install', done: false })
+    expect(setupChecklist({ ...base, install: { possible: true, done: true } })?.[0]).toEqual({ id: 'install', done: true })
+  })
+  it('is left out where installing is not possible', () => {
+    expect(setupChecklist({ ...base, install: { possible: false, done: false } })?.map((t) => t.id)).toEqual(['wishes', 'share', 'backup'])
+  })
+  it('counts towards the checklist going away', () => {
+    expect(setupChecklist({ ...base, wishes: 3, sharedLists: 1, lastExportAt: 9, install: { possible: true, done: false } })).toEqual([
+      { id: 'install', done: false },
+      { id: 'wishes', done: true },
+      { id: 'share', done: true },
+      { id: 'backup', done: true },
+    ])
+    expect(setupChecklist({ ...base, wishes: 3, sharedLists: 1, lastExportAt: 9, install: { possible: true, done: true } })).toBeNull()
   })
 })

@@ -92,8 +92,15 @@ function hasBrand(env: InstallEnv, name: string): boolean {
   return (env.brands ?? []).some((b) => b === name)
 }
 
+/** Client hints that name a Chromium browser other than Chrome (whose menus differ). */
+const OTHER_CHROMIUM_BRANDS = ['Microsoft Edge', 'Opera', 'Opera GX', 'Brave', 'Samsung Internet', 'Vivaldi', 'Yandex', 'YaBrowser', 'DuckDuckGo']
+
+function brandsNameAnotherBrowser(env: InstallEnv): boolean {
+  return OTHER_CHROMIUM_BRANDS.some((b) => hasBrand(env, b))
+}
+
 /** Links opened inside these apps load in their own web view, where installing is not possible. Conservative: known markers only. */
-const IN_APP = /\b(FBAN|FBAV|FB_IAB|FBIOS|FB4A|Instagram|Messenger(?:ForiOS|LiteForiOS)?|WhatsApp|Snapchat|LinkedInApp|Pinterest|musical_ly|BytedanceWebview|TikTok|Line)\/|\bGSA\/|\[(?:FBAN|FB_IAB)/
+const IN_APP = /\b(FBAN|FBAV|FB_IAB|FBIOS|FB4A|Instagram|LinkedInApp|Snapchat|musical_ly|BytedanceWebview|WhatsApp|Pinterest)|\bLine\/|\bGSA\//
 
 function versionOf(ua: string, re: RegExp): number {
   const m = re.exec(ua)
@@ -177,7 +184,7 @@ function androidGuide(env: InstallEnv): InstallGuide {
       'android-firefox',
       'android',
       [
-        { icon: 'more-vertical', text: ['Tap ', t('⋮'), '.'] },
+        { icon: 'more-vertical', text: ['Tap ', t('⋮'), ' to open the menu.'] },
         { icon: 'add-square', text: ['Tap ', t('Install'), ' or ', t('Add to Home screen'), '.'] },
         { icon: 'check', text: ['Tap ', t('Add'), '.'] },
       ],
@@ -186,13 +193,12 @@ function androidGuide(env: InstallEnv): InstallGuide {
   }
   // Chrome itself: Chromium-based browsers that add their own token are not Chrome.
   const otherChromium = /(EdgA|OPR|OPX|YaBrowser|Brave|Vivaldi|UCBrowser|MiuiBrowser|HuaweiBrowser|HeyTapBrowser|DuckDuckGo)\//.test(ua)
-  const brandsSayChrome = env.brands === undefined || env.brands.length === 0 || hasBrand(env, 'Google Chrome')
-  if (/Chrome\/\d+/.test(ua) && !otherChromium && brandsSayChrome) {
+  if (/Chrome\/\d+/.test(ua) && !otherChromium && !brandsNameAnotherBrowser(env)) {
     return base(
       'android-chrome',
       'android',
       [
-        { icon: 'more-vertical', text: ['Tap ', t('⋮'), '.'] },
+        { icon: 'more-vertical', text: ['Tap ', t('⋮'), ' to open the menu.'] },
         { icon: 'add-square', text: ['Tap ', t('Add to home screen'), '.'] },
         { icon: 'check', text: ['Tap ', t('Install'), '.'] },
       ],
@@ -241,9 +247,8 @@ function desktopGuide(env: InstallEnv): InstallGuide {
       { icon: 'install', text: ['Choose ', t('Install Hippo'), ' or ', t('Install this site as an app'), '.'] },
     ])
   }
-  const otherChromium = /(OPR|YaBrowser|Vivaldi|Brave|Whale)\//.test(ua) || hasBrand(env, 'Opera') || hasBrand(env, 'Brave')
-  const chromeBrand = env.brands === undefined || env.brands.length === 0 || hasBrand(env, 'Google Chrome') || hasBrand(env, 'HeadlessChrome') || hasBrand(env, 'Chromium')
-  if (/Chrome\/\d+/.test(ua) && !otherChromium && chromeBrand) {
+  const otherChromium = /(OPR|YaBrowser|Vivaldi|Brave|Whale)\//.test(ua) || brandsNameAnotherBrowser(env)
+  if (/Chrome\/\d+/.test(ua) && !otherChromium) {
     return base('desktop-chrome', platform, [
       { icon: 'more-vertical', text: ['Open the Chrome menu, ', t('⋮'), '.'] },
       { icon: 'menu', text: ['Choose ', t('Cast, save, and share'), '.'] },
@@ -276,7 +281,11 @@ export function installGuideFor(env: InstallEnv): InstallGuide {
   const ios = iosPlatform(env)
   const android = /Android/.test(ua)
   const platform: Platform = ios ?? (android ? 'android' : desktopPlatform(ua))
-  if (env.standalone) return base('installed', platform, [], { shareSheet: android })
+  if (env.standalone) {
+    // Running installed. A Home Screen or Dock app from Safari keeps its own storage, apart from the browser's.
+    const safariApp = platform === 'mac' && /Version\/\d+.*Safari\//.test(ua) && !/Chrome|Chromium|Edg|Firefox/.test(ua)
+    return base('installed', platform, [], { shareSheet: android, ownStorage: ios !== null || safariApp, ...(safariApp ? { place: 'Dock' as const } : {}) })
+  }
   // A web view inside another app cannot install, and keeps its own storage.
   if (IN_APP.test(ua) || (android && /; wv\)/.test(ua))) {
     const browser = ios ? 'Safari' : android ? 'Chrome' : 'your browser'
@@ -307,13 +316,30 @@ export function installPlacement(g: Pick<InstallGuide, 'kind' | 'ownStorage'>): 
   return g.ownStorage ? 'first' : 'late'
 }
 
+/** The install task's name, in the device's words: for the checklist and Settings. */
+export function installTaskName(g: Pick<InstallGuide, 'place' | 'kind'>): string {
+  if (g.kind === 'desktop-firefox') return 'Bookmark Hippo'
+  if (g.place === 'Dock') return 'Add Hippo to the Dock'
+  if (g.place === 'apps') return 'Install Hippo'
+  return `Put Hippo on your ${g.place}`
+}
+
+/** The setup step's question, in two tones. */
+export function installHeading(g: InstallGuide): { muted: string; bright: string } {
+  if (g.kind === 'in-app') return { muted: 'Open Hippo', bright: `in ${g.realBrowser} first` }
+  if (g.kind === 'desktop-firefox') return { muted: 'Keep Hippo', bright: 'one click away' }
+  if (g.place === 'Dock') return { muted: 'Add Hippo', bright: 'to the Dock' }
+  if (g.place === 'apps') return { muted: 'Install Hippo', bright: 'as an app' }
+  return { muted: 'Put Hippo on', bright: `your ${g.place}` }
+}
+
 /** One honest sentence on why installing is worth it. */
 export function whyInstall(g: InstallGuide): string {
-  if (g.kind === 'desktop-firefox') return 'A bookmark gets you back to Hippo in one click.'
+  if (g.kind === 'desktop-firefox') return 'Firefox cannot install Hippo as an app, so a bookmark is the quickest way back.'
+  if (g.kind === 'in-app') return `From ${g.realBrowser}, Hippo can go on your ${g.place === 'apps' ? 'computer' : g.place} and open like an app.`
   if (g.place === 'Home Screen') return 'Added to your Home Screen, Hippo opens full screen like an app.'
   if (g.place === 'Dock') return 'Added to the Dock, Hippo opens in its own window like an app.'
   if (g.platform === 'android') return 'Installed, Hippo opens from your home screen like an app and shows up when you tap Share in other apps.'
-  if (g.kind === 'in-app') return 'Opened in your browser, Hippo can be installed and opens like an app.'
   return 'Installed, Hippo opens in its own window like an app.'
 }
 
@@ -330,11 +356,12 @@ export function ownStorageReason(g: InstallGuide): string | undefined {
   return `On ${g.platform === 'mac' ? 'a Mac' : deviceName(g.platform)}, ${where} keeps its own copy of your wishes, so it is best to add it before you start.`
 }
 
-/** For later (Settings, the checklist): how to bring wishes from this browser into the installed app. */
+/** For later (Settings, the checklist): how to bring wishes from the browser into the installed app. */
 export function moveWishesNote(g: InstallGuide): string | undefined {
   if (!g.ownStorage || g.kind === 'in-app') return undefined
+  if (g.kind === 'installed') return 'This app keeps its own copy of your wishes, apart from the browser. To bring wishes from the browser, use Export backup in Settings there, then Import backup here.'
   const app = g.place === 'Dock' ? 'the Dock app' : 'the Home Screen app'
-  return `${app === 'the Dock app' ? 'The Dock app' : 'The Home Screen app'} keeps its own copy of your wishes. To move wishes you added in this browser, use Export backup in Settings here, then open ${app} and use Import backup in its Settings.`
+  return `${app === 'the Dock app' ? 'The Dock app' : 'The Home Screen app'} keeps its own copy of your wishes. To move wishes you added in this browser, use Export backup in Settings, then open ${app} and use Import backup in its Settings.`
 }
 
 /** Reads the environment from the browser. Kept apart so everything above stays testable. */

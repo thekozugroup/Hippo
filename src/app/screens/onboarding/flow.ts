@@ -43,27 +43,22 @@ export function hostOf(url: string): string {
   }
 }
 
-export type CaptureMethod = 'install' | 'share' | 'shortcut' | 'bookmarklet'
+export type CaptureMethod = 'share' | 'shortcut' | 'bookmarklet'
 
 export interface DeviceInfo {
   userAgent: string
   maxTouchPoints: number
-  /** The browser offered to install Hippo (beforeinstallprompt). */
-  canInstall: boolean
-  /** Hippo is already running as an installed app. */
-  standalone: boolean
 }
 
 /**
- * The one capture method to offer: the Shortcut on iPhone and iPad; the share
- * sheet on Android (after installing, if needed); installing on a computer
- * whose browser offers it; otherwise the bookmarklet.
+ * The one capture method to offer: the Shortcut on iPhone and iPad, the share sheet on Android
+ * (setup's install step comes just before, so Hippo is usually installed by then), and the
+ * bookmarklet on a computer. Installing has its own step, so it is never the answer here.
  */
 export function captureMethodFor(d: DeviceInfo): CaptureMethod {
   const ua = d.userAgent
   const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && d.maxTouchPoints > 1)
   if (ios) return 'shortcut'
-  if (/Android/.test(ua)) return d.standalone || !d.canInstall ? 'share' : 'install'
-  if (d.canInstall) return 'install'
+  if (/Android/.test(ua)) return 'share'
   return 'bookmarklet'
 }

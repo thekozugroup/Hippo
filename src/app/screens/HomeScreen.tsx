@@ -4,6 +4,7 @@ import { useCore } from '../core/context.ts'
 import { useGuestLists, useItems, useSettings, useSharedLists } from '../core/data.ts'
 import { AppScreen } from '../layout/AppScreen.tsx'
 import { setupChecklist } from '../core/onboarding.ts'
+import { useInstallGuide } from '../pwa/useInstall.ts'
 import { formatAdded, safeUrl } from '../lib/format.ts'
 import { BackupReminder } from './BackupReminder.tsx'
 import { GuestListRow, OwnedListRow } from './lists/ListRows.tsx'
@@ -38,6 +39,8 @@ export function HomeScreen() {
   const recent = [...(items ?? [])].sort((a, b) => b.createdAt - a.createdAt).slice(0, RECENT_SHOWN)
   const liveIds = new Set((items ?? []).map((i) => i.id))
   const shareHref = lists && lists.length > 0 ? '#/lists' : '#/list/new'
+  const { guide, installedHere } = useInstallGuide()
+  const installed = guide.kind === 'installed' || installedHere || settings?.seen.appInstalled !== undefined
   const checklist =
     !loading && settings
       ? setupChecklist({
@@ -46,6 +49,7 @@ export function HomeScreen() {
           wishes: count,
           sharedLists: (lists ?? []).filter((l) => l.status === 'published').length,
           lastExportAt: settings.lastExportAt,
+          install: { possible: guide.canInstall, done: installed },
         })
       : null
 
@@ -98,7 +102,7 @@ export function HomeScreen() {
         ) : null}
       </section>
 
-      {checklist ? <SetupChecklist tasks={checklist} wishes={count} lists={lists ?? []} /> : empty ? <HowItWorks /> : null}
+      {checklist ? <SetupChecklist tasks={checklist} wishes={count} lists={lists ?? []} install={{ guide, installed: installedHere }} /> : empty ? <HowItWorks /> : null}
 
       {!checklist && (count > 0 || (lists?.length ?? 0) > 0) ? <BackupReminder lastExportAt={settings?.lastExportAt} /> : null}
 

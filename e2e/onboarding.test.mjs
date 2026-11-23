@@ -24,7 +24,7 @@ test('setup: a new owner answers each step with the keyboard and lands on Home w
   // 1. What Hippo is, one button. The heading has focus after each step and says which step it is.
   await h1(page, /Make a wishlist/).waitFor()
   assert.equal(await h1(page, /Make a wishlist/).getAttribute('aria-describedby') !== null, true)
-  assert.equal(await page.getByText('Step 1 of 5').count(), 1)
+  assert.equal(await page.getByText('Step 1 of 6').count(), 1)
   violations.push(...(await axe(page, 'step 1')))
   await page.getByRole('button', { name: 'Get started' }).focus()
   await page.keyboard.press('Enter')
@@ -32,7 +32,7 @@ test('setup: a new owner answers each step with the keyboard and lands on Home w
   // 2. Name: typed, shown back in the hint, Enter continues.
   await h1(page, /call you/).waitFor()
   await page.waitForFunction(() => document.activeElement?.tagName === 'H1')
-  assert.equal(await page.title(), 'Your name, step 2 of 5 - Hippo')
+  assert.equal(await page.title(), 'Your name, step 2 of 6 - Hippo')
   await page.keyboard.press('Tab')
   await page.keyboard.type('Ann')
   await page.getByText('“Ann’s list”', { exact: false }).waitFor()
@@ -61,14 +61,21 @@ test('setup: a new owner answers each step with the keyboard and lands on Home w
   await page.getByText('Saves the link from shop.example', { exact: false }).waitFor()
   await field.press('Enter')
 
-  // 5. One capture method for this device, then Finish.
+  // 5. Installing, in this browser's own words (Chrome on a computer, no install prompt here), then on.
+  await h1(page, /Install Hippo\s*as an app/).waitFor()
+  assert.equal(await page.title(), 'Install Hippo, step 5 of 6 - Hippo')
+  await page.getByRole('list').getByText('Cast, save, and share').waitFor()
+  violations.push(...(await axe(page, 'step 5 install')))
+  await page.getByRole('button', { name: 'Continue' }).click()
+
+  // 6. One capture method for this device, then Finish.
   await h1(page, /from anywhere/).waitFor()
   await page.getByText('“Wool scarf” is on your list Birthday 2027.').waitFor()
-  violations.push(...(await axe(page, 'step 5')))
+  violations.push(...(await axe(page, 'step 6')))
   await page.getByRole('button', { name: 'Finish' }).click()
 
   await page.waitForURL(/#\/$/)
-  await page.getByRole('heading', { name: 'Get set up · 0 of 3' }).waitFor()
+  await page.getByRole('heading', { name: 'Get set up · 0 of 4' }).waitFor()
   await page.getByText('All set, Ann.').waitFor()
   await page.getByRole('link', { name: /Wool scarf/ }).waitFor()
   await page.getByRole('link', { name: /Birthday 2027/ }).click()
@@ -104,8 +111,11 @@ test('setup: a new owner answers each step with the keyboard and lands on Home w
   await h1(page, /one thing/).waitFor()
   violations.push(...(await axe(page, 'dark step 4')))
   await page.getByRole('button', { name: 'Skip' }).click()
+  await h1(page, /as an app/).waitFor()
+  violations.push(...(await axe(page, 'dark step 5 install')))
+  await page.getByRole('button', { name: 'Skip' }).click()
   await h1(page, /from anywhere/).waitFor()
-  violations.push(...(await axe(page, 'dark step 5')))
+  violations.push(...(await axe(page, 'dark step 6')))
   // Closing a replay goes to Home, and Back from there returns to Settings.
   await page.getByRole('button', { name: 'Close setup' }).click()
   await page.waitForURL(/#\/$/)
@@ -128,6 +138,8 @@ test('setup: skipping the occasion still saves the wish, with no list', async ({
   await h1(page, /one thing/).waitFor()
   await page.getByRole('button', { name: 'A good book' }).click()
   await page.getByRole('button', { name: 'Save wish' }).click()
+  await h1(page, /as an app/).waitFor()
+  await page.getByRole('button', { name: 'Skip' }).click()
   await page.getByText('“A good book” is in your wishlist.').waitFor()
   await page.getByRole('button', { name: 'Finish' }).click()
   await page.waitForURL(/#\/$/)

@@ -1,0 +1,89 @@
+/* Install guidance: numbered steps with a plain icon each. Used on the dark setup field (which
+   sets data-theme="dark", so the semantic tokens resolve to their dark values) and on sheets. */
+
+.install-guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-related);
+  min-width: 0;
+}
+
+.install-guide__steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin: 0;
+  /* In em, so the numbers stay inside the page gutter at large text sizes. */
+  padding-inline-start: 1.4em;
+  list-style: decimal;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text);
+}
+.install-guide--sheet .install-guide__steps {
+  font-size: var(--fs-secondary);
+}
+.install-guide__steps > li::marker {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* The number (the list marker), then the icon, then the words; long words wrap under the words. */
+.install-guide__step {
+  padding-inline-start: var(--sp-1);
+}
+.install-guide__icon-wrap {
+  display: inline-flex;
+  vertical-align: -0.2em;
+  margin-inline-end: var(--sp-2);
+  color: var(--text-2);
+}
+.install-guide__icon-wrap svg,
+.install-guide__icon {
+  width: 1.25em;
+  height: 1.25em;
+  flex-shrink: 0;
+}
+.install-guide__text {
+  overflow-wrap: anywhere;
+}
+.install-guide strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.install-guide__note,
+.install-guide__done {
+  margin: 0;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+}
+.install-guide__done {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  color: var(--text);
+}
+.install-guide__done .install-guide__icon {
+  margin-block-start: 0.15em;
+  color: var(--success);
+}
+
+.install-guide__copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  min-width: 0;
+}
+.install-guide__url {
+  min-width: 0;
+  font-size: var(--fs-label);
+  line-height: var(--lh-caption);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+  user-select: all;
+  -webkit-user-select: all;
+}

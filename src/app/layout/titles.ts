@@ -2,6 +2,8 @@
 // never include list names, share-link data or anything else from content
 // someone else could control.
 
+import { welcomeOrder, type WelcomeStep } from './routeMotion.ts'
+
 const SUFFIX = ' - Hippo'
 
 const ROUTES: ReadonlyArray<[RegExp, string]> = [
@@ -16,14 +18,23 @@ const ROUTES: ReadonlyArray<[RegExp, string]> = [
   [/^\/g\/[^/]+$/, 'Shared list'],
   [/^\/settings$/, 'Settings'],
   [/^\/design$/, 'Design gallery'],
-  [/^\/welcome\/start$/, 'Welcome, step 1 of 5'],
-  [/^\/welcome\/name$/, 'Your name, step 2 of 5'],
-  [/^\/welcome\/occasion$/, 'The occasion, step 3 of 5'],
-  [/^\/welcome\/wish$/, 'Your first wish, step 4 of 5'],
-  [/^\/welcome\/capture$/, 'Add wishes from anywhere, step 5 of 5'],
 ]
 
+const STEP_TITLES: Record<WelcomeStep, string> = {
+  start: 'Welcome',
+  install: 'Install Hippo',
+  name: 'Your name',
+  occasion: 'The occasion',
+  wish: 'Your first wish',
+  capture: 'Add wishes from anywhere',
+}
+
 export function titleFor(path: string): string {
+  const step = /^\/welcome\/([a-z]+)$/.exec(path)?.[1]
+  const steps = welcomeOrder()
+  const at = steps.findIndex((s) => s === step)
+  const current = steps[at]
+  if (current) return `${STEP_TITLES[current]}, step ${at + 1} of ${steps.length}${SUFFIX}`
   const match = ROUTES.find(([re]) => re.test(path))
   return (match ? match[1] : 'Page not found') + SUFFIX
 }

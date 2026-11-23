@@ -1,18 +1,39 @@
+import { lazy, Suspense, useState } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
 import { List, ListRow, SectionHeader } from '../../ui/index.ts'
 import { markSeen, type SharedList } from '../../core/index.ts'
 import { useCore } from '../core/context.ts'
 import { CHECKLIST_WISHES, type ChecklistTask } from '../core/onboarding.ts'
+import { installTaskName, type InstallGuide } from '../pwa/guide.ts'
+
+const InstallSheet = lazy(() => import('../pwa/InstallSheet.tsx'))
 
 /**
- * "Get set up" on Home after first-run setup: three tasks that track real state (wishes on the
- * device, a shared list, a saved backup). It goes away when all are done or when hidden.
+ * "Get set up" on Home after first-run setup: tasks that track real state (Hippo installed where
+ * that is possible, wishes on the device, a shared list, a saved backup). It goes away when all are
+ * done or when hidden. The install task opens this device's steps in a sheet.
  */
-export function SetupChecklist({ tasks, wishes, lists }: { tasks: ChecklistTask[]; wishes: number; lists: readonly SharedList[] }) {
+export function SetupChecklist({
+  tasks,
+  wishes,
+  lists,
+  install,
+}: {
+  tasks: ChecklistTask[]
+  wishes: number
+  lists: readonly SharedList[]
+  install?: { guide: InstallGuide; installed: boolean }
+}) {
   const core = useCore()
+  // null until first opened, so the sheet's code loads on first use and then stays mounted (focus returns to the row on close).
+  const [sheet, setSheet] = useState<boolean | null>(null)
   const done = tasks.filter((t) => t.done).length
   const draft = lists.find((l) => l.status !== 'published')
-  const text: Record<ChecklistTask['id'], { title: string; secondary?: string; href: string }> = {
+  const text: Record<ChecklistTask['id'], { title: string; secondary?: string; href?: string }> = {
+    install: {
+      title: install ? installTaskName(install.guide) : 'Install Hippo',
+      secondary: install?.guide.kind === 'in-app' ? `Open Hippo in ${install.guide.realBrowser} first` : 'Opens like an app',
+    },
     wishes: { title: 'Add three wishes', secondary: `${Math.min(wishes, CHECKLIST_WISHES)} of ${CHECKLIST_WISHES}`, href: '#/item/new' },
     share: { title: 'Share your list', secondary: 'Friends get a private link', href: draft ? `#/list/${draft.id}` : '#/list/new' },
     backup: { title: 'Save a backup', secondary: 'A file that brings your wishes back on any device', href: '#/settings' },
@@ -29,7 +50,7 @@ export function SetupChecklist({ tasks, wishes, lists }: { tasks: ChecklistTask[
           return (
             <ListRow
               key={t.id}
-              {...(t.done ? {} : { href: d.href })}
+              {...(t.done ? {} : d.href ? { href: d.href } : { onClick: () => setSheet(true) })}
               leading={
                 <span key={String(t.done)} className={t.done ? 'setup-task__icon is-done motion-enter' : 'setup-task__icon'} aria-hidden="true">
                   {t.done ? <CircleCheck /> : <Circle />}
@@ -46,6 +67,11 @@ export function SetupChecklist({ tasks, wishes, lists }: { tasks: ChecklistTask[
           )
         })}
       </List>
+      {install && sheet !== null ? (
+        <Suspense fallback={null}>
+          <InstallSheet open={sheet} onClose={() => setSheet(false)} guide={install.guide} installed={install.installed} />
+        </Suspense>
+      ) : null}
     </section>
   )
 }
