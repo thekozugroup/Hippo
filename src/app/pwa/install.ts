@@ -8,6 +8,8 @@ interface InstallPromptEvent extends Event {
 }
 
 let deferred: InstallPromptEvent | null = null
+/** Hippo was installed from this page (the `appinstalled` event, or an accepted prompt). */
+let installedHere = false
 const listeners = new Set<() => void>()
 
 function isInstallPrompt(e: Event): e is InstallPromptEvent {
@@ -23,6 +25,7 @@ if (typeof window !== 'undefined') {
   })
   window.addEventListener('appinstalled', () => {
     deferred = null
+    installedHere = true
     for (const l of listeners) l()
   })
 }
@@ -43,10 +46,17 @@ export async function promptInstall(): Promise<boolean> {
   deferred = null
   await e.prompt()
   const choice = await e.userChoice
+  if (choice.outcome === 'accepted') installedHere = true
   for (const l of listeners) l()
   return choice.outcome === 'accepted'
 }
 
+/** Hippo was installed from this page since it loaded. */
+export function wasInstalledHere(): boolean {
+  return installedHere
+}
+
 export function isStandalone(): boolean {
+  if ((navigator as { standalone?: unknown }).standalone === true) return true
   return typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches
 }
