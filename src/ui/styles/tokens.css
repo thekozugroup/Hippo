@@ -3,9 +3,11 @@
    their scale and step. Only the steps Hippo uses are declared. */
 
 :root {
-  /* Safe areas (top bar, floating nav, sheets). Inside the Android app, Capacitor's SystemBars
-     sets --safe-area-inset-* on <html> (its documented mechanism, which also covers WebViews that
-     report no env() insets); browsers have no such properties and use env() as before. */
+  /* Safe areas (top bar, floating nav, sheets). One source of truth with a fallback: inside the
+     Android app, MainActivity (EdgeToEdgeInsets.java) sets --safe-area-inset-* on <html> to the
+     real system bar sizes, which also covers WebViews older than 140 that report no env() insets;
+     browsers have no such properties and use env() as before. Setting --safe-area-inset-top by
+     hand previews an inset (DESIGN.md, "The status area"). */
   --inset-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --inset-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --inset-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));

@@ -222,6 +222,12 @@ html[data-top-inset][data-under='sheet'] body::before {
   }
 }
 
+/* In landscape, three-button navigation or a camera cutout can sit at a side: the app's content
+   keeps clear of it while the page background continues underneath. */
+html[data-native] #root {
+  padding-inline: var(--inset-left) var(--inset-right);
+}
+
 /* While the keyboard is open the floating navigation steps aside, so the focused field and the
    form's own actions have the room above the keyboard. */
 html[data-native][data-keyboard] .screen__nav {

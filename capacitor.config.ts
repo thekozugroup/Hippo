@@ -26,11 +26,13 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
   },
   plugins: {
-    // Built-in plugin: edge to edge, with the insets handed to CSS as --safe-area-inset-*.
+    // Built-in plugin, used only for the icon colours (src/app/native/shell.ts). Its inset handling
+    // is off: on WebView versions before 140 it pads the window by the bar sizes, so the page is not
+    // drawn under the bars. MainActivity (EdgeToEdgeInsets.java) keeps the WebView full size and
+    // hands the bar sizes to CSS as --safe-area-inset-* instead.
     SystemBars: {
-      insetsHandling: 'css',
+      insetsHandling: 'disable',
       style: 'DARK',
-      initialViewportFitValueHint: 'cover',
     },
     SplashScreen: {
       // The app hides the splash once the first screen has painted; this is only the fallback.

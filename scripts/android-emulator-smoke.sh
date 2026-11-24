@@ -1,25 +1,33 @@
 #!/usr/bin/env bash
-# Smoke test of the Android app on a running emulator (the Android workflow
-# runs it inside reactivecircus/android-emulator-runner):
+# Checks of the Android app on a running emulator (the Android workflow runs it
+# inside reactivecircus/android-emulator-runner):
 #
 #   scripts/android-emulator-smoke.sh <apk> <output folder>
 #
-# 1. Installs the APK and starts Hippo.
-# 2. Waits for the first screen of the web app (setup's opening screen, which
-#    has "Skip setup") in the UI tree that Android's uiautomator dumps. Fails if
-#    it never appears.
-# 3. The logo intro finishes: within about five seconds of the first screen the
-#    "Hippo" logo is small and at the top (never left large). Required.
-# 4. The setup slide control works with real touch input in the real WebView:
-#    `input swipe` along it moves to the next step (the drag); Back, then
-#    `input tap` on it moves on again (the tap). Required.
-# 5. Shares a product link into Hippo the way a browser does (ACTION_SEND,
+# Measurements inside the WebView come from scripts/android-webview-checks.mjs
+# (Playwright attached to the app's WebView over adb; needs `npm ci` first).
+#
+# 1. Installs the APK, turns animations on (the runner turns them off, which
+#    makes the WebView report reduced motion) and starts Hippo.
+# 2. Logo intro (WebView): the glyph is sampled from launch and must end small in
+#    its header; whether a large phase was seen is reported.
+# 3. Edge to edge on setup (WebView and screenshot): the WebView covers the whole
+#    window, the insets the layout uses match the system bars, the page is at
+#    the very top-left, and the pixels in both bar strips are the page's own.
+# 4. The first screen in Android's UI tree (uiautomator).
+# 5. The setup slide control with real touch input: `input swipe` along it moves
+#    to the next step (the drag); Back, then `input tap` moves on again (the tap).
+# 6. Keyboard (WebView): with the keyboard open the WebView ends at its top and
+#    the field and the step's actions are above it. Reported when the emulator
+#    shows no keyboard.
+# 7. Home (WebView and screenshot): edge to edge again; then with the light sheet
+#    scrolled under the status bar, the fade layer and dark status bar icons.
+# 8. Shares a product link into Hippo the way a browser does (ACTION_SEND,
 #    text/plain) and checks that Add a wish opens. Reported, not required.
 #
-# Animations are switched back on for the app (the emulator runner turns them
-# off, which makes the WebView report reduced motion), so the intro really plays.
-# Every check polls with a deadline and prints the UI dump when it fails.
-# Leaves screenshots, UI dumps and the app's log lines in the output folder.
+# Every check polls with a deadline and writes a PASS, FAIL or INFO line with
+# its numbers to <output>/checks.txt. Leaves screenshots at each point, UI dumps,
+# window manager dumps and the app's log lines in the output folder.
 set -euo pipefail
 
 APK="${1:?apk path}"
@@ -31,10 +39,19 @@ adb wait-for-device
 adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 1; done'
 adb install -r -g "$APK"
 # The runner sets these to 0 (disable-animations); with 0 Android WebView reports reduced motion and
-# the logo intro would not run at all. Turn them on so the check below sees the real intro.
+# the logo intro would not run at all. Turn them on before launch so the check sees the real intro
+# (the WebView check reports what matchMedia('(prefers-reduced-motion: reduce)') says).
 for k in window_animation_scale transition_animation_scale animator_duration_scale; do adb shell settings put global "$k" 1 || true; done
+# Show the on-screen keyboard even though the emulator has a hardware keyboard.
+adb shell settings put secure show_ime_with_hard_keyboard 1 || true
 adb logcat -c || true
-adb shell am start -W -n "$PKG/.MainActivity"
+rm -f "$OUT/checks.txt"
+
+status=0
+webview() { timeout 240 node scripts/android-webview-checks.mjs "$1" "$OUT"; }
+
+# 2 and 3: starts the app itself, so the logo is sampled from launch.
+if webview launch; then launch="passed"; else launch="FAILED"; status=1; fi
 
 # Looks for a pattern in a fresh UI dump, for up to $2 seconds; keeps the last dump as $3.
 wait_for_text() {
@@ -49,8 +66,9 @@ wait_for_text() {
   return 1
 }
 
-status=0
+first="FAILED"
 if wait_for_text 'Skip setup|Make a wishlist' 180 "$OUT/first-screen.xml"; then
+  first="passed"
   echo "PASS: the web app rendered its first screen inside the app."
   grep -o -E 'text="(Skip setup|Make a wishlist[^"]*)"' "$OUT/first-screen.xml" | head -3 || true
 else
@@ -94,24 +112,10 @@ fail_with_dump() {
 read -r SCREEN_W SCREEN_H < <(adb shell wm size | tr -d '\r' | sed -n 's/.*: \([0-9]*\)x\([0-9]*\).*/\1 \2/p' | tail -1)
 echo "Screen: ${SCREEN_W}x${SCREEN_H}"
 
-intro="skipped"
 drag="skipped"
 tap="skipped"
-if [ "$status" -eq 0 ]; then
-  # 3. The logo lands: small and near the top within ~5 s (polled to 8 s for a slow emulator).
-  intro="FAILED"
-  end=$((SECONDS + 8))
-  while [ "$SECONDS" -lt "$end" ]; do
-    if dump "$OUT/logo.xml" && b="$(bounds_of "$OUT/logo.xml" '^Hippo\|')"; then
-      read -r x1 y1 x2 y2 <<<"$b"
-      if [ $((x2 - x1)) -lt $((SCREEN_W * 2 / 5)) ] && [ "$y1" -lt $((SCREEN_H / 6)) ]; then intro="passed"; break; fi
-    fi
-    sleep 1
-  done
-  adb exec-out screencap -p > "$OUT/logo.png" || true
-  if [ "$intro" = "passed" ]; then echo "PASS: the logo is small and at the top ($b)."; else fail_with_dump "the logo was not at rest within 8 seconds (last bounds: ${b:-none})" "$OUT/logo.xml"; status=1; fi
-
-  # 4a. Drag: swipe the knob along the slide control to its end.
+if [ "$first" = "passed" ]; then
+  # 5a. Drag: swipe the knob along the slide control to its end.
   drag="FAILED"
   if dump "$OUT/step1.xml" && c="$(bounds_of "$OUT/step1.xml" 'Get started')"; then
     read -r x1 y1 x2 y2 <<<"$c"
@@ -124,7 +128,7 @@ if [ "$status" -eq 0 ]; then
     fail_with_dump "no Get started control in the UI tree" "$OUT/step1.xml"; status=1
   fi
 
-  # 4b. Back to step 1, then tap the control.
+  # 5b. Back to step 1, then tap the control.
   tap="FAILED"
   adb shell input keyevent KEYCODE_BACK
   if wait_for_text 'Get started' 15 "$OUT/back.xml" && c="$(bounds_of "$OUT/back.xml" 'Get started')"; then
@@ -137,8 +141,19 @@ if [ "$status" -eq 0 ]; then
   fi
 fi
 
+keyboard="skipped"
+home="skipped"
+if [ "$tap" = "passed" ]; then
+  # 6: on the name step the slide control led to.
+  if webview keyboard; then keyboard="passed"; else keyboard="FAILED"; status=1; fi
+fi
+if [ "$drag" != "skipped" ]; then
+  # 7: leaves setup.
+  if webview home; then home="passed"; else home="FAILED"; status=1; fi
+fi
+
 share="skipped"
-if [ "$status" -eq 0 ]; then
+if [ "$first" = "passed" ]; then
   adb shell am start -W -a android.intent.action.SEND -t text/plain \
     --es android.intent.extra.SUBJECT "Red wool scarf" \
     --es android.intent.extra.TEXT "https://example.com/products/red-wool-scarf?utm_source=share" \
@@ -159,10 +174,12 @@ if [ -n "$pid" ]; then adb logcat -d --pid="$pid" > "$OUT/app-log.txt" || true; 
 adb logcat -d -b crash > "$OUT/crash-log.txt" || true
 
 {
-  echo "first screen: $([ -f "$OUT/first-screen.xml" ] && grep -q -E 'Skip setup|Make a wishlist' "$OUT/first-screen.xml" && echo passed || echo FAILED)"
-  echo "logo intro finished (small, at the top, within 8 s, animations on): $intro"
+  echo "first screen: $first"
+  echo "launch, logo intro and edge to edge on setup (WebView): $launch"
   echo "slide control, drag with input swipe: $drag"
   echo "slide control, tap with input tap: $tap"
+  echo "keyboard (WebView): $keyboard"
+  echo "Home edge to edge, fade layer and status bar icons (WebView): $home"
   echo "share into Hippo: $share"
 } > "$OUT/result.txt"
 exit "$status"

@@ -110,6 +110,8 @@ function syncBars(): void {
   const want = barStylesFor({ dark: pageIsDark(), darkField, sheetUnder: isSheetUnderStatusBar() })
   if (want.status !== applied.status) {
     applied.status = want.status
+    // What the app asked Android for, readable by the emulator check (scripts/android-webview-checks.mjs).
+    root.dataset.statusIcons = want.status === 'DARK' ? 'light' : 'dark'
     void SystemBars.setStyle({ style: want.status === 'DARK' ? SystemBarsStyle.Dark : SystemBarsStyle.Light, bar: SystemBarType.StatusBar }).catch(() => undefined)
   }
   if (want.navigation !== applied.navigation) {
