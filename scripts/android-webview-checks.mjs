@@ -14,6 +14,10 @@
 //             open checks the WebView ends at the keyboard and the field and the
 //             step's actions are above it; then closes it and checks the insets
 //             come back.
+//   share     share <out> <label> <expected link> [screenshot]: Add a wish is open with the
+//             shared link in its link field, and the page lookup started or answered
+//             without blocking the form.
+//   share-none share-none <out> <label>: Add a wish did not open (an old share handed back).
 //   home      Leaves setup, runs the edge-to-edge checks on Home, scrolls the light
 //             sheet under the status bar and checks the fade layer and the status
 //             bar icon colour.
@@ -523,6 +527,108 @@ async function home() {
   }
 }
 
+// ------------------------------------------------------------------ share into Hippo
+
+/** What the Add a wish form shows, read in the page. */
+function wishForm() {
+  const fieldFor = (name) => {
+    const label = [...document.querySelectorAll('label')].find((l) => l.textContent.trim().replace(/\s*\*$/, '') === name)
+    return label?.control ?? null
+  }
+  const form = document.querySelector('form.item-form')
+  const link = fieldFor('Shop link')
+  const title = fieldFor('Name')
+  const notes = fieldFor('Notes')
+  const submit = form?.querySelector('button[type="submit"]') ?? null
+  return {
+    hash: window.location.hash,
+    heading: [...document.querySelectorAll('h1')].map((h) => h.textContent.trim()).join(' | '),
+    form: form !== null,
+    link: link?.value ?? null,
+    title: title?.value ?? null,
+    notes: notes?.value ?? null,
+    lookup: form?.getAttribute('data-lookup') ?? '',
+    status: form?.querySelector('[role="status"].sr-only')?.textContent?.trim() ?? '',
+    linkUsable: link ? !link.disabled && !link.readOnly : false,
+    submitUsable: submit ? !submit.disabled : false,
+  }
+}
+
+// share <label> <expected link> [screenshot name]: after the smoke script shared a link into Hippo,
+// Add a wish must be open with the link field holding the shared address (tracking parameters
+// removed), and the on-device page lookup must have started or answered without blocking the form.
+// The emulator cannot reach a real shop, so whether a picture or price arrives is not checked.
+async function share() {
+  const [label = 'share', expected = '', shot = ''] = process.argv.slice(4)
+  const { device, page } = await connect()
+  try {
+    let f = null
+    let opened = false
+    const start = Date.now()
+    while (Date.now() - start < 60_000) {
+      try {
+        f = await page.evaluate(wishForm)
+      } catch {
+        f = null // navigating: try again
+      }
+      opened = f !== null && f.hash.startsWith('#/item/new') && f.form && f.heading.includes('Add a wish')
+      if (opened && f.link === expected) break
+      await sleep(250)
+    }
+    const waited = Date.now() - start
+    check(opened, `${label}: Add a wish is open`, f ? `address ${f.hash || '(none)'}, heading "${f.heading}", form ${f.form ? 'present' : 'missing'}, after ${waited} ms` : `no page to read after ${waited} ms`)
+    check(Boolean(f && f.link === expected), `${label}: the link field holds the shared address`, f ? `link field "${f.link}", expected "${expected}"; name "${f.title}"` : 'no form')
+    // The lookup: started (pending) or answered (filled, nothing, failed); the form stays usable meanwhile.
+    const phases = new Set()
+    const lookupStart = Date.now()
+    let last = f
+    while (Date.now() - lookupStart < 30_000) {
+      try {
+        last = await page.evaluate(wishForm)
+      } catch {
+        break
+      }
+      if (last.lookup) phases.add(last.lookup)
+      if (['filled', 'nothing', 'failed', 'off'].includes(last.lookup)) break
+      await sleep(100)
+    }
+    const started = [...phases].some((p) => ['pending', 'filled', 'nothing', 'failed'].includes(p))
+    const usable = Boolean(last && last.linkUsable && last.submitUsable && last.link === expected)
+    check(
+      started && usable,
+      `${label}: the page lookup started or answered without blocking the form`,
+      last ? `lookup phases seen: ${[...phases].join(' > ') || 'none'}; says "${last.status}"; link field ${last.linkUsable ? 'editable' : 'not editable'}, Save ${last.submitUsable ? 'enabled' : 'disabled'}, link still "${last.link}"` : 'no form',
+    )
+    if (shot) screenshot(shot)
+  } finally {
+    await device.close()
+  }
+}
+
+// share-none <label>: after Android recreated the app with its old share intent, Add a wish must not open again.
+async function shareNone() {
+  const [label = 'no share'] = process.argv.slice(4)
+  const { device, page } = await connect()
+  try {
+    let f = null
+    let opened = false
+    const start = Date.now()
+    // Long enough for the shell to start and ask the plugin (it does so within a second or two).
+    while (Date.now() - start < 12_000) {
+      try {
+        f = await page.evaluate(wishForm)
+        if (f.hash.startsWith('#/item/new')) opened = true
+      } catch {
+        // navigating
+      }
+      await sleep(250)
+    }
+    check(!opened, `${label}: Add a wish did not open again`, f ? `address ${f.hash || '(none)'}, heading "${f.heading}" after ${Date.now() - start} ms` : 'no page to read')
+  } finally {
+    await device.close()
+  }
+}
+
 // A local check of the pixel analysis on saved screenshots: node scripts/android-webview-checks.mjs pixels <out> <png> <statusPx> <navPx>
 async function pixels() {
   const { readFileSync } = await import('node:fs')
@@ -530,7 +636,7 @@ async function pixels() {
   pixelChecks(file, readFileSync(file), { status: Number(status), nav: Number(nav) })
 }
 
-const phases = { launch, keyboard, home, pixels }
+const phases = { launch, keyboard, home, share, 'share-none': shareNone, pixels }
 if (!phases[phase]) {
   console.error(`Unknown phase "${phase}". Use one of: ${Object.keys(phases).join(', ')}`)
   process.exit(2)

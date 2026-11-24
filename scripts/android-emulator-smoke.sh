@@ -22,8 +22,14 @@
 #    shows no keyboard.
 # 7. Home (WebView and screenshot): edge to edge again; then with the light sheet
 #    scrolled under the status bar, the fade layer and dark status bar icons.
-# 8. Shares a product link into Hippo the way a browser does (ACTION_SEND,
-#    text/plain) and checks that Add a wish opens. Reported, not required.
+# 8. Shares product links into Hippo the way a browser does (ACTION_SEND,
+#    text/plain): with the app in the foreground, again straight after, from the
+#    background, not running (cold start), and as the first launch after the
+#    app's data is cleared. Each must end on Add a wish with the link field
+#    holding the shared address without tracking parameters, read inside the
+#    WebView, and the on-device page lookup started or answered without
+#    blocking the form. Also: after Android recreates the app with the share
+#    that started it, Add a wish does not open again.
 #
 # Every check polls with a deadline and writes a PASS, FAIL or INFO line with
 # its numbers to <output>/checks.txt. Leaves screenshots at each point, UI dumps,
@@ -152,20 +158,69 @@ if [ "$drag" != "skipped" ]; then
   if webview home; then home="passed"; else home="FAILED"; status=1; fi
 fi
 
-share="skipped"
-if [ "$first" = "passed" ]; then
-  adb shell am start -W -a android.intent.action.SEND -t text/plain \
-    --es android.intent.extra.SUBJECT "Red wool scarf" \
-    --es android.intent.extra.TEXT "https://example.com/products/red-wool-scarf?utm_source=share" \
-    -n "$PKG/.MainActivity" || true
-  if wait_for_text 'Add a wish' 60 "$OUT/after-share.xml"; then
-    share="passed"
-    echo "PASS: sharing a link into Hippo opened Add a wish."
+# 8: shares into Hippo. The am command goes to the device's shell as one string: adb joins its
+# arguments with spaces and the device shell splits them again, so a quoted subject passed as
+# separate arguments would arrive as several words (the share's subject would become a package).
+send_share() {
+  local subject="$1" text="$2" output
+  output="$(adb shell "am start -W -a android.intent.action.SEND -t text/plain --es android.intent.extra.SUBJECT '$subject' --es android.intent.extra.TEXT '$text' -n $PKG/.MainActivity" 2>&1 | tr -d '\r')" || true
+  echo "$output"
+  if echo "$output" | grep -q -E '^Error|Exception'; then return 1; fi
+}
+
+# Runs one share case: sends it, then checks the form inside the WebView. Sets the named result variable.
+share_case() {
+  local var="$1" label="$2" subject="$3" text="$4" expected="$5" shot="${6:-}"
+  local result="FAILED"
+  if send_share "$subject" "$text"; then
+    if webview_share share "$label" "$expected" "$shot"; then result="passed"; fi
   else
-    share="did not open Add a wish"
-    echo "NOTE: sharing a link into Hippo did not open Add a wish (reported, not required)."
+    echo "FAIL $label: the share intent was not delivered" | tee -a "$OUT/checks.txt"
   fi
+  if [ "$result" != "passed" ]; then status=1; fi
+  printf -v "$var" '%s' "$result"
+}
+webview_share() { timeout 240 node scripts/android-webview-checks.mjs "$1" "$OUT" "${@:2}"; }
+
+share_running="skipped"
+share_again="skipped"
+share_background="skipped"
+share_cold="skipped"
+share_redelivery="skipped"
+share_first="skipped"
+if [ "$first" = "passed" ]; then
+  # 8a. The app in the foreground (on Home after the checks above).
+  share_case share_running "share while running" "Red wool scarf" \
+    "https://example.com/products/red-wool-scarf?utm_source=share" "https://example.com/products/red-wool-scarf"
+  # 8b. Straight after, a second share: the form must show the second one.
+  share_case share_again "second share while running" "Blue kite" \
+    "Look at this kite https://example.com/products/blue-kite?gclid=abc&size=2" "https://example.com/products/blue-kite?size=2"
+  # 8c. The app in the background.
+  adb shell input keyevent KEYCODE_HOME; sleep 2
+  share_case share_background "share from the background" "Green mug" \
+    "https://example.com/products/green-mug" "https://example.com/products/green-mug"
+  # 8d. The app not running (cold start).
+  adb shell am force-stop "$PKG"; sleep 1
+  share_case share_cold "cold-start share" "Yellow raincoat" \
+    "https://example.com/products/yellow-raincoat?utm_campaign=autumn" "https://example.com/products/yellow-raincoat" share-cold-start
+  dump "$OUT/after-share.xml" || true
   adb exec-out screencap -p > "$OUT/after-share.png" || true
+  # 8e. Android recreates the app with the share that started it (the process was stopped in the
+  #     background, then the person returns to Hippo from the launcher): Add a wish must not open again.
+  adb shell input keyevent KEYCODE_HOME; sleep 2
+  adb shell am kill "$PKG" || true; sleep 2
+  if [ -z "$(adb shell pidof "$PKG" | tr -d '\r')" ]; then
+    adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+    if webview_share share-none "recreated after a share"; then share_redelivery="passed"; else share_redelivery="FAILED"; status=1; fi
+    adb exec-out screencap -p > "$OUT/after-recreate.png" || true
+  else
+    share_redelivery="not run (the process was not stopped in the background)"
+    echo "INFO recreated after a share: am kill did not stop the process; not checked" | tee -a "$OUT/checks.txt"
+  fi
+  # 8f. A first-ever launch that begins with a share (the app's data cleared, as after installing).
+  adb shell pm clear "$PKG" >/dev/null || true; sleep 1
+  share_case share_first "first-launch share" "Red wool scarf" \
+    "https://example.com/products/red-wool-scarf?utm_source=share" "https://example.com/products/red-wool-scarf" share-first-launch
 fi
 
 # The app's own log lines only (Capacitor logging is off; this shows crashes and WebView errors).
@@ -180,6 +235,11 @@ adb logcat -d -b crash > "$OUT/crash-log.txt" || true
   echo "slide control, tap with input tap: $tap"
   echo "keyboard (WebView): $keyboard"
   echo "Home edge to edge, fade layer and status bar icons (WebView): $home"
-  echo "share into Hippo: $share"
+  echo "share while running: $share_running"
+  echo "second share while running: $share_again"
+  echo "share from the background: $share_background"
+  echo "cold-start share: $share_cold"
+  echo "no second form after Android recreates the app: $share_redelivery"
+  echo "first-launch share: $share_first"
 } > "$OUT/result.txt"
 exit "$status"

@@ -158,7 +158,8 @@ jobs:
   # (scripts/android-emulator-smoke.sh, with measurements inside the WebView from
   # scripts/android-webview-checks.mjs through Playwright over adb): the logo intro lands small in
   # its header; the page is drawn edge to edge under both system bars with the real insets; the
-  # keyboard; Home's status area; and the setup slide control by drag (input swipe) and tap (input tap).
+  # keyboard; Home's status area; the setup slide control by drag (input swipe) and tap (input tap);
+  # and shares into Hippo (foreground, repeat, background, cold start, first launch, re-delivery).
   emulator:
     needs: build
     runs-on: ubuntu-latest
@@ -203,7 +204,7 @@ jobs:
             echo
             if [ -f emulator-smoke/checks.txt ]; then sed -e 's/^\(PASS\|FAIL\|INFO\) /- **\1** /' emulator-smoke/checks.txt; else echo "- No measurements were taken."; fi
             echo
-            echo "Inside the WebView (Playwright over adb): the logo glyph is sampled from launch and must end small in its header (a large phase is reported); the WebView must cover the whole window; the insets the layout uses must match the system bar sizes from the window manager; the page must be at the very top-left; in the screenshot, the pixels just inside each bar must continue the page with no colour step at the bar's edge; with the keyboard open the WebView ends at its top with the field and the step's actions above it; on Home, with the sheet under the status bar, the fade layer is drawn and the status bar icons are dark. With real touch input: an \`input swipe\` along the Get started control and, after Back, an \`input tap\` on it reach the name step. The share check is reported only."
+            echo "Inside the WebView (Playwright over adb): the logo glyph is sampled from launch and must end small in its header (a large phase is reported); the WebView must cover the whole window; the insets the layout uses must match the system bar sizes from the window manager; the page must be at the very top-left; in the screenshot, the pixels just inside each bar must continue the page with no colour step at the bar's edge; with the keyboard open the WebView ends at its top with the field and the step's actions above it; on Home, with the sheet under the status bar, the fade layer is drawn and the status bar icons are dark. With real touch input: an \`input swipe\` along the Get started control and, after Back, an \`input tap\` on it reach the name step. Shares into Hippo (ACTION_SEND, text/plain) with the app in the foreground, again straight after, from the background, not running and as a first launch after clearing its data must each end on Add a wish with the shared link (tracking parameters removed) in its link field, read inside the WebView, and the on-device page lookup started or answered without blocking the form (the emulator reaches no real shop, so picture and price are not checked); after Android recreates the app with the share that started it, Add a wish must not open again."
             echo
             echo "Screenshots at each point, the UI dumps, window manager dumps and the app's log are in the emulator-smoke artifact."
           } >> "$GITHUB_STEP_SUMMARY"

@@ -39,7 +39,7 @@ describe('shared from another app (Android app share target)', () => {
     const stop = subscribeCapture(seen)
     const before = captureEpoch()
     const draft = captureShared({ title: 'Red wool scarf', text: 'Have a look: https://shop.example/p/scarf?utm_source=android&fbclid=abc&colour=red.' })
-    expect(draft).toEqual({ title: 'Red wool scarf', url: 'https://shop.example/p/scarf?colour=red' })
+    expect(draft).toEqual({ title: 'Red wool scarf', url: 'https://shop.example/p/scarf?colour=red', notes: 'Have a look:' })
     expect(peekCaptureDraft()).toEqual(draft)
     expect(captureEpoch()).toBe(before + 1)
     expect(seen).toHaveBeenCalledTimes(1)

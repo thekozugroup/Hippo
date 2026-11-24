@@ -195,6 +195,8 @@ function focusFirstError(): void {
 }
 
 type LookupNote = { kind: 'pending' | 'done'; text: string } | { kind: 'off-hint' }
+/** Where the latest lookup is, on the form as data-lookup (read by the Android emulator check). */
+type LookupPhase = 'idle' | 'off' | 'pending' | 'filled' | 'nothing' | 'failed'
 
 const OFF_HINT = 'Pictures come automatically when you add with the bookmarklet or Shortcut. You can also turn on Link lookup in Settings.'
 const FAILURE_TEXT: Record<'rate-limited' | 'other', string> = {
@@ -230,6 +232,7 @@ function filledText(patch: { title?: string; imageUrl?: string; price?: Money })
 function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, prefilled: boolean) {
   const core = useCore()
   const [note, setNote] = useState<LookupNote | undefined>()
+  const [phase, setPhase] = useState<LookupPhase>('idle')
   const run = useRef<{ id: number; url: string | undefined; controller?: AbortController }>({ id: 0, url: undefined })
   // The answer may arrive after the person kept typing: merge into what the form holds then.
   const latest = useRef(f)
@@ -241,6 +244,7 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
     run.current.controller?.abort()
     run.current = { id: run.current.id + 1, url: undefined }
     setNote(undefined)
+    setPhase('idle')
   }
 
   const onDevice = isNativeApp()
@@ -257,6 +261,7 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
       const on = onDevice ? await getPageLookupEnabled(core.db) : await getLinkPreviewEnabled(core.db)
       if (run.current.id !== id) return
       // Turned off in the app's Settings: nothing is fetched and nothing is said.
+      if (!on) setPhase('off')
       if (!on && onDevice) return
       if (!on) {
         if (pasted && !now.imageUrl.trim()) {
@@ -268,8 +273,10 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
         return
       }
       setNote({ kind: 'pending', text: onDevice ? DEVICE_TEXT.pending : 'Looking up the title and picture\u2026' })
+      setPhase('pending')
       const result = onDevice ? await lookupOnDevice(url, { db: core.db, signal: controller.signal }) : await lookupLinkPreview(url, { db: core.db, signal: controller.signal })
       if (run.current.id !== id || result.kind === 'cancelled') return
+      setPhase(result.kind === 'found' ? 'filled' : result.kind === 'nothing-found' ? 'nothing' : result.kind === 'disabled' ? 'off' : 'failed')
       if (result.kind === 'found') {
         const prev = latest.current
         const typedPrice = parseMoneyInput(prev.price, prev.currency)
@@ -311,7 +318,7 @@ function useLinkLookup(f: FormState, setF: Dispatch<SetStateAction<FormState>>, 
   }, [])
 
   const hint = note?.kind === 'off-hint' ? OFF_HINT : note?.text
-  return { start, cancel, hint }
+  return { start, cancel, hint, phase }
 }
 
 function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null }) {
@@ -502,7 +509,7 @@ function ItemForm({ item, draft }: { item: Item | null; draft: DraftItem | null 
   const err = (k: keyof Errors) => (errors[k] ? { error: errors[k] } : {})
 
   return (
-    <form className="item-form app-stack app-stack--loose" onSubmit={(e) => void submit(e)} noValidate>
+    <form className="item-form app-stack app-stack--loose" data-lookup={lookup.phase} onSubmit={(e) => void submit(e)} noValidate>
       {restored ? (
         <div className="item-form__restored" role="status">
           <p className="app-note">Your unsaved changes are back.</p>
