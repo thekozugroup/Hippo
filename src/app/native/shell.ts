@@ -131,6 +131,15 @@ function wireBars(): void {
 
 // ------------------------------------------------------------------ shares and links
 
+/** The number of the latest share used; an older answer (two shares in quick succession) is ignored. */
+let lastShareSeq = 0
+
+/**
+ * Takes the share the SharedText plugin holds, if any, and opens it: a transfer link goes to the
+ * transfer import, anything else to Add a wish through captureShared (the same checks as a deep
+ * link). Called at start (a share that started the app, held by the plugin until now) and on every
+ * "received" (a share while the app runs, in the foreground or the background).
+ */
 async function takeShare(): Promise<void> {
   let shared: unknown
   try {
@@ -140,6 +149,10 @@ async function takeShare(): Promise<void> {
   }
   const text = sharedTextFrom(shared)
   if (!text) return
+  if (text.seq !== undefined) {
+    if (text.seq <= lastShareSeq) return
+    lastShareSeq = text.seq
+  }
   // A transfer link shared from another app (a chat): receive it, never as a wish.
   const transfer = transferPayloadInText(`${text.title ?? ''} ${text.text ?? ''}`)
   if (transfer) {

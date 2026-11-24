@@ -54,12 +54,14 @@ export function barStylesFor(s: BarState): { status: BarStyle; navigation: BarSt
   return { status: lightBehindStatus ? 'LIGHT' : 'DARK', navigation: s.dark || s.darkField ? 'DARK' : 'LIGHT' }
 }
 
-/** Reads what the SharedText plugin returned: only string fields, nothing else. */
-export function sharedTextFrom(value: unknown): { title?: string; text?: string } | null {
+/** Reads what the SharedText plugin returned: only string fields and a positive whole share number, nothing else. */
+export function sharedTextFrom(value: unknown): { title?: string; text?: string; seq?: number } | null {
   if (typeof value !== 'object' || value === null) return null
   const v = value as Record<string, unknown>
-  const out: { title?: string; text?: string } = {}
+  const out: { title?: string; text?: string; seq?: number } = {}
   if (typeof v.title === 'string' && v.title.trim()) out.title = v.title
   if (typeof v.text === 'string' && v.text.trim()) out.text = v.text
-  return out.title !== undefined || out.text !== undefined ? out : null
+  if (out.title === undefined && out.text === undefined) return null
+  if (typeof v.seq === 'number' && Number.isSafeInteger(v.seq) && v.seq > 0) out.seq = v.seq
+  return out
 }
