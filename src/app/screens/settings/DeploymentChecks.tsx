@@ -4,6 +4,7 @@ import { Button, Skeleton, StatusPill } from '../../../ui/index.ts'
 import { browserDeploymentEnv, checkDeployment, DEFAULT_RELAYS, type DeploymentCheck } from '../../../core/index.ts'
 import { useCore } from '../../core/context.ts'
 import { useSettings } from '../../core/data.ts'
+import { HOSTING_GUIDE_URL } from '../../lib/hosting.ts'
 import { isNativeApp } from '../../native/platform.ts'
 
 /** Inside the Android app the files come from the APK: the address, service worker and storage promise checks are about a browser tab, so they are left out. */
@@ -102,6 +103,13 @@ export function DeploymentChecks({ run }: DeploymentChecksProps) {
         </summary>
         <div className="app-stack settings-deploy__body">
           <p className="app-note">For whoever set up this copy of Hippo. A relay is a sync server that carries shared lists.</p>
+          {isNativeApp() ? null : (
+            <p className="app-note">
+              <a href={HOSTING_GUIDE_URL} target="_blank" rel="noopener noreferrer">
+                Host your own copy of Hippo<span className="sr-only"> (opens in a new tab)</span>
+              </a>
+            </p>
+          )}
           <p className="settings-deploy__status" role="status" aria-live="polite">
             {summary(state)}
           </p>

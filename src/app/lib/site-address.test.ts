@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_RELAYS } from '../../core/index.ts'
 import { generateListSecret, generateSigningKey, publicKeyOf } from '../../core/crypto/keys.ts'
 import { encodeSharePayload, shareLinkFor } from '../../core/crypto/link.ts'
-import { siteUrlFromEnv } from '../../../vite.config.ts'
+import { resolveSiteUrl, siteUrlFromEnv } from '../../../vite.config.ts'
 import { payloadFromPastedLink, payloadFromSiteLink, PUBLIC_SITE_URL, shareBaseFor, shareBaseUrl } from './site-address.ts'
 
 const SITE = 'https://owner.github.io/Hippo/'
@@ -10,8 +10,8 @@ const keys = { ownerPubkey: publicKeyOf(generateSigningKey()), listSecret: gener
 const payload = encodeSharePayload(keys)
 
 describe('the site address', () => {
-  it('is one constant from the build: HIPPO_SITE_URL, normalised, or empty without it', () => {
-    expect(PUBLIC_SITE_URL).toBe(siteUrlFromEnv(process.env.HIPPO_SITE_URL) ?? '')
+  it('is one constant from the build: the resolved site address, or empty without one', () => {
+    expect(PUBLIC_SITE_URL).toBe(resolveSiteUrl(process.env) ?? '')
   })
 
   it('HIPPO_SITE_URL must be an https address without credentials, query or fragment; a slash is added', () => {

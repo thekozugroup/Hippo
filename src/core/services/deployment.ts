@@ -42,6 +42,12 @@ export interface DeploymentEnv {
   }
   /** Opens and closes a scratch database; resolves true when that worked. Omit when IndexedDB is missing. */
   probeIndexedDb?: (() => Promise<boolean>) | undefined
+  /**
+   * Whether the host sends `frame-ancestors` (in a Content-Security-Policy header) or X-Frame-Options
+   * with the page's own files. Resolves undefined when it cannot tell (no network, a service worker
+   * answered, an unreadable response). Omit when the environment cannot ask.
+   */
+  probeFramingHeader?: (() => Promise<boolean | undefined>) | undefined
   /** Checks to leave out, for example the browser-only ones inside the Android app. */
   skip?: readonly DeploymentCheckId[] | undefined
   /** Creates a WebSocket for a relay URL. Omit when the environment has none. */
@@ -101,8 +107,29 @@ function checkOwnOrigin(env: DeploymentEnv): DeploymentCheck {
   return { id: 'own-origin', status: 'ok', finding: `Hippo has an address of its own (${host || 'this host'}).`, fix: '' }
 }
 
-function checkNotFramed(env: DeploymentEnv): DeploymentCheck {
-  if (!env.framed) return { id: 'not-framed', status: 'ok', finding: 'Hippo is not inside another site.', fix: '' }
+/** True when response headers forbid framing: a CSP with frame-ancestors, or X-Frame-Options. Pure, for tests. */
+export function headersForbidFraming(get: (name: string) => string | null): boolean {
+  const csp = get('content-security-policy') ?? ''
+  if (/(^|;)\s*frame-ancestors\s/i.test(csp)) return true
+  return /^(deny|sameorigin)$/i.test((get('x-frame-options') ?? '').trim())
+}
+
+async function checkNotFramed(env: DeploymentEnv): Promise<DeploymentCheck> {
+  if (!env.framed) {
+    let header: boolean | undefined
+    try {
+      header = await env.probeFramingHeader?.()
+    } catch {
+      header = undefined
+    }
+    const finding =
+      header === true
+        ? 'Hippo is not inside another site, and this host tells browsers never to show it in a frame.'
+        : header === false
+          ? 'Hippo is not inside another site. This host does not send a header that forbids framing, so Hippo relies on its own check.'
+          : 'Hippo is not inside another site.'
+    return { id: 'not-framed', status: 'ok', finding, fix: '' }
+  }
   return {
     id: 'not-framed',
     status: 'problem',
@@ -315,9 +342,20 @@ export function browserDeploymentEnv(relays: readonly string[]): DeploymentEnv {
   } catch {
     framed = true
   }
+  // hippo.json is never cached by the service worker, so its response carries the host's own headers.
+  const probeFramingHeader = async (): Promise<boolean | undefined> => {
+    try {
+      const res = await fetch(new URL('hippo.json', document.baseURI), { method: 'HEAD', cache: 'no-store' })
+      if (!res.ok || !/json/i.test(res.headers.get('content-type') ?? '')) return undefined
+      return headersForbidFraming((n) => res.headers.get(n))
+    } catch {
+      return undefined
+    }
+  }
   return {
     location: window.location,
     framed,
+    probeFramingHeader: typeof fetch === 'undefined' ? undefined : probeFramingHeader,
     navigator,
     probeIndexedDb: typeof indexedDB === 'undefined' ? undefined : probe,
     createWebSocket: typeof WebSocket === 'undefined' ? undefined : browserProbeSocket,

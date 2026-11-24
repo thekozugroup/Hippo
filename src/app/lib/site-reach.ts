@@ -6,7 +6,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { isNativeApp, siteFileFetcher } from '../native/index.ts'
 import { checkSite } from './site-check.ts'
-import { onSiteChange, siteAddress } from './site-address.ts'
+import { chosenSite, onSiteChange, siteAddress } from './site-address.ts'
 
 export type Reach = 'unknown' | 'ok' | 'unreachable'
 
@@ -21,6 +21,28 @@ export function siteReach(): Promise<Reach> {
     checked = { site, result: checkSite(site, fetchFile).then((r) => (r.ok ? 'ok' : 'unreachable')) }
   }
   return checked.result
+}
+
+let guideDismissed = false
+
+/** The person chose "Share anyway" on the guided screen: do not ask again until the app restarts. */
+export function dismissSiteGuide(): void {
+  guideDismissed = true
+}
+
+/**
+ * Should the guided screen come before sharing? Only in the app, only while the site is the built-in
+ * one (a site the person chose themselves is theirs to fix), and only when there is none or it does
+ * not answer. Never throws.
+ */
+export async function needsSiteSetup(): Promise<boolean> {
+  if (!isNativeApp() || guideDismissed || chosenSite()) return false
+  if (!siteAddress()) return true
+  try {
+    return (await siteReach()) === 'unreachable'
+  } catch {
+    return false
+  }
 }
 
 /** Forget the answer (after the person chose another site, or checked one by hand). */

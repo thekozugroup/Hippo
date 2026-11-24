@@ -11,7 +11,7 @@ Status: v1 in development. License: MIT.
 3. Any number of shared lists, each a chosen subset of the private wishlist, each with its own link.
 4. Givers claim items or pledge partial amounts without creating an account.
 5. The owner sees nothing about claims. Givers are anonymous unless they choose a nickname, which only other givers see.
-6. No paid infrastructure and no server operated by the project. Anyone can self-host by forking and enabling GitHub Pages.
+6. No paid infrastructure and no server operated by the project. Anyone can put their own copy online for free: one button on Vercel (recommended), or a fork with GitHub Pages enabled.
 
 ## 2. Non-goals (v1)
 
@@ -27,7 +27,7 @@ Status: v1 in development. License: MIT.
 |---|---|
 | Owner | Capture wants quickly, organise them, share selected items per occasion, stay unspoiled |
 | Giver | Open a link, see what is wanted and what is still available, claim or chip in, undo |
-| Self-hoster | Fork, enable Pages, have a working instance with no secrets or configuration |
+| Self-hoster | Press one button (Vercel) or fork and enable Pages, and have a working instance with no secrets or configuration; then point the Android app at it |
 
 ## 4. Functional requirements
 
@@ -56,6 +56,7 @@ Status: v1 in development. License: MIT.
 - FR-10d Android app. The same web app inside a Capacitor shell, with its files in the APK and its data in the app's own WebView storage (separate from the browser's; moved with a backup file). It adds: Hippo in Android's share sheet (ACTION_SEND, text/plain), handled at a cold start and while running, through the same capture path as FR-9; Back and the predictive back gesture closing an open sheet first, then going back in history, then leaving from a top-level screen; edge-to-edge layout with safe-area insets and system bar icons that follow the screen; a splash screen and an adaptive launcher icon from the hippo glyph; light haptic feedback when a gift is marked, a switch is turned or a deletion is confirmed (none under reduced motion or with touch feedback off); the system share sheet for share links and for saving a backup file. Every link the app makes or copies points at the public website (`HIPPO_SITE_URL` at build time), because the app's own address is local. Links to that website can open in the app where Android allows it (the person turns it on under Open by default; a GitHub Pages project site cannot publish the verification file), and Lists has "Open a list from a link" for a pasted link. There is no install step, install task or service worker in the app. Its data is excluded from Android cloud backup and device transfer, because it holds list keys. The only permission is Internet.
 - FR-10e Reading shop pages (Android app only, on by default, a switch in Settings under Shop pages with the sentence "Hippo opens the shop page from your phone to read its name, picture and price; nothing is sent to anyone else."). For a link that was pasted, shared or prefilled, when the name, picture or price is empty, the phone fetches the page itself: `https` and public hosts only, every redirect and every resolved address checked, 8 seconds, 1.5 MB, no cookies, HTML only. Open Graph and product meta tags and JSON-LD `Product`/`Offer` data are read from an inert parsed copy, validated like any other input, and fill only empty fields; a newer link cancels the lookup. Microlink (FR-10a) is not offered in the app.
 - FR-10f Hippo site in the app: the website the app's links point at defaults to `HIPPO_SITE_URL` and can be changed at run time (Settings, Hippo site). An address is used only after the app has fetched its `hippo.json` through native HTTP and found a compatible Hippo site; its relays are adopted unless the person set their own. Before a list link is shown the app checks once per session that the site answers and says so beside the link when it does not; sharing is never blocked.
+- FR-10g Connect the app to a site. The two ways to point the app at a Hippo website are one component with two choices: "I have a Hippo site" (type the address, with or without `https://`; spaces and a page name are dropped; the check in FR-10f runs and its specific error is shown under the field; the host that was connected is named) and "Set one up, free, about two minutes" (three short steps and a button that opens the Vercel setup page for this project in the phone's browser; the person comes back and types the address). It is shown (a) before the link when the owner shares a list for the first time and the built-in site does not answer or none is set, after which sharing continues at once, with "Share anyway" to carry on with the not-reachable note, and (b) under "I already use Hippo", "Use my own Hippo site" and Settings, Hippo site. Adding wishes is never blocked. The setup page address and the project address come from one constant (`src/app/lib/hosting.ts`), so a fork can change them. The app's own screens say "your Hippo site", "web address" and "put it online". On the website there is nothing to connect: Settings, in the Deployment checks area, has one link, "Host your own copy of Hippo".
 - FR-10a Link preview (opt-in, off by default). For a wish added by pasting a link or through the Android share sheet, Hippo can ask one third-party service (Microlink, `api.microlink.io`) for the page's title and picture. It runs only after the user turns it on in Settings, sends only the link (tracking parameters and fragment removed, https only), times out after a few seconds, and fills only fields the user has left empty. Answers are validated like any other untrusted input. The bookmarklet and Shortcut read the page themselves and need no third party; they remain the recommended method.
 
 ### 4.3 Shared lists (owner)
@@ -85,7 +86,7 @@ Status: v1 in development. License: MIT.
 - FR-26 List content and claims are end-to-end encrypted. The decryption key travels only in the URL fragment of the share link. Relays store ciphertext.
 - FR-27 Only the owner's key can publish or change list content. Only a claim's author can change or withdraw that claim.
 - FR-28 The app makes no requests to third parties except the configured relays, item images that the owner chose to attach (loaded with `referrerpolicy="no-referrer"`, from any `https` host), and, only after the owner opts in (FR-10a), the link preview service. Its own host is asked for the time (a HEAD request to the app's address). The Android app also asks the public website for the time, and fetches the shop pages of links the person adds unless that is turned off (FR-10e); it never contacts Microlink.
-- FR-29 Hippo refuses to run inside another site's frame (GitHub Pages cannot send `frame-ancestors`): before the app starts it shows a message with a link that opens Hippo in its own tab. The Android app is never framed and skips the check.
+- FR-29 Hippo refuses to run inside another site's frame (GitHub Pages cannot send `frame-ancestors`; Vercel sends it as a header, see section 6): before the app starts it shows a message with a link that opens Hippo in its own tab. The Android app is never framed and skips the check.
 - FR-30 Settings can show deployment checks: HTTPS, an origin of its own, not framed, service worker, storage, persistent storage and relay reachability, each with a plain-language finding and fix. The Android app leaves out the origin, service worker and persistent storage checks.
 
 Threat model:
@@ -121,7 +122,17 @@ Known limitation: hiding claims from the owner is enforced by the app, not by cr
 
 ## 6. Architecture summary
 
-- Static PWA: React + TypeScript + Vite, deployed to GitHub Pages by a GitHub Actions workflow.
+- Static PWA: React + TypeScript + Vite. Two hosting options, both with nothing to configure:
+
+| | Vercel (recommended) | GitHub Pages |
+|---|---|---|
+| Setup | The "Deploy with Vercel" button in the README: Vercel copies the repository into the person's GitHub account, builds it and puts it online. `vercel.json` holds the build settings and headers. | Fork, name the fork `<organisation>.github.io`, turn on Pages; a GitHub Actions workflow builds and publishes |
+| Own address | Yes, per project; a custom domain such as `hippo.example.com` is one `CNAME` record | Only with an organisation site or a custom domain |
+| Headers | Content-Security-Policy (the page's policy plus `frame-ancestors 'none'`), `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, cache rules for hashed files, the service worker, the manifest and `hippo.json` | None; the policy is a `<meta>` tag only |
+| Site address in link previews and `hippo.json` | `HIPPO_SITE_URL` if set, else Vercel's production address (production builds only; redeploy after adding a domain) | `HIPPO_SITE_URL`, set by the workflow |
+| Updates from the original | Not automatic: merge the original's changes into the copy, or fork and import the fork | Same |
+| Plan | Free Hobby plan: personal, non-commercial use | Free |
+
 - Android app: the same build in native mode (`vite build --mode native`) inside Capacitor 8, built into an APK by the Android workflow. Native-only code is in `src/app/native/`, loaded with dynamic imports and left out of the website build; the app's three small plugins (share target, page fetch, haptics) are Java in `android/`.
 - Local data: IndexedDB via Dexie.
 - Sync: end-to-end encrypted events on public Nostr relays, behind a `Transport` interface so another backend can replace relays. See `PROTOCOL.md`.
