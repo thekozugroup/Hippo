@@ -95,6 +95,12 @@ svg {
   outline-offset: 2px;
 }
 
+/* A heading that only receives focus from script (after a screen change, so a screen reader
+   starts there) is not a control. It takes focus without drawing the ring. */
+:is(h1, h2, h3)[tabindex='-1']:focus-visible {
+  outline: none;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
