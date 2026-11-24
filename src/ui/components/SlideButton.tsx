@@ -8,8 +8,15 @@ import './SlideButton.css'
 /** The event a completed slide sends (it bubbles), so the app can add touch feedback without this component knowing about it. */
 export const SLIDE_COMPLETE_EVENT = 'slidecomplete'
 
-/** Activations closer together than this count once (a tap during the settle, or the click a browser sends after a drag). */
+/**
+ * Pointer activations of one control closer together than this count once: a double tap, or a tap
+ * during the settle after a slide. The lock belongs to one control instance; a setup step that
+ * changes gets a new instance (StepScreen keys it by step), so it never holds back a press on the
+ * next question. Keyboard presses are not timed: a held-down Enter (key repeat) is ignored instead.
+ */
 const REPEAT_LOCK_MS = 350
+/** How long after a slide ends the click a browser may still send for that same press is ignored. */
+const SLIDE_CLICK_MS = 400
 
 export interface SlideButtonProps extends Omit<ComponentPropsWithRef<'button'>, 'children' | 'onClick' | 'aria-label'> {
   /** The visible label and the button's accessible name ("Get started", "Continue"). */
@@ -59,6 +66,7 @@ export function SlideButton({
   onPointerMove,
   onPointerUp,
   onPointerCancel,
+  onKeyDown,
   ...rest
 }: SlideButtonProps) {
   const own = useRef<HTMLButtonElement | null>(null)
@@ -85,6 +93,8 @@ export function SlideButton({
   }
   useLayoutEffect(() => {
     place(0, 1, 1)
+    // A press on the new label is a new decision, never a repeat of the press on the old one.
+    lastActivation.current = undefined
   }, [label])
 
   // After a completed slide the knob waits at the end; it goes back once the work is done.
@@ -179,7 +189,7 @@ export function SlideButton({
     if (d.intent !== 'slide') return
     setDragging(false)
     // The browser may still send a click for this press; the slide decides instead.
-    suppressClickUntil.current = performance.now() + 400
+    suppressClickUntil.current = performance.now() + SLIDE_CLICK_MS
     if (!cancelled && completesAt(slideProgress(d.offset, d.max)) && activate(true)) {
       place(d.max, d.max, d.dir)
       setDone(true)
@@ -207,6 +217,11 @@ export function SlideButton({
       aria-describedby={cx(rest['aria-describedby'], disabled && disabledReason ? reasonId : undefined) || undefined}
       className={cx('slide-btn', 'frost', 'frost--on-hero', busy && 'is-busy', disabled && 'is-disabled', dragging && 'is-dragging', done && 'is-done', className)}
       onClick={onClick}
+      onKeyDown={(e) => {
+        onKeyDown?.(e)
+        // A held-down Enter repeats keydown, and each would press the button again: one press is one activation.
+        if (e.key === 'Enter' && e.repeat) e.preventDefault()
+      }}
       onPointerDown={startDrag}
       onPointerMove={moveDrag}
       onPointerUp={(e) => endDrag(e, false)}

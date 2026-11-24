@@ -3,7 +3,7 @@
 
 import { existsSync } from 'node:fs'
 import { startMockRelay } from '../src/core/testing/mock-relay.ts'
-import { freePort, loadPlaywright, ROOT, startPreview, tests } from './harness.mjs'
+import { applyStress, freePort, loadPlaywright, ROOT, startPreview, stressFromEnv, tests } from './harness.mjs'
 import './flows.test.mjs'
 import './review.test.mjs'
 import './onboarding.test.mjs'
@@ -25,9 +25,13 @@ const filter = process.argv[2]
 const selected = filter ? tests.filter((t) => new RegExp(filter).test(t.name)) : tests
 const { chromium } = loadPlaywright()
 
+const stress = stressFromEnv()
 const relay = await startMockRelay(0)
+if (stress.relayMs) relay.setLatency(stress.relayMs)
 const preview = await startPreview(await freePort())
 const browser = await chromium.launch()
+applyStress(browser, stress)
+if (stress.cpu || stress.netMs || stress.relayMs) console.log(`  stress: ${JSON.stringify(stress)}`)
 const state = {}
 
 let failed = 0

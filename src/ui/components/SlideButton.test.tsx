@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { SlideButton } from './SlideButton.tsx'
+import { StepScreen } from './StepScreen.tsx'
 import { completesAt, dragIntent, isRepeat, knobOffset, labelOpacity, slideProgress, SLIDE_THRESHOLD } from './slide.ts'
 
 describe('slide logic', () => {
@@ -208,5 +209,86 @@ describe('SlideButton', () => {
     const btn = screen.getByRole('button', { name: 'Continue' })
     act(() => slide(btn, 28, 280))
     expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('the repeat guard is per control and per step', () => {
+  let restore: () => void
+  beforeEach(() => {
+    restore = stubLayout()
+    HTMLElement.prototype.setPointerCapture = () => undefined
+  })
+  afterEach(() => restore())
+
+  it('a double tap on one control counts once', () => {
+    const onActivate = vi.fn()
+    render(<SlideButton label="Continue" onActivate={onActivate} />)
+    const btn = screen.getByRole('button', { name: 'Continue' })
+    fireEvent.click(btn, { detail: 1 })
+    fireEvent.click(btn, { detail: 2 })
+    expect(onActivate).toHaveBeenCalledTimes(1)
+  })
+
+  it('a quick press after the label changed is a new decision and counts', () => {
+    const onActivate = vi.fn()
+    const { rerender } = render(<SlideButton label="Install Hippo" onActivate={onActivate} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Install Hippo' }), { detail: 1 })
+    rerender(<SlideButton label="Continue" onActivate={onActivate} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }), { detail: 1 })
+    expect(onActivate).toHaveBeenCalledTimes(2)
+  })
+
+  it('a held-down Enter presses once: its repeats are ignored', () => {
+    const onActivate = vi.fn()
+    render(<SlideButton label="Continue" onActivate={onActivate} />)
+    const btn = screen.getByRole('button', { name: 'Continue' })
+    // What a browser does for a key held down: keydown repeats, and each one not prevented clicks.
+    const press = (repeat: boolean) => {
+      if (fireEvent.keyDown(btn, { key: 'Enter', repeat })) fireEvent.click(btn, { detail: 0 })
+    }
+    press(false)
+    press(true)
+    press(true)
+    expect(onActivate).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('StepScreen', () => {
+  it('a press on the next step comes through however soon it follows the last one, also with the same label', () => {
+    const onContinue = vi.fn()
+    const { rerender } = render(<StepScreen step={2} total={6} title="What should we call you?" continueLabel="Continue" onContinue={onContinue} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }), { detail: 1 })
+    expect(onContinue).toHaveBeenCalledTimes(1)
+    rerender(<StepScreen step={3} total={6} title="What is the occasion?" continueLabel="Continue" onContinue={onContinue} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }), { detail: 1 })
+    expect(onContinue).toHaveBeenCalledTimes(2)
+  })
+
+  it('on one step a double tap still counts once', () => {
+    const onContinue = vi.fn()
+    render(<StepScreen step={2} total={6} title="What should we call you?" continueLabel="Continue" onContinue={onContinue} />)
+    const btn = screen.getByRole('button', { name: 'Continue' })
+    fireEvent.click(btn, { detail: 1 })
+    fireEvent.click(btn, { detail: 2 })
+    expect(onContinue).toHaveBeenCalledTimes(1)
+  })
+
+  it('Enter in a field continues once; held down, its repeats do not carry on to later steps', () => {
+    const onContinue = vi.fn()
+    render(
+      <StepScreen step={2} total={6} title="What should we call you?" continueLabel="Continue" onContinue={onContinue}>
+        <input aria-label="Your name" />
+      </StepScreen>,
+    )
+    const field = screen.getByRole('textbox', { name: 'Your name' })
+    const btn = screen.getByRole('button', { name: 'Continue' })
+    // Implicit submission: an Enter keydown that is not prevented clicks the form's submit button.
+    const press = (repeat: boolean) => {
+      if (fireEvent.keyDown(field, { key: 'Enter', repeat })) fireEvent.click(btn, { detail: 0 })
+    }
+    press(false)
+    press(true)
+    press(true)
+    expect(onContinue).toHaveBeenCalledTimes(1)
   })
 })

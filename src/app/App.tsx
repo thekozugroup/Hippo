@@ -65,6 +65,12 @@ function preloadFor(path: string): Promise<unknown> | undefined {
 }
 setRoutePreloader(preloadFor)
 
+/** True when focus is now on something other than the page and other than `before`. */
+function movedOn(before: Element | null): boolean {
+  const now = document.activeElement
+  return now !== null && now !== document.body && now !== document.documentElement && now !== before && now.isConnected
+}
+
 /** Moves focus to the new screen's heading and scrolls to the top after navigation. */
 function RouteFocus() {
   const [location] = useLocation()
@@ -81,7 +87,12 @@ function RouteFocus() {
       first.current = false
       return
     }
+    // What has focus once the new screen is in place: the page itself (the control that was pressed
+    // went with the old screen), or a control that stays, such as the navigation.
+    const before = document.activeElement
     const id = window.requestAnimationFrame(() => {
+      // Someone who already moved on to a control on the new screen (Tab, or a quick press) keeps it.
+      if (movedOn(before)) return
       document.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true })
     })
     return () => window.cancelAnimationFrame(id)

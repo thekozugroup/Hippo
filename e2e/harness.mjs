@@ -42,6 +42,50 @@ export function freePort() {
   })
 }
 
+/**
+ * Timing stress for finding races (never set in CI): every page the tests open gets
+ *   HIPPO_E2E_CPU=<n>         CPU throttling by a factor of n (Chromium, through CDP),
+ *   HIPPO_E2E_NET_MS=<ms>     that much extra latency on each of the page's own HTTP requests,
+ * and HIPPO_E2E_RELAY_MS=<ms> (read in run.mjs) delays every mock relay answer by that much.
+ */
+export function stressFromEnv(env = process.env) {
+  const num = (v) => (v && Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0)
+  return { cpu: num(env.HIPPO_E2E_CPU), netMs: num(env.HIPPO_E2E_NET_MS), relayMs: num(env.HIPPO_E2E_RELAY_MS) }
+}
+
+/** Applies `stressFromEnv` CPU and network settings to every page of every context `browser` makes. */
+export function applyStress(browser, { cpu, netMs }) {
+  if (!cpu && !netMs) return
+  const slow = async (page) => {
+    try {
+      const cdp = await page.context().newCDPSession(page)
+      if (cpu > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu })
+      if (netMs) {
+        await cdp.send('Network.enable')
+        await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: netMs, downloadThroughput: -1, uploadThroughput: -1 })
+      }
+    } catch {
+      // A page that closed at once (a download) needs no throttling.
+    }
+  }
+  const newContext = browser.newContext.bind(browser)
+  browser.newContext = async (...args) => {
+    const context = await newContext(...args)
+    const newPage = context.newPage.bind(context)
+    const done = new WeakSet()
+    context.newPage = async () => {
+      const page = await newPage()
+      done.add(page)
+      await slow(page)
+      return page
+    }
+    context.on('page', (page) => {
+      if (!done.has(page)) void slow(page)
+    })
+    return context
+  }
+}
+
 /** Starts `vite preview` for dist/ under SUBPATH; resolves once it answers. */
 export async function startPreview(port) {
   const child = spawn(process.execPath, [ROOT + 'node_modules/vite/bin/vite.js', 'preview', '--port', String(port), '--strictPort', '--host', '127.0.0.1', '--base', SUBPATH], {

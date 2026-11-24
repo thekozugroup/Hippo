@@ -83,6 +83,11 @@ export function StepScreen({
     if (!busy) onContinue?.()
   }
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    // A held-down Enter in a field would submit again on every repeat, carrying on past the next step.
+    if (e.key === 'Enter' && e.repeat) {
+      e.preventDefault()
+      return
+    }
     if (e.key !== 'Escape' || !onBack || e.defaultPrevented || e.nativeEvent.isComposing) return
     if (e.target instanceof HTMLSelectElement) return
     e.preventDefault()
@@ -108,7 +113,8 @@ export function StepScreen({
             {hasProgress ? <StepProgress className="step-screen__progress" id={progressId} current={step} total={total} /> : <div className="step-screen__progress" />}
             <div className="step-screen__actions">
               {onBack ? <IconButton type="button" variant="frost" size="lg" className="step-screen__back" aria-label={backLabel} icon={<ArrowLeft />} onClick={onBack} /> : null}
-              {continueLabel ? <SlideButton type="submit" className="step-screen__continue" label={continueLabel} busy={busy} {...(busyLabel ? { busyLabel } : {})} /> : null}
+              {/* Keyed by step: each question gets its own control, so a press on it is never taken for a repeat of the last step's. */}
+              {continueLabel ? <SlideButton key={step ?? 'step'} type="submit" className="step-screen__continue" label={continueLabel} busy={busy} {...(busyLabel ? { busyLabel } : {})} /> : null}
             </div>
             {secondary.length > 0 ? (
               <div className="step-screen__secondary">

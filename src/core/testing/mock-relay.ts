@@ -29,6 +29,8 @@ export interface MockRelay {
   /** Simulates a relay that accepts connections but never answers a request (no events, no EOSE) until `speak()`. */
   silence(): void
   speak(): void
+  /** Delays every answer by `ms` (0: answer at once), keeping their order on each connection. For timing tests. */
+  setLatency(ms: number): void
   close(): Promise<void>
 }
 
@@ -55,8 +57,20 @@ export function startMockRelay(port = 0): Promise<MockRelay> {
   const subs = new Map<WebSocket, Map<string, Filter[]>>()
   const wss = new WebSocketServer({ port, host: '127.0.0.1' })
 
+  let latency = 0
+  /** Per connection, when the last delayed answer goes out: a later answer never overtakes it. */
+  const sendAt = new WeakMap<WebSocket, number>()
   const send = (ws: WebSocket, msg: unknown[]): void => {
-    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg))
+    const deliver = () => {
+      if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg))
+    }
+    if (latency <= 0) {
+      deliver()
+      return
+    }
+    const at = Math.max(Date.now() + latency, sendAt.get(ws) ?? 0)
+    sendAt.set(ws, at)
+    setTimeout(deliver, at - Date.now())
   }
 
   let paused = false
@@ -167,6 +181,9 @@ export function startMockRelay(port = 0): Promise<MockRelay> {
         },
         speak: () => {
           silent = false
+        },
+        setLatency: (ms: number) => {
+          latency = Number.isFinite(ms) && ms > 0 ? ms : 0
         },
         close: () =>
           new Promise<void>((done) => {
