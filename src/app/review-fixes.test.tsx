@@ -280,7 +280,9 @@ describe('clock notice', () => {
     const view = await openAt(core, '#/settings', 'Settings')
     expect(screen.queryByText(/clock on this device/)).toBeNull()
     act(() => clock.set(-3600_000))
-    expect(await screen.findByText(clockNoticeText(-3600_000))).toBeInTheDocument()
+    // Said in the toast, and kept at the top of the screen until dismissed.
+    expect(await screen.findByRole('note', { name: 'Device clock' })).toHaveTextContent(clockNoticeText(-3600_000))
+    expect(screen.getAllByText(clockNoticeText(-3600_000)).some((el) => el.closest('.toast'))).toBe(true)
     expect(clockNoticeText(-3600_000)).toBe(
       'The clock on this device is about 1 hour ahead. Hippo uses the correct time instead, so everyone sees the same gifts. You can fix the clock in your device settings.',
     )

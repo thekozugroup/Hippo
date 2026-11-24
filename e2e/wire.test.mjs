@@ -164,11 +164,18 @@ test('setup: "Get started" works within 200 ms of the first step, while the larg
     await page.goto(baseUrl + '#/welcome/start')
     const start = page.getByRole('button', { name: 'Get started' })
     await start.waitFor()
-    const t0 = Date.now()
     assert.equal(await page.locator('.logo--intro').count(), 1, 'the intro is playing when the control appears')
-    await start.click({ timeout: 200 })
+    // Whether the intro was still playing at the moment the press arrived: measured in the page, so a
+    // slow machine cannot make the press late (Playwright waits for a moving control to stand still,
+    // so a control that moved with the intro would be pressed only after it).
+    await page.evaluate(() => {
+      window.__introAtPress = []
+      // The pointer arriving on the control, just before the press (which itself ends the intro).
+      window.addEventListener('pointermove', () => window.__introAtPress.push(document.querySelector('.logo--intro') !== null), { capture: true, once: true })
+    })
+    await start.click()
     await page.getByRole('heading', { level: 1, name: /What should we\s*call you\?/ }).waitFor()
-    assert.ok(Date.now() - t0 < 1500, 'the step changed without waiting for the intro')
+    assert.deepEqual(await page.evaluate(() => window.__introAtPress), [true], 'the press came while the intro played, and the step changed without waiting for it')
     assert.equal(await page.locator('.logo--intro').count(), 0, 'the press ended the intro')
     // One logo in the accessibility tree, always.
     assert.equal(await page.getByText('Hippo', { exact: true }).count(), 1)

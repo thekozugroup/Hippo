@@ -10,12 +10,14 @@
 //    this checks the web side only; the Android workflow runs the real APK.
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { freePort, ROOT, test } from './harness.mjs'
+import { rmSync } from 'node:fs'
+import { freePort, need, ROOT, test } from './harness.mjs'
 import { assertNoProblems, newUser, skipSetup } from './flows.test.mjs'
 import { encodeSharePayload } from '../src/core/crypto/link.ts'
 import { generateListSecret, generateSigningKey, publicKeyOf } from '../src/core/crypto/keys.ts'
 
-const OUT = 'node_modules/.tmp/e2e-native'
+// One folder per run, so two runs on one machine never build into each other's served files.
+const OUT = `node_modules/.tmp/e2e-native-${process.pid}`
 const SITE = 'https://example.org/hippo/'
 const env = { ...process.env, HIPPO_SITE_URL: SITE }
 
@@ -37,10 +39,20 @@ export async function serveNativeBuild() {
     env,
     stdio: 'ignore',
   })
+  // Never outlives the runner, whatever happens to the test that started it.
+  process.once('exit', () => child.kill('SIGTERM'))
   const url = `http://127.0.0.1:${port}/app/`
   for (let i = 0; i < 100; i++) {
     try {
-      if ((await fetch(url)).ok) return { url, stop: () => child.kill('SIGTERM') }
+      if ((await fetch(url)).ok) {
+        return {
+          url,
+          stop: () => {
+            child.kill('SIGTERM')
+            rmSync(ROOT + OUT, { recursive: true, force: true })
+          },
+        }
+      }
     } catch {
       // not up yet
     }
@@ -89,7 +101,7 @@ test('app build: boots in Chromium with no service worker, no manifest, its own 
 })
 
 test('app build: inside the app, setup has no install step and the app-only parts show', async ({ browser, relay, state }) => {
-  const server = state.nativeServer
+  const server = need(state, 'nativeServer', 'app build: boots in Chromium with no service worker')
   try {
     const user = await newUser(browser, relay, 'app-native', state)
     await watchPolicy(user.context)

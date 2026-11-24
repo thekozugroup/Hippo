@@ -114,6 +114,7 @@ export async function startPreview(port) {
   let output = ''
   child.stdout.on('data', (d) => (output += d))
   child.stderr.on('data', (d) => (output += d))
+  process.once('exit', () => child.kill('SIGTERM'))
   const url = `http://127.0.0.1:${port}${SUBPATH}`
   for (let i = 0; i < 100; i++) {
     try {

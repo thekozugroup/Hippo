@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createCore, MemoryTransport } from '../core/index.ts'
 import { App } from './App.tsx'
@@ -75,5 +75,35 @@ describe('App shell', () => {
     window.location.hash = '#/l/not-a-link'
     render(<App core={testCore()} />)
     expect(await screen.findByRole('heading', { level: 1, name: 'This link does not work' })).toBeInTheDocument()
+  })
+})
+
+describe('focus after navigation', () => {
+  it('moves to the new screen’s heading, unless the person has already moved on to a control there', async () => {
+    window.location.hash = '#/item/new'
+    const frames: FrameRequestCallback[] = []
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => frames.push(cb))
+    const flush = () => act(() => frames.splice(0).forEach((cb) => cb(0)))
+    try {
+      render(<App core={testCore()} />)
+      await screen.findByRole('heading', { level: 1, name: 'Add a wish' })
+      flush()
+
+      // Nothing focused on the new screen yet: its heading takes focus.
+      act(() => void (window.location.hash = '#/settings'))
+      const settings = await screen.findByRole('heading', { level: 1, name: 'Settings' })
+      flush()
+      expect(document.activeElement).toBe(settings)
+
+      // A quick person (or a script) focuses a control on the new screen before the next frame: it keeps focus.
+      act(() => void (window.location.hash = '#/item/new'))
+      await screen.findByRole('heading', { level: 1, name: 'Add a wish' })
+      const add = screen.getByRole('button', { name: 'Add to wishlist' })
+      add.focus()
+      flush()
+      expect(document.activeElement).toBe(add)
+    } finally {
+      raf.mockRestore()
+    }
   })
 })

@@ -9,6 +9,31 @@ const { AxeBuilder } = createRequire(import.meta.url)('@axe-core/playwright')
 
 const h1 = (page, name) => page.getByRole('heading', { level: 1, name })
 
+/** Waits until setup's saved progress (in the app's database) holds `text`. */
+async function savedProgressHas(page, text) {
+  const read = async (want) => {
+    const ask = (req) => new Promise((resolve, reject) => ((req.onsuccess = () => resolve(req.result)), (req.onerror = () => reject(req.error))))
+    for (const info of await indexedDB.databases()) {
+      if (!info.name) continue
+      const db = await ask(indexedDB.open(info.name))
+      try {
+        if (!db.objectStoreNames.contains('settings')) continue
+        const row = await ask(db.transaction('settings').objectStore('settings').get('onboarding'))
+        if (JSON.stringify(row ?? null).includes(want)) return true
+      } finally {
+        db.close()
+      }
+    }
+    return false
+  }
+  const deadline = Date.now() + 30_000
+  // page.waitForFunction does not wait for a promise, so poll with evaluate (which does).
+  while (!(await page.evaluate(read, text))) {
+    assert.ok(Date.now() < deadline, `setup's saved progress never held "${text}"`)
+    await page.waitForTimeout(50)
+  }
+}
+
 async function axe(page, label) {
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   return r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${label}: ${v.id} ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
@@ -159,7 +184,7 @@ test('setup: closing the app mid-flow resumes at the same step with the answers 
   await h1(page, /Sam, what is/).waitFor()
   await page.getByRole('radio', { name: 'Something else' }).check()
   await page.getByRole('textbox', { name: 'What is the occasion?' }).fill('Moving house')
-  await page.waitForTimeout(700) // typing is saved shortly after it stops
+  await savedProgressHas(page, 'Moving house') // typing is saved shortly after it stops
   await page.close()
 
   page = await u.context.newPage()
