@@ -48,6 +48,58 @@ test('settings: the deployment checks are collapsed at the bottom, open on deman
   }
 })
 
+test('updates: the version check asks GitHub only when pressed, the policy allows it, and the helper opens the prefilled new-file page', async ({ browser, relay, baseUrl, state }) => {
+  const u = await newUser(browser, relay, 'w-updates', state)
+  try {
+    const { page, context } = u
+    const toGitHub = []
+    context.on('request', (req) => {
+      if (/(^|\.)github(usercontent)?\.com$/.test(new URL(req.url()).hostname)) toGitHub.push(req.url())
+    })
+    await context.route('https://raw.githubusercontent.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/plain', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ version: '99.0.0' }) }),
+    )
+    await context.route('https://github.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>GitHub</title>' }))
+
+    await page.goto(baseUrl + '#/settings')
+    await page.getByRole('heading', { level: 1, name: 'Settings' }).waitFor()
+    const row = page.getByText('Deployment checks', { exact: true })
+    await row.scrollIntoViewIfNeeded()
+    await row.click()
+    const check = page.getByRole('button', { name: 'Check for a newer version' })
+    await check.waitFor()
+    const version = JSON.parse(await (await page.request.get(baseUrl + 'hippo.json')).text()).version
+    assert.ok(await page.getByText(version, { exact: true }).isVisible(), 'shows the version from hippo.json')
+    await page.waitForTimeout(300)
+    assert.deepEqual(toGitHub, [], 'nothing goes to GitHub until asked')
+
+    await check.click()
+    await page.getByText('Version 99.0.0 is available.', { exact: false }).waitFor()
+    assert.deepEqual(toGitHub, ['https://raw.githubusercontent.com/thekozugroup/Hippo/stable/package.json'])
+
+    const field = page.getByRole('textbox', { name: 'Your repository' })
+    await field.fill('not a repository')
+    await page.getByRole('button', { name: /Open GitHub to add the file/ }).click()
+    assert.equal(await field.getAttribute('aria-invalid'), 'true')
+    await field.fill('ada/hippo')
+    const [popup] = await Promise.all([context.waitForEvent('page'), page.getByRole('button', { name: /Open GitHub to add the file/ }).click()])
+    await popup.waitForLoadState()
+    const opened = new URL(popup.url())
+    assert.equal(opened.origin + opened.pathname, 'https://github.com/ada/hippo/new/main')
+    assert.equal(opened.searchParams.get('filename'), '.github/workflows/hippo-update.yml')
+    assert.match(opened.searchParams.get('value') ?? '', /^# Keeps this copy of Hippo up to date/)
+    assert.equal(await popup.evaluate(() => window.opener), null, 'opened without a link back to Hippo')
+    await page.getByText('GitHub opened in a new tab for ada/hippo.', { exact: false }).waitFor()
+
+    const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
+    const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+    assert.deepEqual(bad.map((v) => `${v.id} ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`), [])
+    assertNoProblems(u.problems)
+  } finally {
+    await u.context.close()
+  }
+})
+
 test('link lookup: while the setting is off no request ever goes to the preview host; once on, exactly one does', async ({ browser, relay, baseUrl, state }) => {
   const u = await newUser(browser, relay, 'w-lookup', state)
   try {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { ChevronDown, RefreshCw } from 'lucide-react'
 import { Button, Skeleton, StatusPill } from '../../../ui/index.ts'
 import { browserDeploymentEnv, checkDeployment, DEFAULT_RELAYS, type DeploymentCheck } from '../../../core/index.ts'
@@ -6,6 +6,9 @@ import { useCore } from '../../core/context.ts'
 import { useSettings } from '../../core/data.ts'
 import { HOSTING_GUIDE_URL } from '../../lib/hosting.ts'
 import { isNativeApp } from '../../native/platform.ts'
+
+/** Version check and the automatic update helper: website only, loaded when this section is opened. */
+const UpdatesPanel = lazy(() => import('./UpdatesPanel.tsx'))
 
 /** Inside the Android app the files come from the APK: the address, service worker and storage promise checks are about a browser tab, so they are left out. */
 const NATIVE_SKIP = ['own-origin', 'service-worker', 'persistent-storage'] as const
@@ -131,6 +134,11 @@ export function DeploymentChecks({ run }: DeploymentChecksProps) {
               Check again
             </Button>
           </div>
+          {open && !isNativeApp() ? (
+            <Suspense fallback={null}>
+              <UpdatesPanel />
+            </Suspense>
+          ) : null}
         </div>
       </details>
     </section>

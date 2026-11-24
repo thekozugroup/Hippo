@@ -1,9 +1,17 @@
 name: Deploy to GitHub Pages
 
+# For copies hosted on GitHub Pages (README, "Alternative: GitHub Pages"). It runs only when the
+# repository variable HIPPO_PAGES is set to true (Settings, Secrets and variables, Actions,
+# Variables), so repositories that do not use Pages, the original included, get no failed runs.
+# It also runs after the Update Hippo workflow (scripts/hosting/hippo-update.yml) has committed an
+# update, because a commit pushed by a workflow's own token starts no push-triggered workflow.
 on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_run:
+    workflows: [Update Hippo]
+    types: [completed]
 
 permissions:
   contents: read
@@ -14,6 +22,11 @@ concurrency:
 
 jobs:
   build:
+    # After Update Hippo: only when it succeeded and main has moved since it started (it committed).
+    if: >-
+      vars.HIPPO_PAGES == 'true' &&
+      (github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_sha != github.sha))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

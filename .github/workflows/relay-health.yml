@@ -20,6 +20,9 @@ concurrency:
 
 jobs:
   check:
+    # Only in the original, or where it is asked for: a manual run, or the repository variable
+    # HIPPO_RELAY_HEALTH set to true. Other copies skip it, so nobody gets unexpected weekly emails.
+    if: github.repository == 'thekozugroup/Hippo' || github.event_name == 'workflow_dispatch' || vars.HIPPO_RELAY_HEALTH == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

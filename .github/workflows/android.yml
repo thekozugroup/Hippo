@@ -33,6 +33,9 @@ concurrency:
 
 jobs:
   build:
+    # Only in the original, or where it is asked for: a manual run, or the repository variable
+    # HIPPO_ANDROID set to true. Copies of Hippo that only host the website skip it.
+    if: github.repository == 'thekozugroup/Hippo' || github.event_name == 'workflow_dispatch' || vars.HIPPO_ANDROID == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:

@@ -27,6 +27,10 @@ const THEME_COLOR = '#1e3a8a'
 // lookup (src/core/services/link-preview.ts, LINK_PREVIEW_HOST). It is off
 // unless the user turns it on in Settings. Keep this in step with that constant.
 const LINK_PREVIEW_ORIGIN = 'https://api.microlink.io'
+// The website's one GitHub host: Settings, Deployment checks, "Check for a newer version" reads the
+// original's version from it, only when the person who runs the copy presses that button
+// (src/app/lib/auto-update.ts, RAW_GITHUB_ORIGIN). Not in the Android app, which does not offer it.
+export const UPDATE_CHECK_ORIGIN = 'https://raw.githubusercontent.com'
 
 /** Directives shared by the website and the Android app. */
 const CSP_COMMON = [
@@ -43,7 +47,7 @@ const CSP_COMMON = [
 
 export const CSP = [
   ...CSP_COMMON,
-  `connect-src 'self' wss: ${LINK_PREVIEW_ORIGIN} ws://127.0.0.1:* ws://localhost:*`,
+  `connect-src 'self' wss: ${LINK_PREVIEW_ORIGIN} ${UPDATE_CHECK_ORIGIN} ws://127.0.0.1:* ws://localhost:*`,
   "manifest-src 'self'",
   "worker-src 'self'",
 ].join('; ')
@@ -130,13 +134,17 @@ export function siteInfoJson(version: string, site?: string): string {
   return `${JSON.stringify(info, null, 2)}\n`
 }
 
+/** This build's version, from package.json. */
+function packageVersion(): string {
+  return (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }).version
+}
+
 function siteInfoFile(site: string | undefined): Plugin {
   return {
     name: 'hippo-site-info',
     apply: 'build',
     generateBundle() {
-      const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
-      this.emitFile({ type: 'asset', fileName: 'hippo.json', source: siteInfoJson(pkg.version, site) })
+      this.emitFile({ type: 'asset', fileName: 'hippo.json', source: siteInfoJson(packageVersion(), site) })
     },
   }
 }
@@ -192,6 +200,7 @@ export default defineConfig(({ mode }) => {
       // every native-only branch and its dynamic import of plugin code is left out of the bundle.
       __HIPPO_NATIVE__: JSON.stringify(native),
       __HIPPO_SITE_URL__: JSON.stringify(site ?? ''),
+      __HIPPO_VERSION__: JSON.stringify(packageVersion()),
     },
     ...(native ? { build: { outDir: NATIVE_OUT_DIR, emptyOutDir: true } } : {}),
     resolve: {

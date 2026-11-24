@@ -27,7 +27,7 @@ Status: v1 in development. License: MIT.
 |---|---|
 | Owner | Capture wants quickly, organise them, share selected items per occasion, stay unspoiled |
 | Giver | Open a link, see what is wanted and what is still available, claim or chip in, undo |
-| Self-hoster | Press one button (Vercel) or fork and enable Pages, and have a working instance with no secrets or configuration; then point the Android app at it |
+| Self-hoster | Press one button (Vercel) or fork and enable Pages, and have a working instance with no secrets or configuration; add one file to have it update itself; then point the Android app at it |
 
 ## 4. Functional requirements
 
@@ -85,9 +85,9 @@ Status: v1 in development. License: MIT.
 
 - FR-26 List content and claims are end-to-end encrypted. The decryption key travels only in the URL fragment of the share link. Relays store ciphertext.
 - FR-27 Only the owner's key can publish or change list content. Only a claim's author can change or withdraw that claim.
-- FR-28 The app makes no requests to third parties except the configured relays, item images that the owner chose to attach (loaded with `referrerpolicy="no-referrer"`, from any `https` host), and, only after the owner opts in (FR-10a), the link preview service. Its own host is asked for the time (a HEAD request to the app's address). The Android app also asks the public website for the time, and fetches the shop pages of links the person adds unless that is turned off (FR-10e); it never contacts Microlink.
+- FR-28 The app makes no requests to third parties except the configured relays, item images that the owner chose to attach (loaded with `referrerpolicy="no-referrer"`, from any `https` host), only after the owner opts in (FR-10a), the link preview service, and, on the website only when the person running the copy presses "Check for a newer version" in Deployment checks, one request for the original's `stable` `package.json` on raw.githubusercontent.com (no cookies, no referrer). Its own host is asked for the time (a HEAD request to the app's address). The Android app also asks the public website for the time, and fetches the shop pages of links the person adds unless that is turned off (FR-10e); it never contacts Microlink.
 - FR-29 Hippo refuses to run inside another site's frame (GitHub Pages cannot send `frame-ancestors`; Vercel sends it as a header, see section 6): before the app starts it shows a message with a link that opens Hippo in its own tab. The Android app is never framed and skips the check.
-- FR-30 Settings can show deployment checks: HTTPS, an origin of its own, not framed, service worker, storage, persistent storage and relay reachability, each with a plain-language finding and fix. The Android app leaves out the origin, service worker and persistent storage checks.
+- FR-30 Settings can show deployment checks: HTTPS, an origin of its own, not framed, service worker, storage, persistent storage and relay reachability, each with a plain-language finding and fix. The Android app leaves out the origin, service worker and persistent storage checks. On the website the section also shows the copy's version, "Check for a newer version" and the "Turn on automatic updates" helper (the owner types `name/repository`, checked strictly, and GitHub's new-file page opens with the update workflow filled in; the name is not stored), loaded only when the section is opened.
 
 Threat model:
 
@@ -126,11 +126,11 @@ Known limitation: hiding claims from the owner is enforced by the app, not by cr
 
 | | Vercel (recommended) | GitHub Pages |
 |---|---|---|
-| Setup | The "Deploy with Vercel" button in the README: Vercel copies the repository into the person's GitHub account, builds it and puts it online. `vercel.json` holds the build settings and headers. | Fork, name the fork `<organisation>.github.io`, turn on Pages; a GitHub Actions workflow builds and publishes |
+| Setup | The "Deploy with Vercel" button in the README: Vercel copies the repository into the person's GitHub account (a new private repository with one commit and without `.github/`), builds it and puts it online. `vercel.json` holds the build settings and headers. | Fork, name the fork `<organisation>.github.io`, turn on Pages and set the repository variable `HIPPO_PAGES` to `true`; a GitHub Actions workflow builds and publishes |
 | Own address | Yes, per project; a custom domain such as `hippo.example.com` is one `CNAME` record | Only with an organisation site or a custom domain |
 | Headers | Content-Security-Policy (the page's policy plus `frame-ancestors 'none'`), `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, cache rules for hashed files, the service worker, the manifest and `hippo.json` | None; the policy is a `<meta>` tag only |
 | Site address in link previews and `hippo.json` | `HIPPO_SITE_URL` if set, else Vercel's production address (production builds only; redeploy after adding a domain) | `HIPPO_SITE_URL`, set by the workflow |
-| Updates from the original | Not automatic: merge the original's changes into the copy, or fork and import the fork | Same |
+| Updates from the original | Automatic once the owner adds one workflow file (see "Updates for copies" below) | Same; the Pages workflow publishes each update |
 | Plan | Free Hobby plan: personal, non-commercial use | Free |
 
 - Android app: the same build in native mode (`vite build --mode native`) inside Capacitor 8, built into an APK by the Android workflow. Native-only code is in `src/app/native/`, loaded with dynamic imports and left out of the website build; the app's three small plugins (share target, page fetch, haptics) are Java in `android/`.
@@ -148,6 +148,13 @@ Code layout:
 | `android/` | The Capacitor Android project |
 | `e2e/` | Playwright end-to-end tests |
 | `docs/` | This document, protocol, design system |
+
+### Updates for copies
+
+- Channel: the original has a `stable` branch. CI runs on every push, `main` included; when it passes for a push to `main`, the promote workflow fast-forwards `stable` to exactly that commit (never backwards, never forced). Copies follow `stable`, so they only receive commits that passed lint, typecheck, unit, hosting and end-to-end tests.
+- The owner adds one file to the copy, `.github/workflows/hippo-update.yml` (template: `scripts/hosting/hippo-update.yml`), from a link in the README or from Settings, Deployment checks, "Turn on automatic updates", which opens GitHub's new-file page filled in. It runs daily, by hand and once when added, with `contents: write` only, and runs the updater script as it is on the fetched `stable` (`scripts/hosting/update-copy.sh`), so the logic can improve without the owner touching the file. Turning it on means trusting this project's `stable` branch with write access to the copy's code; the template and README say so.
+- The updater finds the version the copy was last in step with (a marker file `.hippo/upstream`, else the newest of the copy's own commits whose files, ignoring `.github/`, equal a version of the original, else the shared history of a fork), then applies the original's changes since then: as an exact copy when the owner changed nothing, as a three-way merge (`git merge-tree` with that version as the base) when they did. A clash changes nothing and fails the run with the files listed and the two ways out. It never writes under `.github/`, commits in the owner's name (Vercel's Hobby plan deploys commits to a private repository only when the Hobby team's owner authored them) and pushes as a fast-forward.
+- The website shows its version in Deployment checks and, only when the owner presses "Check for a newer version", compares it with `stable`'s `package.json` on raw.githubusercontent.com (FR-28).
 
 ## 7. Milestones
 

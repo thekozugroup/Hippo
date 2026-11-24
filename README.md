@@ -79,6 +79,8 @@ npm run android:apk    # android/app/build/outputs/apk/debug/app-debug.apk
 
 `npm run android:sync` builds the web app for the app (into `dist-native/`) and copies it into `android/`. Open `android/` in Android Studio to run it on a phone. `npm run icons:android` draws the launcher icon and the splash mark again from the hippo glyph.
 
+**In a fork**, the **Android app** workflow runs when you start it by hand. To have it also run on pushes and version tags, as it does in the original, add a repository variable `HIPPO_ANDROID` set to `true`.
+
 **The site address.** `HIPPO_SITE_URL` is the public website that share links made in the app point at. The build stops without it. The Android workflow uses this repository's GitHub Pages address; set a repository variable named `HIPPO_SITE_URL` (Settings, Secrets and variables, Actions, Variables) to use a custom domain such as your Vercel address. You can also build the app with its address left at the default and change it later in the app, under Settings, Hippo site. Choose it before you share lists from the app, because the links contain it.
 
 ### Signing
@@ -111,7 +113,7 @@ You can put your own copy of Hippo online for free and point the Android app at 
 | Effort | One button, about two minutes | About 20 minutes of steps |
 | Address of its own | Yes, every project has its own | Only with an organisation or a custom domain |
 | Security headers (blocks framing, and more) | Yes, sent by the host | No, GitHub Pages cannot send them |
-| Updates | You pull them in (see below) | You pull them in |
+| Updates | Automatic after you add one file (see below) | Automatic after you add one file |
 | Cost | Free for personal use | Free |
 
 Vercel is recommended because the copy gets its own address, the host sends real security headers, and the setup is one click. GitHub Pages stays supported; its steps are [further down](#alternative-github-pages).
@@ -128,7 +130,7 @@ You need a GitHub account (free). If you do not have one, make one first at <htt
 4. Vercel makes your own copy of Hippo in your GitHub account, builds it and puts it online. This takes about a minute. There is nothing to fill in: no settings, no secrets, no database.
 5. When it finishes, Vercel shows a preview of the site. Press it, or press **Continue to Dashboard** and then **Visit**. The address looks like `hippo-xxxx.vercel.app`. That is your Hippo. Open it in a browser and go through setup.
 
-GitHub may show a failed run of **Deploy to GitHub Pages** in your copy, because that workflow is for the other route. It does no harm. To stop it, open **Actions**, choose **Deploy to GitHub Pages**, open the three-dot menu and choose **Disable workflow**.
+Your copy does not get the original's `.github` folder (Vercel leaves it out), so no workflows run in it until you add one, for example the automatic updates below.
 
 #### Give it your own address
 
@@ -142,22 +144,38 @@ Do this if you want an address like `hippo.example.com`. You need a domain name 
 
 If you use an apex domain such as `example.com`, Vercel asks for an `A` record instead.
 
-#### Updates
+#### Turn on automatic updates
 
-A copy made with the button is not linked to the original, and nothing is pulled in on its own. When you push a change to your copy's `main` branch, Vercel builds and publishes it by itself. It does not look at the original project.
+A copy made with the button is not linked to the original, so new versions of Hippo do not arrive by themselves. To have them arrive, add one file to your copy. You do this once.
 
-To take a newer version of Hippo into your copy, run this on your computer:
+1. Open your Hippo site, go to **Settings**, open **Deployment checks** at the bottom and find **Turn on automatic updates**. Type your copy's repository as `name/repository` (for example `ada/hippo`; it is in the address of your repository on GitHub) and press **Open GitHub to add the file**.
+   Or use [this link](https://github.com/OWNER/REPO/new/main?filename=.github%2Fworkflows%2Fhippo-update.yml&value=%23+Keeps+this+copy+of+Hippo+up+to+date+with+the+original+project.%0A%23%0A%23+Once+a+day%2C+and+when+you+run+it+from+the+Actions+tab%2C+it+fetches+the+original%27s+%22stable%22+branch%0A%23+%28changes+that+passed+all+of+the+original%27s+checks%29.+When+there+is+a+newer+version+it+adds+one%0A%23+commit+with+the+new+files+to+this+repository%2C+and+your+host+publishes+it.+It+never+changes%0A%23+anything+under+.github%2C+and+when+your+own+edits+clash+with+the+original%27s+it+changes+nothing+and%0A%23+the+run+fails+with+a+list+of+the+files.%0A%23%0A%23+Trust%3A+turning+this+on+lets+the+Hippo+project%27s+stable+branch+change+this+repository%27s+code.+The%0A%23+update+script+itself+comes+from+that+branch.+To+stop%3A+delete+this+file%2C+or+open+Actions%2C+Update%0A%23+Hippo%2C+the+%22...%22+menu%2C+Disable+workflow.+To+stay+on+one+version%3A+set+HIPPO_CHANNEL+to+a+version%0A%23+tag+such+as+v0.1.5.%0Aname%3A+Update+Hippo%0A%0Aon%3A%0A++schedule%3A%0A++++-+cron%3A+%2737+4+*+*+*%27+%23+every+day+at+04%3A37+UTC%0A++push%3A%0A++++paths%3A+%5B%27.github%2Fworkflows%2Fhippo-update.yml%27%5D+%23+once+now%2C+to+show+it+works%0A++workflow_dispatch%3A%0A++++inputs%3A%0A++++++channel%3A%0A++++++++description%3A+Branch+or+tag+of+the+original+to+follow+%28empty+means+stable%29%0A++++++++default%3A+%27%27%0A++++++replace%3A%0A++++++++description%3A+Replace+my+copy+with+the+original+%28discards+my+own+changes+outside+.github%29%0A++++++++type%3A+boolean%0A++++++++default%3A+false%0A++++++dry_run%3A%0A++++++++description%3A+Dry+run+%28only+report+what+would+change%29%0A++++++++type%3A+boolean%0A++++++++default%3A+false%0A%0Apermissions%3A%0A++contents%3A+write%0A%0Aconcurrency%3A%0A++group%3A+hippo-update%0A++cancel-in-progress%3A+false%0A%0Aenv%3A%0A++HIPPO_UPSTREAM_URL%3A+https%3A%2F%2Fgithub.com%2Fthekozugroup%2FHippo.git+%23+where+updates+come+from%0A++HIPPO_CHANNEL%3A+stable%0A%0Ajobs%3A%0A++update%3A%0A++++runs-on%3A+ubuntu-latest%0A++++timeout-minutes%3A+10%0A++++steps%3A%0A++++++-+uses%3A+actions%2Fcheckout%403d3c42e5aac5ba805825da76410c181273ba90b1+%23+v7.0.1%0A++++++++with%3A%0A++++++++++ref%3A+%24%7B%7B+github.event.repository.default_branch+%7D%7D%0A++++++++++fetch-depth%3A+0%0A++++++-+name%3A+Update+Hippo%0A++++++++env%3A%0A++++++++++HIPPO_CHANNEL%3A+%24%7B%7B+inputs.channel+%7C%7C+env.HIPPO_CHANNEL+%7D%7D%0A++++++++++HIPPO_REPLACE%3A+%24%7B%7B+inputs.replace+%7D%7D%0A++++++++++HIPPO_DRY_RUN%3A+%24%7B%7B+inputs.dry_run+%7D%7D%0A++++++++run%3A+%7C%0A++++++++++case+%22%24HIPPO_CHANNEL%22+in+-*+%7C+*%5B%21A-Za-z0-9._%2F-%5D*%29+echo+%22Not+a+branch+or+tag+name.%22%3B+exit+1+%3B%3B+esac%0A++++++++++git+fetch+--no-tags+--+%22%24HIPPO_UPSTREAM_URL%22+%22%24HIPPO_CHANNEL%22%0A++++++++++git+show+FETCH_HEAD%3Ascripts%2Fhosting%2Fupdate-copy.sh+%3E+%22%24RUNNER_TEMP%2Fupdate-copy.sh%22%0A++++++++++HIPPO_UPSTREAM%3D%22%24%28git+rev-parse+FETCH_HEAD%29%22+bash+%22%24RUNNER_TEMP%2Fupdate-copy.sh%22%0A), then in the browser's address bar replace `OWNER/REPO` with your GitHub name and repository and press Enter.
+2. GitHub opens a new file, `.github/workflows/hippo-update.yml`, already filled in. Press **Commit changes**, then **Commit changes** again.
+
+What happens next: the file runs once straight away, then every day. When the original project has a newer version, it adds one commit with the new files to your copy, and Vercel publishes it a minute later. To check it worked, open your repository's **Actions** tab: a run called **Update Hippo** should be green, and its summary says what it did. After an update, **Settings**, **Deployment checks** on your site shows the new version.
+
+Good to know:
+
+- **What you trust.** Turning this on lets this project's `stable` branch change your copy's code. `stable` only moves to versions that passed all of the project's checks, and the updater script itself comes from it. The file you add is [`scripts/hosting/hippo-update.yml`](scripts/hosting/hippo-update.yml); it is short, so read it first if you like.
+- **Your own changes stay.** It never touches `.github`. If you changed files, it merges the new version into your changes. If your change and the original's touch the same lines, it changes nothing, the run fails, and GitHub emails you the list of files and what to do: merge them by hand, or run **Actions**, **Update Hippo**, **Run workflow** with **Replace my copy with the original** ticked, which discards your own changes outside `.github`.
+- **Commits are made in your name**, the same name as your copy's first commit, because Vercel's free plan only publishes commits to a private repository that its owner made.
+- **To turn it off**, delete the file, or open **Actions**, **Update Hippo**, the three-dot menu and **Disable workflow**.
+- **To stay on one version**, change `HIPPO_CHANNEL: stable` in the file to a version tag such as `v0.1.5`. **Run workflow** also has a box for this, and a dry run that only reports what would change.
+- It uses about half a minute of GitHub Actions time a day, well inside the free allowance.
+
+#### Update by hand instead
+
+If you prefer to decide when to update, skip the file above and run the same updater on your computer (it needs Git 2.40 or newer and Bash):
 
 ```
 git clone https://github.com/<you>/hippo
 cd hippo
-git remote add upstream https://github.com/thekozugroup/Hippo.git
-git fetch upstream
-git merge upstream/main
-git push
+git fetch https://github.com/thekozugroup/Hippo.git stable
+git show FETCH_HEAD:scripts/hosting/update-copy.sh > ../update-copy.sh
+HIPPO_UPSTREAM=FETCH_HEAD bash ../update-copy.sh
 ```
 
-If Git says the histories are unrelated, add `--allow-unrelated-histories` to the merge. For one-button updates instead, fork the project on GitHub (the **Fork** button on the original page), then in Vercel choose **Add New**, **Project**, and import your fork. GitHub then shows **Sync fork** on your copy, and Vercel publishes each sync.
+It says what it did, makes one commit and pushes it, and Vercel publishes it. Add `HIPPO_DRY_RUN=true` in front to only see what would change. How it works is in [`scripts/hosting/README.md`](scripts/hosting/README.md). A plain `git merge` of the original does not work well for a copy made with the button: the two share no history, so Git reports every file as a conflict.
 
 #### What it costs
 
@@ -211,6 +229,7 @@ If you would rather use your own domain, skip this step and do step 5 instead. I
 
 1. In the fork, open **Settings → Pages**.
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+3. Open **Settings → Secrets and variables → Actions**, choose the **Variables** tab, then **New repository variable**. Name it `HIPPO_PAGES`, set the value to `true` and save. The publish workflow only runs where this variable is `true`, so repositories that do not use Pages get no failed runs.
 
 #### 4. Publish
 
@@ -219,7 +238,7 @@ If you would rather use your own domain, skip this step and do step 5 instead. I
 3. Wait for the run to turn green (about 5 minutes). Open `https://<name>.github.io/`.
 4. Back in **Settings → Pages**, tick **Enforce HTTPS** if it is offered.
 
-There is nothing to configure: no secrets, no database. The workflow passes your site's address to the build, so links you paste in chats show a preview card with a picture. A build without it still works, and the card then has no picture.
+Apart from the `HIPPO_PAGES` variable there is nothing to configure: no secrets, no database. The workflow passes your site's address to the build, so links you paste in chats show a preview card with a picture. A build without it still works, and the card then has no picture.
 
 #### 5. Optional: use your own domain instead
 
@@ -228,6 +247,10 @@ There is nothing to configure: no secrets, no database. The workflow passes your
 3. In **Settings → Pages**, enter the domain under **Custom domain** and save. Tick **Enforce HTTPS** once it appears (this can take up to an hour).
 
 Share links contain the web address, so choose your final address before you share lists. Lists shared from another address keep working only while that address stays online.
+
+#### 6. Optional: automatic updates
+
+Add the update file as described in [Turn on automatic updates](#turn-on-automatic-updates); it works the same in a fork. After each update it commits, the **Deploy to GitHub Pages** workflow publishes it. A fork made before version 0.1.5 has an older copy of that workflow, which the updater does not change (it never touches `.github`); in that case run **Deploy to GitHub Pages** by hand after an update, or copy `.github/workflows/deploy.yml` from the original once.
 
 ### Check the result
 
@@ -244,9 +267,11 @@ Open your site, go to **Settings**, scroll to the bottom and open **Deployment c
 
 "Unknown" means the browser did not give an answer. It does not mean something is wrong. In the Android app the address, service worker and storage checks are left out, because they are about a browser tab.
 
+On the website, below the checks, **Updates** shows your copy's version. **Check for a newer version** compares it with the newest version of Hippo; this is the only time the site contacts GitHub, and only when you press it. **Turn on automatic updates** is the helper described above.
+
 ### Watch the relays
 
-Relays come and go. The repository contains a weekly check, the **Relay health** workflow, which starts on its own every Monday. It does this for each default relay:
+Relays come and go. The repository contains a weekly check, the **Relay health** workflow, which starts on its own every Monday in the original project. In a fork it runs only when you start it by hand, or every week once you add a repository variable `HIPPO_RELAY_HEALTH` set to `true`. It does this for each default relay:
 
 1. It sends one small test message that looks like Hippo traffic.
 2. It asks for the message back.
@@ -272,7 +297,7 @@ GitHub switches off scheduled workflows after 60 days without any activity in th
 - **Framing.** On Vercel, Hippo sends `Content-Security-Policy` with `frame-ancestors 'none'` and `X-Frame-Options: DENY` as real headers, and the browser refuses to show it inside another site. GitHub Pages cannot send them, and a policy set in a `<meta>` tag cannot include `frame-ancestors`. So on every host Hippo also checks for itself: if it is shown inside another site's frame, it starts nothing and shows a message with a link that opens Hippo in its own tab. If you host Hippo anywhere else that lets you set headers, also send `Content-Security-Policy: frame-ancestors 'none'`.
 - **Device clocks.** Claims are ordered by time, and a device whose clock is wrong would disagree with everyone else about who is getting a gift. Hippo measures the device clock against the `Date` header of a request to its own address (never a third party) and uses the corrected time; it tells the person once when the clock is more than about two minutes off. Without an answer (offline on a first visit) it uses the device clock.
 - **Content-Security-Policy is set by a `<meta>` tag**, because GitHub Pages cannot send custom headers. On Vercel the same policy is also sent as a header (`vercel.json`), with `frame-ancestors 'none'` added. Vercel also sends `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and a `Permissions-Policy` that turns off features Hippo does not use. It does not send `Cross-Origin-Opener-Policy`: that header only matters for sites that open pop-ups which talk back to the page, which Hippo does not do, and the system share sheet and install prompt cannot be tested for it from here. The policy allows plain `ws:` only for loopback addresses (the developer relay override), so test and production builds are identical. `require-trusted-types-for 'script'` is not set: with it, Chromium blocks the service worker registration (a `TrustedScriptURL` sink) unless a Trusted Types policy is added.
-- **Link lookup is off by default.** If you turn on **Link lookup** in Settings, Hippo sends the link of each wish you add to Microlink (`api.microlink.io`), a third-party service, so it can look up the page's title and picture. Only the link is sent, after tracking parameters and the part after `#` are removed, and only for `https` links to public sites. Microlink sees the link and your IP address, as any web server would. Nothing is sent to it while the setting is off. Besides the relays and Hippo's own address, the content policy allows two kinds of outside requests: this one host, and pictures over `https` from any host, because a wish's picture can come from any shop (PRD FR-28).
+- **Link lookup is off by default.** If you turn on **Link lookup** in Settings, Hippo sends the link of each wish you add to Microlink (`api.microlink.io`), a third-party service, so it can look up the page's title and picture. Only the link is sent, after tracking parameters and the part after `#` are removed, and only for `https` links to public sites. Microlink sees the link and your IP address, as any web server would. Nothing is sent to it while the setting is off. Besides the relays and Hippo's own address, the content policy allows three kinds of outside requests: this one host; `raw.githubusercontent.com`, which the website asks for the newest version number only when you press **Check for a newer version** in Deployment checks (no cookies, nothing about you or your lists); and pictures over `https` from any host, because a wish's picture can come from any shop (PRD FR-28).
 - **Android app.** The app asks for one permission, Internet. Its content policy is the website's without the parts it does not use (no service worker, no manifest, no Microlink). WebView debugging is off in release builds, and Capacitor's logging is off in every build, so share links and shared text never reach the device log. Reading a shop page fetches only `https` pages on public hosts, checks every redirect and every address the host name resolves to (no loopback, private, link-local or reserved ranges), stops after 8 seconds and 1.5 MB, sends no cookies, and reads only HTML. The page is parsed without running it, and only the name, picture and price are kept, validated like any other input. One limit: a host that gives a different DNS answer to the check and to the connection is not caught. Android's cloud backup and device-to-device transfer leave Hippo's data out.
 - **Moving to another device with a transfer link** (Settings, Move Hippo to another device) sends everything a backup file holds, encrypted with a random key that exists only in the link, to the same public relays as your lists, where it expires after 15 minutes. **Anyone who gets the link in those 15 minutes can copy your wishlist and the keys to your lists**, so send it only to yourself. The receiving device checks every part (signature, order, length, a hash of the whole) and the backup inside with the same validation as a backup file, shows what it found and writes nothing until you confirm; it merges and never replaces lists already there. Once it has the data it asks the relays to delete the parts and overwrites them, so the link cannot be used again; Cancel transfer does the same. Backups larger than 2 MB after compression must be moved with a file. Details: `docs/PROTOCOL.md` section 11.
 - **Removing a list shared with you** hides it on this device but keeps your guest key, so opening the link again lets you change or take back what you said you would get. Backups include hidden lists.
@@ -288,6 +313,8 @@ npm test           # unit and integration tests
 npm run lint
 npm run typecheck
 npm run build      # production build in dist/
+npm run test:e2e   # end-to-end tests in Chromium (builds first)
+npm run test:hosting  # the copy updater, against throwaway Git repositories
 npm run relay-health  # test the default relays (needs internet)
 npm run android:apk   # Android debug APK (see Android app)
 ```
@@ -301,7 +328,7 @@ Source layout:
 | `src/app/` | Screens and routing; `src/app/native/` holds everything specific to the Android app |
 | `android/` | The Android project (Capacitor), with the app's small native plugins |
 | `e2e/` | Playwright end-to-end tests |
-| `scripts/` | Maintainer scripts: icons, the link preview picture (`node scripts/generate-og-image.mjs`), relay health check |
+| `scripts/` | Maintainer scripts: icons, the link preview picture (`node scripts/generate-og-image.mjs`), relay health check; `scripts/hosting/` holds the updater for copies ([its README](scripts/hosting/README.md)) |
 
 ## Adding items
 

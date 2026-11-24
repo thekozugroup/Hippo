@@ -52,7 +52,8 @@
   padding-block-start: var(--space-group);
 }
 /* One line is always reserved, so a result arriving does not move the list. */
-.settings-deploy__status {
+.settings-deploy__status,
+.settings-updates__status {
   margin: 0;
   min-height: var(--lh-body);
   font-size: var(--fs-secondary);
@@ -83,4 +84,19 @@
 }
 .settings-check__fix {
   color: var(--text-2);
+}
+
+/* Updates, inside Deployment checks (UpdatesPanel.tsx). */
+.settings-updates {
+  padding-block-start: var(--space-group);
+  border-block-start: 1px solid var(--hairline);
+}
+.settings-updates__title {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 600;
+}
+.settings-updates code {
+  overflow-wrap: anywhere;
 }

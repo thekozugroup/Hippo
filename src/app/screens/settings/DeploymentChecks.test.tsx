@@ -119,4 +119,19 @@ describe('DeploymentChecks', () => {
     await user.click(row())
     expect(await screen.findByText('The checks did not finish. Try again.')).toBeInTheDocument()
   })
+
+  it('loads the updates part (version, check, helper) only once opened, and contacts nothing by itself', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+      const { user, row } = setup(async () => [OK])
+      expect(screen.queryByRole('button', { name: 'Check for a newer version' })).toBeNull()
+      await user.click(row())
+      expect(await screen.findByRole('button', { name: 'Check for a newer version' })).toBeInTheDocument()
+      expect(screen.getByText(__HIPPO_VERSION__)).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Your repository' })).toBeInTheDocument()
+      expect(fetchSpy.mock.calls.map(([u]) => String(u)).filter((u) => u.includes('github'))).toEqual([])
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })

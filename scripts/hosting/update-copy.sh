@@ -74,14 +74,19 @@ keep_reserved() {
 }
 
 declare -A STRIPPED=()
-# The tree without .github/ and .hippo/, as a tree id. Cached by tree id.
-stripped() {
-  local tree
-  tree="$(git rev-parse "$1^{tree}")"
+# Sets REPLY to the tree without .github/ and .hippo/, as a tree id. Cached by tree id.
+strip_tree() {
+  local tree="$1"
+  case "$tree" in *[!0-9a-f]* | '') tree="$(git rev-parse "$1^{tree}")" ;; esac
   if [ -z "${STRIPPED[$tree]:-}" ]; then
     STRIPPED[$tree]="$(git ls-tree -z "$tree" | drop_reserved | git mktree -z)"
   fi
-  printf '%s\n' "${STRIPPED[$tree]}"
+  REPLY="${STRIPPED[$tree]}"
+}
+# The same, printed (for use in $(...), where the cache is not kept).
+stripped() {
+  strip_tree "$1"
+  printf '%s\n' "$REPLY"
 }
 
 # The original's tree at $1 with this copy's own .github/ and .hippo/ in place of the original's.
@@ -90,7 +95,12 @@ as_copy() {
 }
 
 # A throwaway commit holding a tree, so merge-tree can use it.
-commit_of() { git commit-tree "$1" -m "hippo-update scratch" < /dev/null; }
+commit_of() {
+  GIT_AUTHOR_NAME=hippo-update GIT_AUTHOR_EMAIL=hippo-update@invalid GIT_COMMITTER_NAME=hippo-update \
+    GIT_COMMITTER_EMAIL=hippo-update@invalid git commit-tree "$1" -m "hippo-update scratch" < /dev/null
+}
+
+files() { if [ "$1" -eq 1 ]; then printf '1 file'; else printf '%s files' "$1"; fi; }
 
 is_ancestor() { git merge-base --is-ancestor "$1" "$2" 2> /dev/null; }
 
@@ -106,12 +116,28 @@ version_at() {
   printf '%s\n' "${v:-unknown}"
 }
 
-# Looks for the newest commit in $2's history (bounded) whose files, ignoring .github/, equal $1.
-find_by_tree() {
-  local want="$1" ref="$2" commit tree
+# Stripped trees of the original's recent history (bounded), each mapped to the newest commit that has it.
+declare -A KNOWN=()
+learn_history() {
+  local commit tree
   while read -r commit tree; do
-    [ "$(stripped "$tree")" = "$want" ] && { printf '%s\n' "$commit"; return 0; }
-  done < <(git log --format='%H %T' --max-count="$LIMIT" "$ref" --)
+    strip_tree "$tree"
+    [ -n "${KNOWN[$REPLY]:-}" ] || KNOWN[$REPLY]="$commit"
+  done < <(git log --format='%H %T' --max-count="$LIMIT" "$1" --)
+}
+
+# The last time this copy was in step with the original: walking back along the copy's own history
+# (newest first, bounded), the first commit whose files, ignoring .github/ and the marker, equal a
+# version of the original. Prints that version of the original.
+find_in_step() {
+  local commit
+  while read -r commit; do
+    strip_tree "$commit^{tree}"
+    if [ -n "${KNOWN[$REPLY]:-}" ]; then
+      printf '%s\n' "${KNOWN[$REPLY]}"
+      return 0
+    fi
+  done < <(git rev-list --first-parent --max-count="$LIMIT" HEAD --)
   return 1
 }
 
@@ -172,8 +198,9 @@ TO_VERSION="$(version_at "$TARGET")"
 TARGET_SHORT="$(git rev-parse --short=7 "$TARGET")"
 HEAD_STRIPPED="$(stripped HEAD)"
 
+STARTED=""
 up_to_date() {
-  finish 0 "Hippo is up to date ($FROM_VERSION)." "This copy already has everything in the original's $CHANNEL channel ($TARGET_SHORT)." "$@"
+  finish 0 "Hippo is up to date ($FROM_VERSION)." "This copy already has everything in the original's $CHANNEL channel ($TARGET_SHORT).$STARTED" "$@"
 }
 
 # ----------------------------------------------------------------------------------------------- base
@@ -189,11 +216,13 @@ if [ "$REPLACE" = false ]; then
       BASE_HOW="recorded in $MARKER"
     fi
   fi
-  if [ -z "$BASE" ] && BASE="$(find_by_tree "$HEAD_STRIPPED" "$TARGET")"; then
-    BASE_HOW="matched in the $CHANNEL history"
+  if [ -z "$BASE" ]; then
+    learn_history "$TARGET"
+    if BASE="$(find_in_step)"; then BASE_HOW="matched in the $CHANNEL history"; fi
   fi
-  if [ -z "$BASE" ] && fetch_main && BASE="$(find_by_tree "$HEAD_STRIPPED" "$MAIN_REF")"; then
-    BASE_HOW="matched in the main history"
+  if [ -z "$BASE" ] && fetch_main; then
+    learn_history "$MAIN_REF"
+    if BASE="$(find_in_step)"; then BASE_HOW="matched in the main history"; fi
   fi
   # A fork shares history with the original: where they last met is the starting point.
   if [ -z "$BASE" ] && BASE="$(git merge-base HEAD "$TARGET" 2> /dev/null)"; then
@@ -201,13 +230,14 @@ if [ "$REPLACE" = false ]; then
   fi
   if [ -z "$BASE" ]; then
     finish 4 "Hippo could not be updated automatically: this copy's files do not match any version of the original." \
-      "Its files differ from each of the last $LIMIT versions on the original's $CHANNEL and main branches, so the updater cannot tell which changes are yours. This happens when files were edited by hand since the copy was made. Nothing was changed." \
+      "Neither its files now nor at any earlier commit match one of the last $LIMIT versions on the original's $CHANNEL and main branches, so the updater cannot tell which changes are yours. This happens when files were edited by hand since the copy was made. Nothing was changed." \
       "" \
       "Choose one:" \
       "" \
       "1. Keep your edits. Find the version of Hippo your copy started from (a commit of https://github.com/thekozugroup/Hippo), then add a file named \`$MARKER\` to your copy containing one line: \`commit <that commit id>\`. The next run merges the newer changes into your edits." \
       "2. Replace your copy with the original. Open Actions, choose Update Hippo, then Run workflow, tick \"Replace my copy with the original\" and run it. Your changes to files outside .github are discarded."
   fi
+  STARTED=" Starting point: $(git rev-parse --short=7 "$BASE") ($BASE_HOW)."
   if [ "$BASE" = "$TARGET" ] || is_ancestor "$TARGET" "$BASE"; then
     up_to_date
   fi
@@ -234,8 +264,8 @@ else
     conflicts="$(printf '%s\n' "$merge_out" | sed -n '2,$p' | sed '/^$/d' | sort -u)"
     list="$(printf '%s\n' "$conflicts" | sed -n '1,40s/^/- /p')"
     count="$(printf '%s\n' "$conflicts" | grep -c . || true)"
-    finish 2 "Hippo could not be updated automatically: $count of your changed files were also changed in the original." \
-      "Nothing was changed. The files are:" \
+    finish 2 "Hippo could not be updated automatically: your changes clash with the original's in $(files "$count")." \
+      "You and the original changed the same lines. Nothing was changed. The $( [ "$count" -eq 1 ] && printf 'file is' || printf 'files are'):" \
       "" \
       "$list" \
       "" \
@@ -286,8 +316,8 @@ how="the original's changes were merged into your edits"
 [ "$MODE" = "replace" ] && how="replaced with the original, as asked; your own changes outside .github were discarded"
 
 if [ "$DRY_RUN" = true ]; then
-  finish 0 "Dry run: Hippo would be updated from $FROM_VERSION to $TO_VERSION ($TARGET_SHORT), changing $changed_count files." \
-    "How: $how. Nothing was committed or pushed." "" "$change_list"
+  finish 0 "Dry run: Hippo would be updated from $FROM_VERSION to $TO_VERSION ($TARGET_SHORT), changing $(files "$changed_count")." \
+    "How: $how.$STARTED Nothing was committed or pushed." "" "$change_list"
 fi
 
 # -------------------------------------------------------------------------------------------- commit
@@ -316,7 +346,7 @@ fi
 
 subjects=""
 if [ -n "$BASE" ] && is_ancestor "$BASE" "$TARGET"; then
-  subjects="$(git log --no-merges --format='%s' "$BASE..$TARGET" -- | grep -viE '(^|[^a-z])wip([^a-z]|$)' || true)"
+  subjects="$(git log --no-merges --format='%s' "$BASE..$TARGET" -- . ':(exclude).github' ':(exclude).hippo' | grep -viE '(^|[^a-z])wip([^a-z]|$)' || true)"
 fi
 subject_count="$(printf '%s\n' "$subjects" | grep -c . || true)"
 message="Update Hippo to $TO_VERSION ($TARGET_SHORT)"
@@ -339,5 +369,5 @@ if is_true "${HIPPO_PUSH:-true}"; then
   fi
 fi
 
-finish 0 "Updated Hippo from $FROM_VERSION to $TO_VERSION ($TARGET_SHORT): $changed_count files changed." \
-  "How: $how. Your host publishes the new version in a few minutes." "" "$change_list"
+finish 0 "Updated Hippo from $FROM_VERSION to $TO_VERSION ($TARGET_SHORT): $(files "$changed_count") changed." \
+  "How: $how.$STARTED Your host publishes the new version in a few minutes." "" "$change_list"

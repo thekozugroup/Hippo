@@ -1,10 +1,12 @@
 name: CI
 
-# Pushes to main are checked by the deploy workflow. Pull requests from this
-# repository are already covered by the push run, so only fork PRs run here.
+# The quality gate: every push, main included. When a push to main passes, the promote workflow
+# moves the stable branch to it, and copies of Hippo with automatic updates follow stable
+# (scripts/hosting/README.md). Pull requests from this repository are already covered by the push
+# run, so only fork PRs run here.
 on:
   push:
-    branches-ignore: [main]
+    branches: ['**'] # every branch, no tags
   pull_request:
 
 permissions:
@@ -28,5 +30,6 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: npm run test:hosting
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
