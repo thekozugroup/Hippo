@@ -122,6 +122,33 @@ export {
 } from './services/giver-lists.ts'
 
 export { exportData, importData, parseExportFile, type ExportFile, type ImportResult } from './services/backup.ts'
+export {
+  createTransfer,
+  cancelTransfer,
+  watchTransfer,
+  fetchTransfer,
+  receiveTransfer,
+  deviceHasData,
+  type OutgoingTransfer,
+  type IncomingTransfer,
+  type OutgoingState,
+  type TransferSummary,
+  type ReceiveResult,
+} from './services/transfer.ts'
+export {
+  TransferError,
+  isTransferError,
+  parseTransferLink,
+  extractTransferPayload,
+  looksLikeTransferLink,
+  TRANSFER_TTL_MS,
+  TRANSFER_MAX_SENT_BYTES,
+  TRANSFER_MAX_PLAIN_BYTES,
+  TRANSFER_MAX_EVENT_CONTENT,
+  TRANSFER_CHUNK_BYTES,
+  type TransferFailure,
+  type TransferLink,
+} from './protocol/transfer.ts'
 
 export { resolveItemState, effectiveClaimTime, type ItemState, type ItemStatus, type ClaimRow, type ResolveClaim } from './protocol/resolve.ts'
 export { parseShareLink, extractSharePayload, type SharePayload } from './crypto/link.ts'

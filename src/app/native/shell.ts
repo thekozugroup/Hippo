@@ -6,8 +6,9 @@
 //   history, then leave from a top-level screen (logic.ts). While Back would
 //   leave, the app hands it to Android, so the system's own back-to-home
 //   animation plays.
-// - System bars (Capacitor's SystemBars): light status bar icons over the hero,
-//   navigation bar icons that follow the theme and setup's night field.
+// - System bars (Capacitor's SystemBars): both transparent; status bar icons
+//   light over the hero and dark once the light sheet is under them, navigation
+//   bar icons that follow the theme and setup's night field.
 // - Share target: text shared from another app opens Add a wish (capture.ts).
 // - Links to the public website that Android opens in the app go to the list.
 // - Keyboard: html[data-keyboard] while it is open, so the floating navigation
@@ -22,7 +23,9 @@ import { SplashScreen } from '@capacitor/splash-screen'
 import { captureShared } from '../core/capture.ts'
 import { appResumed } from '../core/core.ts'
 import { historyIndex, navigate } from '../layout/motionLocation.ts'
-import { payloadFromSiteLink, PUBLIC_SITE_URL } from '../lib/site-address.ts'
+import { isSheetUnderStatusBar, onStatusAreaChange } from '../layout/statusArea.ts'
+import { payloadFromSiteLink, PUBLIC_SITE_URL, siteAddress, transferPayloadFromSiteLink } from '../lib/site-address.ts'
+import { holdTransferPayload, transferPayloadInText } from '../lib/transfer-inbox.ts'
 import { wireFeedback } from './feedback.ts'
 import { backActionFor, barStylesFor, sharedTextFrom, type BarStyle } from './logic.ts'
 import { SharedText } from './plugins.ts'
@@ -99,12 +102,12 @@ function pageIsDark(): boolean {
 
 function syncBars(): void {
   const root = document.documentElement
-  const darkField = hashPath().startsWith('/welcome/') || root.dataset.boot === 'setup'
+  const darkField = hashPath().startsWith('/welcome/') || hashPath() === '/existing' || root.dataset.boot === 'setup'
   if (darkField !== (root.dataset.field === 'night')) {
     if (darkField) root.dataset.field = 'night'
     else delete root.dataset.field
   }
-  const want = barStylesFor({ dark: pageIsDark(), darkField })
+  const want = barStylesFor({ dark: pageIsDark(), darkField, sheetUnder: isSheetUnderStatusBar() })
   if (want.status !== applied.status) {
     applied.status = want.status
     void SystemBars.setStyle({ style: want.status === 'DARK' ? SystemBarsStyle.Dark : SystemBarsStyle.Light, bar: SystemBarType.StatusBar }).catch(() => undefined)
@@ -119,18 +122,9 @@ function wireBars(): void {
   new MutationObserver(syncBars).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-boot'] })
   window.addEventListener('hashchange', syncBars)
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncBars)
+  // The status bar icons follow what is under them (layout/statusArea.ts decides, with hysteresis).
+  onStatusAreaChange(syncBars)
   syncBars()
-  // The status bar backdrop (base.css, html[data-native]) shows once the page scrolls under it.
-  const root = document.documentElement
-  const onScroll = () => {
-    const scrolled = window.scrollY > 4
-    if (scrolled !== ('scrolled' in root.dataset)) {
-      if (scrolled) root.dataset.scrolled = ''
-      else delete root.dataset.scrolled
-    }
-  }
-  window.addEventListener('scroll', onScroll, { passive: true })
-  onScroll()
 }
 
 // ------------------------------------------------------------------ shares and links
@@ -144,14 +138,33 @@ async function takeShare(): Promise<void> {
   }
   const text = sharedTextFrom(shared)
   if (!text) return
+  // A transfer link shared from another app (a chat): receive it, never as a wish.
+  const transfer = transferPayloadInText(`${text.title ?? ''} ${text.text ?? ''}`)
+  if (transfer) {
+    holdTransferPayload(transfer)
+    navigate('/move/receive')
+    return
+  }
   if (captureShared(text)) navigate('/item/new')
 }
 
 /** A link Android opened in the app. Only share links of the public website are followed; the link itself is never logged. */
 function openLink(url: unknown): void {
   if (typeof url !== 'string') return
-  const payload = payloadFromSiteLink(url, PUBLIC_SITE_URL)
-  if (payload) navigate(`/l/${payload}`)
+  for (const site of new Set([siteAddress(), PUBLIC_SITE_URL])) {
+    const payload = payloadFromSiteLink(url, site)
+    if (payload) {
+      navigate(`/l/${payload}`)
+      return
+    }
+    // A transfer link: the secret goes straight to the receive screen, never into the address.
+    const transfer = transferPayloadFromSiteLink(url, site)
+    if (transfer) {
+      holdTransferPayload(transfer)
+      navigate('/move/receive')
+      return
+    }
+  }
 }
 
 function wireIncoming(): void {
@@ -187,9 +200,24 @@ function wireForeground(): void {
   )
 }
 
+/**
+ * Hides the splash once the first screen has painted: two frames, or 400 ms if frames do not run
+ * while the splash covers the WebView. Then html[data-splash] goes, which lets the logo intro on
+ * the first setup step start (LogoIntro waits for it, so it never plays under the splash).
+ */
 function hideSplash(): void {
-  // Two frames: the first screen has been laid out and painted.
-  requestAnimationFrame(() => requestAnimationFrame(() => void SplashScreen.hide({ fadeOutDuration: 150 }).catch(() => undefined)))
+  let done = false
+  const hide = () => {
+    if (done) return
+    done = true
+    void SplashScreen.hide({ fadeOutDuration: 150 })
+      .catch(() => undefined)
+      .finally(() => window.setTimeout(() => document.documentElement.removeAttribute('data-splash'), 160))
+  }
+  requestAnimationFrame(() => requestAnimationFrame(hide))
+  window.setTimeout(hide, 400)
+  // Whatever happens to the plugin call, the page is not held back for longer than this.
+  window.setTimeout(() => document.documentElement.removeAttribute('data-splash'), 2500)
 }
 
 export function startShell(): void {

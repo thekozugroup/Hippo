@@ -147,28 +147,79 @@ html[data-boot='setup'] body {
   background: transparent;
 }
 
-/* Android app (html[data-native], set by src/app/native/). None of this applies on the website.
-   The page runs edge to edge under the system bars. The status bar's icons are always light
-   (src/app/native/logic.ts), so once the page scrolls under it a backdrop in the hero's top
-   colour fades in behind it, and its icons stay readable over the white sheet. */
-html[data-native] body::before {
+/* The status area: wherever the page runs under a top inset (the Android app, a Home Screen web
+   app on iPhone), html[data-top-inset] is set (src/app/layout/statusArea.ts) and a fade layer sits
+   over the inset: a small backdrop blur with a flat tint, both strongest at the very top and masked
+   to nothing just below the inset, so the clock and battery stay readable over whatever scrolls
+   under them and there is no hard line. The tint is a darkening of the hero over the hero and the
+   setup field; once the sheet is under the status bar (html[data-under='sheet']) a second layer in
+   the sheet's surface colour fades in. Pointer events pass through. Without an inset nothing is drawn. */
+html[data-top-inset] body::before,
+html[data-top-inset] body::after {
   content: '';
   position: fixed;
   inset-block-start: 0;
   inset-inline: 0;
   z-index: 40;
-  height: var(--inset-top);
-  background: var(--system-bar-fill);
-  opacity: 0;
+  height: calc(var(--inset-top) + var(--top-fade-runout));
   pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(var(--inset-top) * 0.6), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0, #000 calc(var(--inset-top) * 0.6), transparent 100%);
+}
+html[data-top-inset] body::before {
+  background: var(--top-fade-hero-tint);
+  -webkit-backdrop-filter: blur(var(--top-fade-blur));
+  backdrop-filter: blur(var(--top-fade-blur));
+}
+html[data-top-inset] body::after {
+  background: var(--top-fade-sheet-tint);
+  opacity: 0;
   transition: opacity var(--dur) var(--ease);
 }
-html[data-native][data-scrolled] body::before {
+html[data-top-inset][data-under='sheet'] body::after {
   opacity: 1;
 }
-/* Setup's night field is dark in both themes. */
-html[data-native][data-field='night'] body::before {
-  background: var(--slate-950);
+/* Over the sheet the blur stays but the hero's darkening goes, so the surface tint is not greyed. */
+html[data-top-inset][data-under='sheet'] body::before {
+  background: transparent;
+}
+/* No blur available, or less transparency or more contrast asked for: an opaque strip over the
+   inset only (the frost fallback rule), in the colour of what is under it. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html[data-top-inset] body::before {
+    height: var(--inset-top);
+    background: var(--system-bar-fill);
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  html[data-top-inset] body::after {
+    height: var(--inset-top);
+    background: var(--top-fade-sheet-solid);
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  html[data-top-inset] body::before {
+    height: var(--inset-top);
+    background: var(--system-bar-fill);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  html[data-top-inset] body::after {
+    height: var(--inset-top);
+    background: var(--top-fade-sheet-solid);
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+@media (forced-colors: active) {
+  html[data-top-inset] body::before,
+  html[data-top-inset] body::after {
+    display: none;
+  }
 }
 
 /* While the keyboard is open the floating navigation steps aside, so the focused field and the

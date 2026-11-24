@@ -99,6 +99,12 @@
   color: var(--text-2);
 }
 
+/* A note that needs attention (the app's site is not reachable): the amber tone, as a plain line. */
+.app-note--warning {
+  color: var(--tone-amber-fg);
+  font-weight: 500;
+}
+
 /* Informational banner on the sheet (offline, unpublished, warnings) */
 .app-banner {
   display: flex;

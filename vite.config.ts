@@ -2,6 +2,8 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { readFileSync } from 'node:fs'
+import { DEFAULT_RELAYS } from './src/core/config.ts'
 
 /** The Vite mode that builds the web assets for the Android app (Capacitor's webDir is NATIVE_OUT_DIR). */
 export const NATIVE_MODE = 'native'
@@ -90,6 +92,25 @@ export function siteUrlFromEnv(value: string | undefined): string | undefined {
     return u.href.endsWith('/') ? u.href : `${u.href}/`
   } catch {
     return undefined
+  }
+}
+
+/** The sync protocol this build speaks (docs/PROTOCOL.md); the app's site check (src/app/lib/site-check.ts) compares it. */
+export const HIPPO_PROTOCOL_VERSION = 1
+
+/** What a Hippo website says about itself at its root, so the Android app can check an address ("Use my own Hippo site"). */
+export function siteInfoJson(version: string): string {
+  return `${JSON.stringify({ app: 'Hippo', name: 'Hippo', version, protocol: HIPPO_PROTOCOL_VERSION, relays: [...DEFAULT_RELAYS] }, null, 2)}\n`
+}
+
+function siteInfoFile(): Plugin {
+  return {
+    name: 'hippo-site-info',
+    apply: 'build',
+    generateBundle() {
+      const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
+      this.emitFile({ type: 'asset', fileName: 'hippo.json', source: siteInfoJson(pkg.version) })
+    },
   }
 }
 
@@ -201,6 +222,8 @@ export default defineConfig(({ mode }) => {
             '**/icon-512.png',
             '**/icon-maskable-512.png',
             '**/og-image.png',
+            // Read by the Android app over the network to check the site; always fetched fresh.
+            '**/hippo.json',
           ],
           runtimeCaching: [
             {
@@ -217,6 +240,8 @@ export default defineConfig(({ mode }) => {
       // Link preview tags are for the website only: nobody shares the app's local page.
       openGraphUrls(native ? undefined : site),
       ...(native && site ? [siteAddressFile(site)] : []),
+      // The website says what it is at hippo.json (the app's "Use my own Hippo site" check).
+      ...(native ? [] : [siteInfoFile()]),
     ],
     test: {
       environment: 'jsdom',

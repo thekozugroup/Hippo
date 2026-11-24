@@ -141,6 +141,7 @@ describe('haptics', () => {
     expect(hapticFor({ type: 'click', target: el('calm') })).toBeUndefined()
     expect(hapticFor({ type: 'click', target: el('loose') })).toBeUndefined()
     expect(hapticFor({ type: 'click', target: null })).toBeUndefined()
+    expect(hapticFor({ type: 'slidecomplete', target: el('calm') })).toBe('confirm')
   })
 
   it('does nothing under reduced motion', () => {
@@ -171,6 +172,10 @@ describe('shell decisions', () => {
     expect(barStylesFor({ dark: false, darkField: false })).toEqual({ status: 'DARK', navigation: 'LIGHT' })
     expect(barStylesFor({ dark: true, darkField: false })).toEqual({ status: 'DARK', navigation: 'DARK' })
     expect(barStylesFor({ dark: false, darkField: true })).toEqual({ status: 'DARK', navigation: 'DARK' })
+    // The light sheet under the status bar: dark icons; the dark sheet or the night field keep them light.
+    expect(barStylesFor({ dark: false, darkField: false, sheetUnder: true })).toEqual({ status: 'LIGHT', navigation: 'LIGHT' })
+    expect(barStylesFor({ dark: true, darkField: false, sheetUnder: true })).toEqual({ status: 'DARK', navigation: 'DARK' })
+    expect(barStylesFor({ dark: false, darkField: true, sheetUnder: true })).toEqual({ status: 'DARK', navigation: 'DARK' })
   })
 
   it('takes only string fields from a share', () => {

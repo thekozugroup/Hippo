@@ -43,7 +43,8 @@ export interface ExportFile {
   settings: ExportSettings
 }
 
-export async function exportData(db: HippoDb, now = systemNow()): Promise<ExportFile> {
+/** `record: false` (a transfer to another device) leaves "last backup" as it was. */
+export async function exportData(db: HippoDb, now = systemNow(), options: { record?: boolean } = {}): Promise<ExportFile> {
   const [items, categories, sharedLists, guestLists, retiredLists, settings, linkPreview] = await Promise.all([
     db.items.toArray(),
     db.categories.toArray(),
@@ -69,7 +70,7 @@ export async function exportData(db: HippoDb, now = systemNow()): Promise<Export
   if (linkPreview?.value === true) file.settings.linkPreview = true
   const status = settings.onboarding?.status
   if (status === 'completed' || status === 'dismissed') file.settings.setup = status
-  await setLastExportAt(db, now)
+  if (options.record !== false) await setLastExportAt(db, now)
   return file
 }
 

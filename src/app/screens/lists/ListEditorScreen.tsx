@@ -37,6 +37,7 @@ import { useNotify } from '../../core/notify.ts'
 import { requestPersistentStorage } from '../../core/storage.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { shareBaseUrl } from '../../lib/site-address.ts'
+import { SiteReachNote } from '../../lib/SiteReach.tsx'
 import { canShareSheet, shareSheet } from '../../native/index.ts'
 import { formatEventDate, plural, summariseSync, type SyncSummary } from '../../lib/format.ts'
 import { SyncFeedback } from './SyncFeedback.tsx'
@@ -199,6 +200,7 @@ function ShareLinkBox({ list, entering }: { list: SharedList; entering: boolean 
         hint="Anyone with this link can see the list, say they will get a wish or chip in. Send it only to people you trust."
         data-testid="share-link"
       />
+      <SiteReachNote />
       <div className="app-row app-row--fill">
         <Button
           variant="primary"

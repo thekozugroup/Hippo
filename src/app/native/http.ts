@@ -47,3 +47,12 @@ export async function headForDate(input: string): Promise<Pick<Response, 'header
   }
   return { headers }
 }
+
+/** A small JSON file from a Hippo website (its hippo.json), through the same hardened native fetch. */
+export async function fetchSiteFile(url: string, options: { timeoutMs: number; maxBytes: number }): Promise<FetchedPage> {
+  try {
+    return await PageFetch.fetch({ url, timeoutMs: options.timeoutMs, maxBytes: options.maxBytes, accept: 'json' })
+  } catch (e) {
+    throw new PageFetchError(errorCode(e))
+  }
+}

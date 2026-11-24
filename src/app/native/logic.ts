@@ -39,15 +39,19 @@ export interface BarState {
   dark: boolean
   /** Setup's night field fills the screen (dark in both themes). */
   darkField: boolean
+  /** The sheet has scrolled up under the transparent status bar (layout/statusArea.ts). */
+  sheetUnder?: boolean
 }
 
 /**
- * The status bar always sits over the blue hero, setup's night field, or (once the page scrolls)
- * the app's status bar backdrop in the hero colour, so its icons are always light. The navigation
- * bar sits over the sheet: dark icons on the light sheet, light icons in the dark theme and on setup.
+ * Both bars are transparent and the page runs under them. The status bar's icons follow what is
+ * under them: light over the blue hero and setup's night field, dark once the light sheet has
+ * scrolled under (in the dark theme the sheet is dark, so they stay light). The navigation bar
+ * sits over the sheet: dark icons on the light sheet, light icons in the dark theme and on setup.
  */
 export function barStylesFor(s: BarState): { status: BarStyle; navigation: BarStyle } {
-  return { status: 'DARK', navigation: s.dark || s.darkField ? 'DARK' : 'LIGHT' }
+  const lightBehindStatus = !s.dark && !s.darkField && s.sheetUnder === true
+  return { status: lightBehindStatus ? 'LIGHT' : 'DARK', navigation: s.dark || s.darkField ? 'DARK' : 'LIGHT' }
 }
 
 /** Reads what the SharedText plugin returned: only string fields, nothing else. */

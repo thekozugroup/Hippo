@@ -143,3 +143,10 @@ export function listStatusLabel(list: Pick<SharedList, 'status' | 'linkPending'>
 export function possessive(name: string): string {
   return `${name}’s`
 }
+
+/** "12 wishes and 2 lists": what a backup or a transfer brought. */
+export function cameIn(items: number, lists: number): string {
+  if (lists === 0) return plural(items, 'wish', 'wishes')
+  if (items === 0) return plural(lists, 'list', 'lists')
+  return `${plural(items, 'wish', 'wishes')} and ${plural(lists, 'list', 'lists')}`
+}

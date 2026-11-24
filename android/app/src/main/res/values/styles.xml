@@ -10,6 +10,10 @@
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
         <item name="android:windowBackground">@color/splash_background</item>
+        <!-- Transparent system bars with no scrim: the page draws under both (MainActivity sets the
+             same at run time, with Android's contrast enforcement turned off). -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
     <!-- Launch theme: the system splash (AndroidX SplashScreen, used by @capacitor/splash-screen on

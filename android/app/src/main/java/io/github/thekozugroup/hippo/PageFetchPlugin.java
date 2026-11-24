@@ -54,10 +54,11 @@ public class PageFetchPlugin extends Plugin {
         int timeoutMs = clamp(call.getInt("timeoutMs"), 8000, 1000, 15000);
         int maxBytes = clamp(call.getInt("maxBytes"), 1_500_000, 16 * 1024, 2_000_000);
         String language = Locale.getDefault().toLanguageTag();
+        boolean json = "json".equals(call.getString("accept"));
         try {
             pool.execute(() -> {
                 try {
-                    PageFetcher.Page page = PageFetcher.fetch(url, timeoutMs, maxBytes, userAgent, language, PageFetcher.SYSTEM_RESOLVER);
+                    PageFetcher.Page page = PageFetcher.fetch(url, timeoutMs, maxBytes, userAgent, language, PageFetcher.SYSTEM_RESOLVER, json);
                     JSObject out = new JSObject();
                     out.put("status", page.status);
                     out.put("url", page.url);

@@ -1,16 +1,22 @@
 import { useId, type ComponentPropsWithRef, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { cx } from '../cx.ts'
 import { HeroBackground } from './HeroBackground.tsx'
 import { IconButton } from './IconButton.tsx'
 import { LogoIntro } from './LogoIntro.tsx'
+import { SlideButton } from './SlideButton.tsx'
 import { StepProgress } from './StepProgress.tsx'
 import './StepScreen.css'
 
+export interface StepAction {
+  label: string
+  onClick: () => void
+}
+
 export interface StepScreenProps extends Omit<ComponentPropsWithRef<'div'>, 'title' | 'children'> {
-  /** The current step, from 1, and the number of steps (shown as dots, read as "Step 2 of 5"). */
-  step: number
-  total: number
+  /** The current step, from 1, and the number of steps (shown as dots, read as "Step 2 of 5"). Leave both out on a screen beside the flow (no dots). */
+  step?: number
+  total?: number
   /** The question or statement; rendered as the page's only h1 (use `TwoTone tone="on-hero"`). */
   title: ReactNode
   /** One or two short sentences under the title. */
@@ -22,13 +28,15 @@ export interface StepScreenProps extends Omit<ComponentPropsWithRef<'div'>, 'tit
   /** Goes to the previous step; omitted on the first step. Escape does the same, outside open pickers. */
   onBack?: () => void
   backLabel?: string
-  /** The wide pill. Runs on click and on Enter in a field. */
-  continueLabel: string
-  onContinue: () => void
-  /** Busy: the pill shows it and ignores presses. */
+  /** The wide slide control (`SlideButton`). Runs on a tap, a completed slide, and Enter in a field. */
+  continueLabel?: string
+  onContinue?: () => void
+  /** Busy (a step is saving): the control shows it, ignores presses and cannot be dragged. */
   busy?: boolean
-  /** One quiet action under the pill, such as "Skip". */
-  secondaryAction?: { label: string; onClick: () => void }
+  /** Said on the control while busy. */
+  busyLabel?: string
+  /** Quiet actions under the pill, such as "Skip" (one, or a short row of them). */
+  secondaryAction?: StepAction | readonly StepAction[]
   /**
    * A preview inside another page (the gallery): fits its content, uses a `div` and an `h2` instead of
    * `main` and `h1`, and does not take part in route transitions.
@@ -56,6 +64,7 @@ export function StepScreen({
   continueLabel,
   onContinue,
   busy = false,
+  busyLabel,
   secondaryAction,
   contained = false,
   logoIntro = false,
@@ -66,10 +75,12 @@ export function StepScreen({
   const Main = contained ? 'div' : 'main'
   const Heading = contained ? 'h2' : 'h1'
   const progressId = useId()
+  const hasProgress = step !== undefined && total !== undefined && total > 0
+  const secondary: readonly StepAction[] = secondaryAction === undefined ? [] : 'label' in secondaryAction ? [secondaryAction] : secondaryAction
   const titleId = useId()
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!busy) onContinue()
+    if (!busy) onContinue?.()
   }
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'Escape' || !onBack || e.defaultPrevented || e.nativeEvent.isComposing) return
@@ -88,27 +99,24 @@ export function StepScreen({
         <Main className="step-screen__main">
           <form className="step-screen__form" onSubmit={submit} noValidate aria-labelledby={titleId}>
             <div className="step-screen__content">
-              <Heading id={titleId} className="step-screen__title" tabIndex={-1} aria-describedby={progressId}>
+              <Heading id={titleId} className="step-screen__title" tabIndex={-1} aria-describedby={hasProgress ? progressId : undefined}>
                 {title}
               </Heading>
               {description ? <div className="step-screen__desc">{description}</div> : null}
               {children ? <div className="step-screen__body">{children}</div> : null}
             </div>
-            <StepProgress className="step-screen__progress" id={progressId} current={step} total={total} />
+            {hasProgress ? <StepProgress className="step-screen__progress" id={progressId} current={step} total={total} /> : <div className="step-screen__progress" />}
             <div className="step-screen__actions">
               {onBack ? <IconButton type="button" variant="frost" size="lg" className="step-screen__back" aria-label={backLabel} icon={<ArrowLeft />} onClick={onBack} /> : null}
-              <button type="submit" className={cx('step-screen__continue', 'frost', 'frost--on-hero', busy && 'is-busy')} aria-busy={busy || undefined}>
-                <span className="step-screen__continue-icon" aria-hidden="true">
-                  {busy ? <span className="step-screen__spinner" /> : <ArrowRight />}
-                </span>
-                <span className="step-screen__continue-label">{continueLabel}</span>
-              </button>
+              {continueLabel ? <SlideButton type="submit" className="step-screen__continue" label={continueLabel} busy={busy} {...(busyLabel ? { busyLabel } : {})} /> : null}
             </div>
-            {secondaryAction ? (
+            {secondary.length > 0 ? (
               <div className="step-screen__secondary">
-                <button type="button" className="step-screen__link" onClick={secondaryAction.onClick}>
-                  {secondaryAction.label}
-                </button>
+                {secondary.map((a) => (
+                  <button key={a.label} type="button" className="step-screen__link" onClick={a.onClick}>
+                    {a.label}
+                  </button>
+                ))}
               </div>
             ) : null}
           </form>

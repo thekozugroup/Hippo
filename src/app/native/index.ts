@@ -18,6 +18,8 @@ export function startNativeShell(): void {
   if (!__HIPPO_NATIVE__ || !isNativeApp()) return
   // At once, so the app's styles (base.css, html[data-native]) apply from the first frame.
   document.documentElement.dataset.native = 'android'
+  // The splash covers the page until shell.ts hides it; the logo intro waits for this to go.
+  document.documentElement.dataset.splash = ''
   void import('./shell.ts').then((m) => m.startShell()).catch(() => undefined)
 }
 
@@ -67,4 +69,10 @@ export async function lookupOnDevice(url: string, deps: { db: HippoDb; signal?: 
 export function clockFetch(): ((input: string) => Promise<Pick<Response, 'headers'>>) | undefined {
   if (!__HIPPO_NATIVE__ || !isNativeApp()) return undefined
   return async (input) => (await import('./http.ts')).headForDate(input)
+}
+
+/** Fetches a Hippo website's hippo.json through native HTTP (the app only); undefined on the website, which never needs it. */
+export function siteFileFetcher(): ((url: string) => Promise<{ status: number; url: string; contentType: string; body: string }>) | undefined {
+  if (!__HIPPO_NATIVE__ || !isNativeApp()) return undefined
+  return async (url) => (await import('./http.ts')).fetchSiteFile(url, { timeoutMs: 8000, maxBytes: 16 * 1024 })
 }

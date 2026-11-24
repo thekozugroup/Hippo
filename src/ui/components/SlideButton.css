@@ -1,0 +1,132 @@
+/* The slide control: a wide frost pill with a white knob at its start. It sits on the dark setup
+   field (StepScreen) or any dark hero; see DESIGN.md, SlideButton. */
+.slide-btn {
+  position: relative;
+  display: flex;
+  flex: 1 1 12rem;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--h-lg);
+  padding: var(--sp-1);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  /* A vertical move that starts here still scrolls the page; a sideways one is the slide's. */
+  touch-action: pan-y;
+  transition: transform var(--dur) var(--ease);
+}
+.slide-btn:active:not(.is-busy, .is-disabled, .is-dragging) {
+  transform: scale(0.98);
+  transition-duration: var(--dur-press);
+}
+.slide-btn.is-busy {
+  cursor: progress;
+}
+.slide-btn.is-disabled {
+  cursor: not-allowed;
+}
+.slide-btn.is-disabled .slide-btn__knob {
+  opacity: 0.55;
+}
+
+.slide-btn__knob {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--h-md);
+  height: var(--h-md);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--ink-on-white);
+  cursor: grab;
+  touch-action: none;
+  /* The settle after a release: back to the start, or on to the end. */
+  transition: transform var(--dur) var(--ease-move);
+}
+.slide-btn.is-dragging .slide-btn__knob {
+  cursor: grabbing;
+  transition: none;
+}
+.slide-btn:hover:not(.is-dragging, .is-done, .is-busy, .is-disabled) .slide-btn__knob {
+  translate: 2px 0;
+}
+.slide-btn__knob svg {
+  width: 22px;
+  height: 22px;
+}
+[dir='rtl'] .slide-btn__arrow {
+  transform: scaleX(-1);
+}
+
+/* The label sits in the middle of what is left of the pill (the knob's width is kept free at the end). */
+.slide-btn__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  padding-inline-end: calc(var(--h-md) + var(--sp-3));
+  text-align: center;
+}
+.slide-btn__label {
+  overflow-wrap: break-word;
+  transition: opacity var(--dur) var(--ease);
+}
+.slide-btn.is-dragging .slide-btn__label {
+  transition: none;
+}
+.slide-btn__reason {
+  font-size: var(--fs-label);
+  line-height: var(--lh-caption);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.86;
+}
+
+.slide-btn__spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: slide-spin 700ms linear infinite;
+}
+@keyframes slide-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-btn,
+  .slide-btn__knob,
+  .slide-btn__label {
+    transition: none;
+  }
+  .slide-btn__spinner {
+    animation: none;
+    border-inline-end-color: currentColor;
+  }
+}
+
+@media (forced-colors: active) {
+  .slide-btn {
+    border: 2px solid ButtonText;
+  }
+  .slide-btn__knob {
+    background: ButtonText;
+    color: ButtonFace;
+  }
+}

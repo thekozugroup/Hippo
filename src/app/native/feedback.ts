@@ -1,5 +1,6 @@
 // Haptic feedback in the app, for a few meaningful moments only: a gift
-// marked, a switch turned, a destructive action confirmed. The tap goes
+// marked, a switch turned, a destructive action confirmed, a slide control
+// pulled to its end. The tap goes
 // through the app's TouchFeedback plugin, which uses the view's
 // performHapticFeedback: Android skips it when the person turned touch
 // feedback off, and it needs no vibration permission. Nothing happens under
@@ -25,6 +26,8 @@ export function haptic(kind: HapticKind): void {
 export function hapticFor(event: { type: string; target: EventTarget | null }): HapticKind | undefined {
   const el = event.target
   if (!(el instanceof Element)) return undefined
+  // A slide control (SlideButton) pulled to its end: one light confirmation.
+  if (event.type === 'slidecomplete') return 'confirm'
   if (event.type === 'change' && el instanceof HTMLInputElement && el.getAttribute('role') === 'switch') return 'toggle'
   if (event.type === 'click') {
     const button = el.closest('button.btn--danger')
@@ -41,7 +44,9 @@ export function wireFeedback(doc: Document = document): () => void {
   }
   doc.addEventListener('change', on, true)
   doc.addEventListener('click', on, true)
+  doc.addEventListener('slidecomplete', on, true)
   return () => {
+    doc.removeEventListener('slidecomplete', on, true)
     doc.removeEventListener('change', on, true)
     doc.removeEventListener('click', on, true)
   }

@@ -157,6 +157,10 @@
   --frost-bar-blur: 14px;
   /* How far a .frost--bleed surface's blurred box reaches past it, above and below (frost.css). */
   --frost-bleed: 32px;
+  /* The top fade under a status bar: blur radius (kept small; see the 2x/3x note in DESIGN.md),
+     and how far it runs out below the inset, where it fades to nothing above the top bar's buttons. */
+  --top-fade-blur: 8px;
+  --top-fade-runout: var(--sp-3);
   --frost-bar-saturate: 1.4;
   --frost-bar-filter: blur(var(--frost-bar-blur)) saturate(var(--frost-bar-saturate));
   --frost-scrim-tint: color-mix(in srgb, var(--slate-950) 36%, transparent);
@@ -192,8 +196,13 @@
      fades every column to the flat fill, so there is no seam on wide screens.
      Dark: flat slate-950 with a soft blue-800 glow. */
   --hero-fill: light-dark(var(--blue-600), var(--slate-950));
-  /* Android app: the backdrop behind the status bar once the page scrolls under it (the hero's top colour). */
+  /* The status area (a top inset: the Android app, a Home Screen web app). Solid fallback: the hero's top colour. */
   --system-bar-fill: light-dark(var(--blue-900), var(--slate-950));
+  /* The top fade's tint over the hero and the setup field (a darkening of the hero colour), and
+     once the sheet has scrolled under the status bar (the sheet's surface). DESIGN.md section 3. */
+  --top-fade-hero-tint: light-dark(color-mix(in srgb, var(--blue-950) 42%, transparent), color-mix(in srgb, var(--slate-950) 60%, transparent));
+  --top-fade-sheet-tint: color-mix(in srgb, var(--surface) 86%, transparent);
+  --top-fade-sheet-solid: var(--surface);
   --hero-bg:
     radial-gradient(ellipse 100% 55% at 30% 30%, light-dark(transparent, color-mix(in srgb, var(--blue-800) 70%, transparent)) 0%, transparent 100%),
     linear-gradient(to bottom, transparent 55%, var(--hero-fill) 100%),

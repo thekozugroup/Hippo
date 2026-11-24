@@ -12,6 +12,15 @@ on:
   workflow_dispatch:
   push:
     tags: ['v*']
+    # Also on main when the app could have changed, so the emulator checks run without a manual start.
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'capacitor.config.ts'
+      - 'package.json'
+      - 'scripts/android-emulator-smoke.sh'
+      - '.github/workflows/android.yml'
 
 permissions:
   contents: read
@@ -143,8 +152,9 @@ jobs:
           path: out/${{ steps.apk.outputs.name }}
           if-no-files-found: error
 
-  # Installs the APK on an emulator, starts it, and checks that the web app's first screen
-  # appears (scripts/android-emulator-smoke.sh). Fails when it does not.
+  # Installs the APK on an emulator and checks real behaviour in the real WebView
+  # (scripts/android-emulator-smoke.sh): the first screen appears, the logo intro lands small at
+  # the top, and the setup slide control works by drag (input swipe) and by tap (input tap).
   emulator:
     needs: build
     runs-on: ubuntu-latest
@@ -174,11 +184,13 @@ jobs:
         if: always()
         run: |
           {
-            echo "## Emulator check (Android 15)"
+            echo "## Emulator check (Android 15, real WebView, real touch input through adb)"
             echo
             if [ -f emulator-smoke/result.txt ]; then sed 's/^/- /' emulator-smoke/result.txt; else echo "- The emulator did not start."; fi
             echo
-            echo "Screenshots, the UI dump and the app's log are in the emulator-smoke artifact."
+            echo "What each line verifies: the first setup screen rendered; the Hippo logo was small and in the top sixth of the screen within 8 seconds with animations on (the intro finished); an \`input swipe\` along the Get started control reached the name step; after Back, an \`input tap\` on it reached the name step. The share check is reported only."
+            echo
+            echo "Screenshots at each point, the UI dumps and the app's log are in the emulator-smoke artifact."
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()

@@ -17,6 +17,11 @@ const ROUTES: ReadonlyArray<[RegExp, string]> = [
   [/^\/l\/[^/]+$/, 'Opening a shared list'],
   [/^\/g\/[^/]+$/, 'Shared list'],
   [/^\/settings$/, 'Settings'],
+  [/^\/existing$/, 'Bring your Hippo here'],
+  [/^\/move$/, 'Move to another device'],
+  [/^\/move\/receive$/, 'Receive from another device'],
+  [/^\/t\/[^/]+$/, 'Opening a transfer link'],
+  [/^\/site$/, 'Your Hippo site'],
   [/^\/design$/, 'Design gallery'],
 ]
 

@@ -19,6 +19,7 @@ import { useNotify } from '../../core/notify.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { ScreenMessage } from '../../layout/ScreenMessage.tsx'
 import { shareBaseUrl } from '../../lib/site-address.ts'
+import { SiteReachNote } from '../../lib/SiteReach.tsx'
 import { canShareSheet, haptic, shareSheet } from '../../native/index.ts'
 import { formatEventDate, plural, possessive } from '../../lib/format.ts'
 import { ClaimSheet, type SheetRequest } from './ClaimSheet.tsx'
@@ -204,6 +205,7 @@ function InviteOthers({ topic, listName }: { topic: string; listName: string }) 
     <section className="app-stack" aria-labelledby="giver-invite">
       <SectionHeader title={<span id="giver-invite">Invite others</span>} />
       <p className="app-note">Anyone with the link can see the list and who is getting what.</p>
+      <SiteReachNote what="the link" />
       <div className="app-row app-row--fill">
         <Button variant="secondary" size="md" fullWidth icon={<Copy />} onClick={() => void copy()}>
           Copy link

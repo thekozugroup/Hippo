@@ -9,6 +9,8 @@ import { handleStartupCapture } from './app/core/capture.ts'
 import { applyTheme, readStoredTheme } from './app/core/theme.ts'
 import { blockIfFramed } from './core/services/frame-guard.ts'
 import { isNativeApp, startNativeShell } from './app/native/index.ts'
+import { startStatusArea } from './app/layout/statusArea.ts'
+import { takeTransferFromLocation } from './app/lib/transfer-inbox.ts'
 
 // GitHub Pages cannot send frame-ancestors, so refuse to run inside another
 // site's frame: show a message and start nothing (no database, no relays).
@@ -17,6 +19,8 @@ if (isNativeApp() || !blockIfFramed(window, document, window.location.href)) {
   // Before the first render: pinned theme (no flash), relay override, then
   // share-target / deep-link capture, which also strips the query string.
   applyTheme(readStoredTheme())
+  // A transfer link (#/t/...): its secret leaves the address bar before anything else runs.
+  takeTransferFromLocation()
   const core = getAppCore()
   handleStartupCapture()
   // Likely a first run: paint the setup's background from the first frame and fetch setup now.
@@ -32,4 +36,6 @@ if (isNativeApp() || !blockIfFramed(window, document, window.location.href)) {
   )
   // Inside the Android app: back button, system bars, share target and the rest (src/app/native/).
   startNativeShell()
+  // Under a top inset (the app, a Home Screen web app): the fade behind the status bar.
+  startStatusArea()
 }

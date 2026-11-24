@@ -19,8 +19,8 @@ export interface SharedTextPlugin {
 }
 
 export interface PageFetchPlugin {
-  /** Fetches an https page from a public host (re-checked after each redirect), without cookies, capped at `maxBytes`. Rejects with code `blocked`, `timeout` or `network`. */
-  fetch(options: { url: string; timeoutMs: number; maxBytes: number }): Promise<FetchedPage>
+  /** Fetches an https page from a public host (re-checked after each redirect), without cookies, capped at `maxBytes`. Reads HTML only, or with `accept: 'json'` JSON only. Rejects with code `blocked`, `timeout` or `network`. */
+  fetch(options: { url: string; timeoutMs: number; maxBytes: number; accept?: 'html' | 'json' }): Promise<FetchedPage>
 }
 
 export interface TouchFeedbackPlugin {

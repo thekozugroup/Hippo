@@ -3,7 +3,7 @@
 
 import { applyRelayOverrideFromUrl, createCore, retryPendingSync, TimeSync, type Core } from '../../core/index.ts'
 import { startSyncRetry, type SyncRetry } from '../lib/sync-retry.ts'
-import { PUBLIC_SITE_URL } from '../lib/site-address.ts'
+import { siteAddress } from '../lib/site-address.ts'
 import { clockFetch, isNativeApp } from '../native/index.ts'
 
 let instance: Core | null = null
@@ -30,9 +30,10 @@ function localStore(): Storage | null {
  */
 function startTimeSync(): TimeSync {
   const nativeFetch = clockFetch()
+  const site = siteAddress()
   const sync =
-    nativeFetch && PUBLIC_SITE_URL
-      ? new TimeSync({ url: PUBLIC_SITE_URL, fetch: nativeFetch, storage: localStore() })
+    nativeFetch && site
+      ? new TimeSync({ url: site, fetch: nativeFetch, storage: localStore() })
       : new TimeSync({ url: new URL('./', window.location.href), storage: localStore() })
   void sync.ready()
   document.addEventListener('visibilitychange', () => {

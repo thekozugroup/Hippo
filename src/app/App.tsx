@@ -27,6 +27,7 @@ import { setWelcomeOrder } from './layout/routeMotion.ts'
 import { installGuideFor, installPlacement, readInstallEnv } from './pwa/guide.ts'
 import { isStandalone, onInstallChange, wasInstalledHere } from './pwa/install.ts'
 import { isNativeApp } from './native/platform.ts'
+import { takeTransferFromLocation } from './lib/transfer-inbox.ts'
 
 // Setup's step order depends on where installing fits on this device; it is fixed for the page's life.
 // Inside the Android app Hippo is already an app: there is no install step.
@@ -42,6 +43,10 @@ const GiverScreen = lazyScreen(() => import('./screens/giver/GiverScreen.tsx').t
 const GiverLinkScreen = lazyScreen(() => import('./screens/giver/GiverScreen.tsx').then((m) => m.GiverLinkScreen))
 const SettingsScreen = lazyScreen(() => import('./screens/settings/SettingsScreen.tsx').then((m) => m.default))
 const OnboardingScreen = lazyScreen(() => import('./screens/onboarding/OnboardingScreen.tsx').then((m) => m.default))
+const MoveScreen = lazyScreen(() => import('./screens/move/MoveScreen.tsx').then((m) => m.default))
+const ReceiveScreen = lazyScreen(() => import('./screens/move/ReceiveScreen.tsx').then((m) => m.default))
+const ExistingScreen = lazyScreen(() => import('./screens/move/ExistingScreen.tsx').then((m) => m.default))
+const SiteScreen = lazyScreen(() => import('./screens/move/SiteScreen.tsx').then((m) => m.default))
 const GalleryScreen = lazy(() => import('./screens/GalleryScreen.tsx'))
 const UpdatePrompt = lazy(() => import('./pwa/UpdatePrompt.tsx'))
 
@@ -51,6 +56,10 @@ function preloadFor(path: string): Promise<unknown> | undefined {
   if (path.startsWith('/g/') || path.startsWith('/l/')) return GiverScreen.preload()
   if (path === '/settings') return SettingsScreen.preload()
   if (path.startsWith('/welcome/')) return OnboardingScreen.preload()
+  if (path === '/move') return MoveScreen.preload()
+  if (path === '/move/receive') return ReceiveScreen.preload()
+  if (path === '/existing') return ExistingScreen.preload()
+  if (path === '/site') return SiteScreen.preload()
   return undefined
 }
 setRoutePreloader(preloadFor)
@@ -181,6 +190,19 @@ function HomeRoute() {
   return <HomeScreen />
 }
 
+/**
+ * A transfer link opened while Hippo was already running (`#/t/<payload>`): the payload goes to
+ * memory and the address is replaced at once, before the receive screen shows.
+ */
+function TransferLinkRoute() {
+  const [, navigate] = useLocation()
+  useLayoutEffect(() => {
+    takeTransferFromLocation()
+    navigate('/move/receive', { replace: true })
+  }, [navigate])
+  return null
+}
+
 export function Routes() {
   const epoch = useRouteEpoch()
   return (
@@ -197,6 +219,11 @@ export function Routes() {
         <Route path="/g/:topic">{(p) => <GiverScreen topic={p.topic} />}</Route>
         <Route path="/settings">{() => <SettingsScreen />}</Route>
         <Route path="/welcome/:step">{(p) => <OnboardingScreen step={p.step} />}</Route>
+        <Route path="/existing">{() => <ExistingScreen />}</Route>
+        <Route path="/move">{() => <MoveScreen />}</Route>
+        <Route path="/move/receive">{() => <ReceiveScreen />}</Route>
+        <Route path="/t/:payload" component={TransferLinkRoute} />
+        <Route path="/site">{() => (isNativeApp() ? <SiteScreen /> : <NotFoundScreen />)}</Route>
         <Route path="/design" component={GalleryScreen} />
         <Route component={NotFoundScreen} />
       </Switch>

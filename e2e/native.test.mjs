@@ -29,7 +29,7 @@ function run(args) {
   })
 }
 
-async function serveNativeBuild() {
+export async function serveNativeBuild() {
   await run(['build', '--mode', 'native', '--outDir', OUT, '--logLevel', 'warn'])
   const port = await freePort()
   const child = spawn(process.execPath, [ROOT + 'node_modules/vite/bin/vite.js', 'preview', '--mode', 'native', '--outDir', OUT, '--port', String(port), '--strictPort', '--host', '127.0.0.1', '--base', '/app/'], {

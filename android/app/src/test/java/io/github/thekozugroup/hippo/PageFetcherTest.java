@@ -104,6 +104,8 @@ public class PageFetcherTest {
         assertTrue(PageFetcher.isHtml("text/html; charset=utf-8"));
         assertTrue(PageFetcher.isHtml("application/xhtml+xml"));
         assertFalse(PageFetcher.isHtml("application/json"));
+        assertTrue(PageFetcher.isJson("application/json; charset=utf-8"));
+        assertFalse(PageFetcher.isJson("text/html"));
         assertFalse(PageFetcher.isHtml("image/jpeg"));
         assertFalse(PageFetcher.isHtml(null));
         assertEquals(StandardCharsets.ISO_8859_1, PageFetcher.charsetOf("text/html; charset=ISO-8859-1"));

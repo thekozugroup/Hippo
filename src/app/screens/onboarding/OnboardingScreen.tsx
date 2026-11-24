@@ -338,7 +338,10 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
           description={<p>No account needed. Setting up takes about a minute.</p>}
           continueLabel="Get started"
           onContinue={goNext}
-          secondaryAction={{ label: 'Skip setup', onClick: () => void leave('dismissed') }}
+          secondaryAction={[
+            { label: 'I already use Hippo', onClick: () => navigate('/existing') },
+            { label: 'Skip setup', onClick: () => void leave('dismissed') },
+          ]}
         />
       )
 

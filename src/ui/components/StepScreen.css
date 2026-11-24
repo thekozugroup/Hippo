@@ -121,77 +121,11 @@
   height: var(--h-lg);
 }
 
-/* The wide pill: a white circle with the arrow at the start, the label in the middle. */
-.step-screen__continue {
-  position: relative;
-  display: flex;
-  flex: 1 1 12rem;
-  align-items: center;
-  min-width: 0;
-  min-height: var(--h-lg);
-  padding: var(--sp-1);
-  padding-inline-end: calc(var(--h-md) + var(--sp-1));
-  border-radius: var(--r-pill);
-  font-size: var(--fs-label);
-  line-height: var(--lh-label);
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform var(--dur) var(--ease);
-}
-.step-screen__continue:active:not(.is-busy) {
-  transform: scale(0.98);
-  transition-duration: var(--dur-press);
-}
-.step-screen__continue.is-busy {
-  cursor: progress;
-}
-
-.step-screen__continue-icon {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: var(--h-md);
-  height: var(--h-md);
-  border-radius: 50%;
-  background: var(--white);
-  color: var(--ink-on-white);
-  transition: transform var(--dur) var(--ease-move);
-}
-.step-screen__continue:hover .step-screen__continue-icon {
-  transform: translateX(2px);
-}
-.step-screen__continue-icon svg {
-  width: 22px;
-  height: 22px;
-}
-
-.step-screen__continue-label {
-  flex: 1;
-  min-width: 0;
-  padding: var(--sp-2) var(--sp-3);
-  text-align: center;
-  overflow-wrap: break-word;
-}
-
-.step-screen__spinner {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
-  border-top-color: currentColor;
-  animation: step-spin 700ms linear infinite;
-}
-@keyframes step-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .step-screen__secondary {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  column-gap: var(--sp-2);
   margin-block-start: var(--sp-2);
 }
 
@@ -226,19 +160,8 @@
   view-transition-name: hippo-step-actions;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .step-screen__spinner {
-    animation: none;
-    border-inline-end-color: currentColor;
-  }
-}
-
-@media (forced-colors: active) {
-  .step-screen__continue {
-    border: 2px solid ButtonText;
-  }
-  .step-screen__continue-icon {
-    background: ButtonText;
-    color: ButtonFace;
-  }
+/* Setup is a full screen of its own: a sideways slide on its control must not become the
+   browser's swipe back. */
+html:has(.step-screen:not(.step-screen--contained)) {
+  overscroll-behavior-x: none;
 }

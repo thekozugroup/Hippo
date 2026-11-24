@@ -1,23 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bookmark, Copy, Download, ExternalLink, RotateCcw, Tags, Upload } from 'lucide-react'
-import { BottomSheet, Button, SectionHeader, SegmentedControl, Switch, TextArea, TextField } from '../../../ui/index.ts'
+import { Bookmark, Copy, Download, ExternalLink, Globe, Link2, RotateCcw, Send, Tags, Upload } from 'lucide-react'
+import { Button, LinkButton, SectionHeader, SegmentedControl, Switch, TextArea, TextField } from '../../../ui/index.ts'
 import {
-  listSharedLists,
   DEFAULT_RELAYS,
-  importData,
-  isHippoError,
   isRelayUrl,
   LIMITS,
   LINK_PREVIEW_DISCLOSURE,
   PAGE_LOOKUP_DISCLOSURE,
-  parseExportFile,
   setLinkPreviewEnabled,
   setPageLookupEnabled,
   setOnboarding,
   setOwnerName,
   setRelayOverride,
   setTheme,
-  type ExportFile,
   type Theme,
 } from '../../../core/index.ts'
 import { useCore } from '../../core/context.ts'
@@ -30,7 +25,10 @@ import { useLocation } from 'wouter'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { downloadBackup } from '../../lib/backup-file.ts'
 import { appBaseUrl, bookmarkletCode, shortcutScript } from '../../lib/capture-tools.ts'
-import { plural, possessive } from '../../lib/format.ts'
+import { possessive } from '../../lib/format.ts'
+import { BackupImport } from '../../lib/BackupImport.tsx'
+import { SiteReachNote } from '../../lib/SiteReach.tsx'
+import { hostLabel, useSiteAddress } from '../../lib/site-reach.ts'
 import { resyncLists } from '../../lib/sync.ts'
 import { CategoriesSheet } from '../CategoriesSheet.tsx'
 import { moveWishesNote, whyInstall } from '../../pwa/guide.ts'
@@ -183,10 +181,6 @@ function BackupSection() {
   const { db } = core
   const notify = useNotify()
   const settings = useSettings()
-  const fileInput = useRef<HTMLInputElement>(null)
-  const [pending, setPending] = useState<{ name: string; file: ExportFile } | null>(null)
-  const [error, setError] = useState<string | undefined>()
-  const [busy, setBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
 
   const doExport = async () => {
@@ -203,53 +197,6 @@ function BackupSection() {
     }
   }
 
-  const onFile = async (file: File | undefined) => {
-    setError(undefined)
-    if (!file) return
-    if (file.size > 20 * 1024 * 1024) {
-      setError('That file is too large to be a Hippo backup.')
-      return
-    }
-    try {
-      const parsed = parseExportFile(JSON.parse(await file.text()))
-      setPending({ name: file.name, file: parsed })
-    } catch (e) {
-      setError(
-        isHippoError(e, 'unsupported-version')
-          ? 'This is not a Hippo backup, or it comes from a newer version of Hippo.'
-          : isHippoError(e, 'invalid-import')
-            ? `This backup file is damaged and was not imported (${e.message}).`
-            : 'This file could not be read. Choose a Hippo backup file (.json).',
-      )
-    } finally {
-      if (fileInput.current) fileInput.current.value = ''
-    }
-  }
-
-  const doImport = async (mode: 'merge' | 'replace') => {
-    if (!pending || busy) return
-    setBusy(true)
-    try {
-      const r = await importData(db, pending.file, { mode, now: core.now() })
-      setPending(null)
-      // A restore is not a first run: Home opens with the restored data, not setup.
-      writeSetupHint(true, core.db.name)
-      if (pending.file.settings.ownerName) {
-        const shared = (await listSharedLists(db)).filter((l) => l.status === 'published').map((l) => l.id)
-        resyncLists(core, shared, notify)
-      }
-      notify(`Imported ${plural(r.items, 'wish', 'wishes')} and ${plural(r.sharedLists + r.guestLists, 'list', 'lists')}.`)
-    } catch (e) {
-      setError(
-        isHippoError(e, 'invalid-import')
-          ? `This backup was not imported because it contains one of your own lists as a list shared with you, or the other way round. Nothing was changed.`
-          : 'The import failed. Nothing was changed.',
-      )
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const last = settings?.lastExportAt
   return (
     <section className="app-stack" aria-labelledby="set-backup">
@@ -263,49 +210,57 @@ function BackupSection() {
       <p className="app-note">
         <strong>Keep the file private.</strong> It contains the keys to your shared lists.
       </p>
+      <BackupImport>
+        {(pick, busy) => (
+          <div className="app-row app-row--fill">
+            <Button variant="secondary" size="md" fullWidth icon={<Download />} loading={exporting} onClick={() => void doExport()}>
+              Export backup
+            </Button>
+            <Button variant="secondary" size="md" fullWidth icon={<Upload />} disabled={busy} onClick={pick}>
+              Import backup
+            </Button>
+          </div>
+        )}
+      </BackupImport>
+    </section>
+  )
+}
+
+/** Moving to another device without a file (a transfer link), both ways. */
+function MoveSection() {
+  return (
+    <section className="app-stack" aria-labelledby="set-move">
+      <h2 id="set-move" className="app-section-title">
+        Another device
+      </h2>
+      <p className="app-note">Move your wishes and lists to another phone or browser with a link that works for 15 minutes. It is a one-time move: afterwards each device keeps its own copy.</p>
       <div className="app-row app-row--fill">
-        <Button variant="secondary" size="md" fullWidth icon={<Download />} loading={exporting} onClick={() => void doExport()}>
-          Export backup
-        </Button>
-        <Button variant="secondary" size="md" fullWidth icon={<Upload />} disabled={busy} onClick={() => fileInput.current?.click()}>
-          Import backup
-        </Button>
+        <LinkButton href="#/move" variant="secondary" size="md" fullWidth icon={<Send />}>
+          Move Hippo to another device
+        </LinkButton>
+        <LinkButton href="#/move/receive" variant="secondary" size="md" fullWidth icon={<Link2 />}>
+          Enter a transfer link
+        </LinkButton>
       </div>
-      <input
-        ref={fileInput}
-        type="file"
-        accept={isNativeApp() ? 'application/json,.json,text/plain,application/octet-stream' : 'application/json,.json'}
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-        data-testid="import-file"
-        onChange={(e) => void onFile(e.target.files?.[0])}
-      />
-      {error ? (
-        <p className="field__error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <BottomSheet
-        open={pending !== null}
-        onClose={() => setPending(null)}
-        title="Import this backup?"
-        description={
-          pending
-            ? `${pending.name}: ${plural(pending.file.items.length, 'wish', 'wishes')}, ${plural(pending.file.categories.length, 'category', 'categories')}, ${plural(pending.file.sharedLists.length + pending.file.guestLists.length, 'list', 'lists')}.`
-            : undefined
-        }
-      >
-        <div className="app-stack">
-          <p className="app-note">Add to what is here keeps your current wishes and updates any that are also in the file. Replace deletes everything on this device first.</p>
-          <Button variant="primary" fullWidth loading={busy} onClick={() => void doImport('merge')}>
-            Add to what is here
-          </Button>
-          <Button variant="danger" fullWidth disabled={busy} onClick={() => void doImport('replace')}>
-            Replace everything
-          </Button>
-        </div>
-      </BottomSheet>
+    </section>
+  )
+}
+
+/** The Android app: which Hippo website its links point at. */
+function SiteSection() {
+  const site = useSiteAddress()
+  return (
+    <section className="app-stack" aria-labelledby="set-site">
+      <h2 id="set-site" className="app-section-title">
+        Hippo site
+      </h2>
+      <p className="app-note">{`Links you share open on ${hostLabel(site)}.`}</p>
+      <SiteReachNote what="links you share" />
+      <div>
+        <LinkButton href="#/site" variant="secondary" size="md" icon={<Globe />}>
+          Use my own Hippo site
+        </LinkButton>
+      </div>
     </section>
   )
 }
@@ -632,6 +587,8 @@ export default function SettingsScreen() {
       </section>
       {isNativeApp() ? null : <InstallSection />}
       <BackupSection />
+      <MoveSection />
+      {isNativeApp() ? <SiteSection /> : null}
       {isNativeApp() ? <AppCaptureSection /> : <CaptureSection />}
       {isNativeApp() ? <PageLookupSection /> : <LinkLookupSection />}
       <RelaySection />

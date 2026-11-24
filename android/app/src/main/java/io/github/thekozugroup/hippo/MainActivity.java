@@ -1,6 +1,10 @@
 package io.github.thekozugroup.hippo;
 
+import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.Window;
+import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 import java.net.CookieHandler;
 import java.net.CookieManager;
@@ -27,5 +31,23 @@ public class MainActivity extends BridgeActivity {
         // shop pages) must not carry or keep any, so native HTTP gets a handler that accepts none.
         // The WebView's own cookie store is separate and unaffected.
         CookieHandler.setDefault(new CookieManager(null, CookiePolicy.ACCEPT_NONE));
+        transparentSystemBars(getWindow());
+    }
+
+    /**
+     * Both system bars fully transparent, with the page drawn under them edge to edge. The page
+     * draws its own soft fade under the status bar (base.css, "The status area") and picks the icon
+     * colour (SystemBars, from src/app/native/shell.ts). Android's own contrast scrim is turned off,
+     * so no grey or white strip appears behind the gesture bar or the status bar.
+     */
+    @SuppressWarnings("deprecation")
+    static void transparentSystemBars(Window window) {
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.setStatusBarContrastEnforced(false);
+            window.setNavigationBarContrastEnforced(false);
+        }
     }
 }

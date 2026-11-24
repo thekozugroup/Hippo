@@ -134,6 +134,20 @@ The list has these seven entries in this order, less any in `env.skip`. `unknown
 | `setOwnerName(db, name?)` | The owner's first name or nickname (max 40, whitespace collapsed; `RangeError` when longer). Published lists carry it as `ownerName` in their meta from their next sync, so call `syncList` for published lists after a change. |
 | `setOnboarding(db, state?)`, `markSeen(db, flag, at)` | First-run setup progress (`{ status, step, answers, listId?, itemId?, updatedAt }`, validated on write and read) and one-time hints (`giverIntro`, `setupChecklist`, `linkPreviewHint`), returned by `getSettings` as `onboarding` and `seen`. |
 
+## Moving to another device (transfer link, PROTOCOL.md section 11)
+
+| Function | What it does |
+|---|---|
+| `createTransfer(core, { siteBase, onProgress? })` | Packs `exportData` (not recorded as a backup), compresses it where `CompressionStream` exists, encrypts and publishes it for 15 minutes; returns an `OutgoingTransfer` with `url` (`<site>#/t/<payload>`, holds the secret: memory only), `expiresAtMs`, `summary`. Throws `TransferError` `too-large` or `offline`. |
+| `watchTransfer(core, t, onState)` | Calls `onState('moved')` once another device received it (`'cancelled'` after a cancel). Returns an unsubscribe. |
+| `cancelTransfer(core, t)` | Marks it cancelled, empties the chunks and sends deletion requests. |
+| `fetchTransfer(core, linkOrPayload, { timeoutMs? })` | Fetches, checks and unpacks; validates the backup with `parseExportFile`. Writes nothing. `TransferError.reason`: `invalid-link`, `unsupported-version`, `expired`, `not-found`, `offline`, `cancelled`, `used`, `missing`, `tampered`, `too-large`, `invalid-backup`, `unsupported`. |
+| `receiveTransfer(core, incoming)` | `importData` in merge mode, marks setup done, then ends the transfer on the relays (`cleared`). |
+| `deviceHasData(core)` | Whether this device has wishes or lists (merge, never replace). |
+| `parseTransferLink`, `extractTransferPayload`, `looksLikeTransferLink` | The link (pure). |
+
+`exportData(db, now?, { record: false })` exports without setting "last backup".
+
 ## Other exports
 
 `resolveItemState`, `parseShareLink`, `extractSharePayload`, `isSafeHttpUrl` (check before rendering any URL as a link or image), `LIMITS`, `DEFAULT_RELAYS`, `MemoryTransport`/`MemoryNetwork`, `NostrTransport`, `createNostrTransportProvider`, `staticTransport`, `HippoDb`/`openDb`, and the model types.

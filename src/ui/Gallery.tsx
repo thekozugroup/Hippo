@@ -20,6 +20,7 @@ import { MoneyField } from './components/MoneyField.tsx'
 import { MoneyText } from './components/MoneyText.tsx'
 import { Screen } from './components/Screen.tsx'
 import { StepProgress } from './components/StepProgress.tsx'
+import { SlideButton } from './components/SlideButton.tsx'
 import { StepScreen } from './components/StepScreen.tsx'
 import { SectionHeader } from './components/SectionHeader.tsx'
 import { SegmentedControl } from './components/SegmentedControl.tsx'
@@ -206,6 +207,23 @@ function Showcase({ theme }: { theme: Theme }) {
           <HeroBackground variant="dark" />
           <div className="gx-on-field__inner">
             <ActivityPanel />
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="Slide button"
+        note="Tap anywhere on it, press Enter or Space, or slide the knob past 60 percent of the track. A short slide springs back. Busy and disabled states cannot be dragged; disabled says why."
+      >
+        <div className="gx-on-field gx-on-field--short" data-theme="dark">
+          <HeroBackground variant="night" />
+          <div className="gx-on-field__inner gx-stack">
+            <SlideButton label="Get started" onActivate={() => undefined} />
+            <SlideButton label="Continue" busy onActivate={() => undefined} />
+            <SlideButton label="Continue" disabled disabledReason="Choose an occasion first." onActivate={() => undefined} />
+            <div dir="rtl">
+              <SlideButton label="Continue" onActivate={() => undefined} />
+            </div>
           </div>
         </div>
       </Section>

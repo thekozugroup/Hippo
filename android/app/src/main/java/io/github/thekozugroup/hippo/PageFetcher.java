@@ -147,6 +147,12 @@ final class PageFetcher {
         }
     }
 
+    static boolean isJson(String contentType) {
+        if (contentType == null) return false;
+        String t = contentType.trim().toLowerCase(Locale.ROOT);
+        return t.startsWith("application/json") || t.startsWith("text/json");
+    }
+
     static boolean isHtml(String contentType) {
         if (contentType == null) return false;
         String t = contentType.trim().toLowerCase(Locale.ROOT);
@@ -174,6 +180,14 @@ final class PageFetcher {
     }
 
     static Page fetch(String address, int timeoutMs, int maxBytes, String userAgent, String language, Resolver resolver) throws Failure {
+        return fetch(address, timeoutMs, maxBytes, userAgent, language, resolver, false);
+    }
+
+    /**
+     * With {@code json} true, the one other use: a Hippo website's small hippo.json (the app's
+     * "Use my own Hippo site" check). The same rules apply; only JSON is read instead of HTML.
+     */
+    static Page fetch(String address, int timeoutMs, int maxBytes, String userAgent, String language, Resolver resolver, boolean json) throws Failure {
         long deadline = System.nanoTime() + timeoutMs * 1_000_000L;
         URL url;
         try {
@@ -191,7 +205,7 @@ final class PageFetcher {
                 c.setAllowUserInteraction(false);
                 c.setConnectTimeout(remaining(deadline));
                 c.setReadTimeout(remaining(deadline));
-                c.setRequestProperty("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1");
+                c.setRequestProperty("Accept", json ? "application/json" : "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1");
                 if (userAgent != null && !userAgent.isEmpty()) c.setRequestProperty("User-Agent", userAgent);
                 if (language != null && !language.isEmpty()) c.setRequestProperty("Accept-Language", language);
                 int status = c.getResponseCode();
@@ -206,7 +220,7 @@ final class PageFetcher {
                     continue;
                 }
                 String type = c.getContentType();
-                if (!isHtml(type)) return new Page(status, url.toString(), type == null ? "" : type, "", false);
+                if (json ? !isJson(type) : !isHtml(type)) return new Page(status, url.toString(), type == null ? "" : type, "", false);
                 InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
                 if (in == null) return new Page(status, url.toString(), type, "", false);
                 ByteArrayOutputStream out = new ByteArrayOutputStream(Math.min(maxBytes, 64 * 1024));
