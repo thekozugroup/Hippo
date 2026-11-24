@@ -66,7 +66,7 @@ describe('app shell', () => {
   it('cold start: the share that was waiting opens Add a wish, with tracking parameters removed', () => {
     expect(atStart.navigate).toEqual([['/item/new']])
     const draft = peekCaptureDraft()
-    expect(draft).toEqual({ title: 'Red wool scarf', url: 'https://shop.example/p/red-scarf?id=4' })
+    expect(draft).toEqual({ title: 'Red wool scarf', url: 'https://shop.example/p/red-scarf?id=4', notes: 'Look at this' })
   })
 
   it('a share while the app runs replaces the form (new epoch) and goes to Add a wish', async () => {

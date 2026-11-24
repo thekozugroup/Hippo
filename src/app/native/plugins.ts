@@ -9,6 +9,8 @@ import type { FetchedPage } from '../../core/index.ts'
 export interface SharedTextData {
   title?: string
   text?: string
+  /** The share's number in this process; it only grows, so an older answer can be told apart. */
+  seq?: number
 }
 
 export interface SharedTextPlugin {
