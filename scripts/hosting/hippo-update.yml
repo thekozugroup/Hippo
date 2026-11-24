@@ -1,0 +1,63 @@
+# Keeps this copy of Hippo up to date with the original project.
+#
+# Once a day, and when you run it from the Actions tab, it fetches the original's "stable" branch
+# (changes that passed all of the original's checks). When there is a newer version it adds one
+# commit with the new files to this repository, and your host publishes it. It never changes
+# anything under .github, and when your own edits clash with the original's it changes nothing and
+# the run fails with a list of the files.
+#
+# Trust: turning this on lets the Hippo project's stable branch change this repository's code. The
+# update script itself comes from that branch. To stop: delete this file, or open Actions, Update
+# Hippo, the "..." menu, Disable workflow. To stay on one version: set HIPPO_CHANNEL to a version
+# tag such as v0.1.5.
+name: Update Hippo
+
+on:
+  schedule:
+    - cron: '37 4 * * *' # every day at 04:37 UTC
+  push:
+    paths: ['.github/workflows/hippo-update.yml'] # once now, to show it works
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Branch or tag of the original to follow (empty means stable)
+        default: ''
+      replace:
+        description: Replace my copy with the original (discards my own changes outside .github)
+        type: boolean
+        default: false
+      dry_run:
+        description: Dry run (only report what would change)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hippo-update
+  cancel-in-progress: false
+
+env:
+  HIPPO_UPSTREAM_URL: https://github.com/thekozugroup/Hippo.git # where updates come from
+  HIPPO_CHANNEL: stable
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - name: Update Hippo
+        env:
+          HIPPO_CHANNEL: ${{ inputs.channel || env.HIPPO_CHANNEL }}
+          HIPPO_REPLACE: ${{ inputs.replace }}
+          HIPPO_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          case "$HIPPO_CHANNEL" in -* | *[!A-Za-z0-9._/-]*) echo "Not a branch or tag name."; exit 1 ;; esac
+          git fetch --no-tags -- "$HIPPO_UPSTREAM_URL" "$HIPPO_CHANNEL"
+          git show FETCH_HEAD:scripts/hosting/update-copy.sh > "$RUNNER_TEMP/update-copy.sh"
+          HIPPO_UPSTREAM="$(git rev-parse FETCH_HEAD)" bash "$RUNNER_TEMP/update-copy.sh"
