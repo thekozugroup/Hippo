@@ -50,6 +50,9 @@ adb install -r -g "$APK"
 for k in window_animation_scale transition_animation_scale animator_duration_scale; do adb shell settings put global "$k" 1 || true; done
 # Show the on-screen keyboard even though the emulator has a hardware keyboard.
 adb shell settings put secure show_ime_with_hard_keyboard 1 || true
+# A slow emulator sometimes shows "Pixel Launcher isn't responding" over the app; such dialogs are
+# about other apps, not Hippo, so they are hidden (and dismissed with Wait if one shows anyway).
+adb shell settings put global hide_error_dialogs 1 || true
 adb logcat -c || true
 rm -f "$OUT/checks.txt"
 
@@ -59,6 +62,32 @@ webview() { timeout 240 node scripts/android-webview-checks.mjs "$1" "$OUT"; }
 # 2 and 3: starts the app itself, so the logo is sampled from launch.
 if webview launch; then launch="passed"; else launch="FAILED"; status=1; fi
 
+# Taps Wait on another app's "isn't responding" dialog in a UI dump, if there is one.
+dismiss_not_responding() {
+  grep -q "isn't responding" "$1" 2>/dev/null || return 0
+  local c
+  c="$(python3 - "$1" <<'PY'
+import re, sys
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except Exception:
+    sys.exit(1)
+for n in root.iter('node'):
+    if (n.get('text') or '') == 'Wait':
+        m = re.match(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', n.get('bounds', ''))
+        if m:
+            x1, y1, x2, y2 = map(int, m.groups())
+            print((x1 + x2) // 2, (y1 + y2) // 2)
+            sys.exit(0)
+sys.exit(1)
+PY
+)" || return 0
+  echo "NOTE: another app's \"isn't responding\" dialog was dismissed with Wait."
+  # shellcheck disable=SC2086
+  adb shell input tap $c || true
+}
+
 # Looks for a pattern in a fresh UI dump, for up to $2 seconds; keeps the last dump as $3.
 wait_for_text() {
   local pattern="$1" seconds="$2" file="$3"
@@ -66,6 +95,7 @@ wait_for_text() {
   while [ "$SECONDS" -lt "$end" ]; do
     if adb shell uiautomator dump /sdcard/hippo-window.xml >/dev/null 2>&1 && adb pull /sdcard/hippo-window.xml "$file" >/dev/null 2>&1; then
       if grep -q -E "$pattern" "$file"; then return 0; fi
+      dismiss_not_responding "$file"
     fi
     sleep 3
   done
@@ -172,6 +202,7 @@ send_share() {
 share_case() {
   local var="$1" label="$2" subject="$3" text="$4" expected="$5" shot="${6:-}"
   local result="FAILED"
+  if dump "$OUT/before-share.xml"; then dismiss_not_responding "$OUT/before-share.xml"; fi
   if send_share "$subject" "$text"; then
     if webview_share share "$label" "$expected" "$shot"; then result="passed"; fi
   else
