@@ -161,6 +161,7 @@ export { NostrTransport, createNostrTransportProvider } from './transport/nostr.
 export { isFramed, blockIfFramed, FRAME_BLOCK_MESSAGE, FRAME_BLOCK_LINK_TEXT, type FrameWindowLike } from './services/frame-guard.ts'
 export {
   checkDeployment,
+  headersForbidFraming,
   browserDeploymentEnv,
   type DeploymentCheck,
   type DeploymentCheckId,

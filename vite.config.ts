@@ -41,7 +41,7 @@ const CSP_COMMON = [
   "frame-src 'none'",
 ]
 
-const CSP = [
+export const CSP = [
   ...CSP_COMMON,
   `connect-src 'self' wss: ${LINK_PREVIEW_ORIGIN} ws://127.0.0.1:* ws://localhost:*`,
   "manifest-src 'self'",
@@ -62,6 +62,13 @@ const NATIVE_CSP = [
   "manifest-src 'none'",
   "worker-src 'none'",
 ].join('; ')
+
+/**
+ * The policy as a real response header (vercel.json). The same directives as the meta tag plus
+ * frame-ancestors, which only a header can carry. vercel.json is static, so it repeats this string;
+ * src/app/lib/vercel-config.test.ts fails when the two differ.
+ */
+export const CSP_HEADER = `${CSP}; frame-ancestors 'none'`
 
 function contentSecurityPolicy(policy: string): Plugin {
   return {
@@ -95,21 +102,41 @@ export function siteUrlFromEnv(value: string | undefined): string | undefined {
   }
 }
 
+/**
+ * The website's public address for this build, in order of trust:
+ * 1. HIPPO_SITE_URL, when it is a valid https address (the GitHub Pages workflow and anyone who sets it).
+ * 2. On Vercel, the production address: VERCEL_PROJECT_PRODUCTION_URL (a host without https://, the
+ *    shortest custom domain of the project, else its vercel.app address), but only when this build is
+ *    the production one (VERCEL_ENV=production). Preview builds return undefined, so a preview never
+ *    names itself as the site. The value is read when the build runs: after adding a custom domain,
+ *    redeploy once so the new address is baked in.
+ * 3. Nothing: the Open Graph address tags and `site` in hippo.json are left out.
+ */
+export function resolveSiteUrl(env: Record<string, string | undefined>): string | undefined {
+  const explicit = siteUrlFromEnv(env.HIPPO_SITE_URL)
+  if (explicit) return explicit
+  if (env.VERCEL_ENV === 'production' && env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return siteUrlFromEnv(`https://${env.VERCEL_PROJECT_PRODUCTION_URL.trim()}`)
+  }
+  return undefined
+}
+
 /** The sync protocol this build speaks (docs/PROTOCOL.md); the app's site check (src/app/lib/site-check.ts) compares it. */
 export const HIPPO_PROTOCOL_VERSION = 1
 
 /** What a Hippo website says about itself at its root, so the Android app can check an address ("Use my own Hippo site"). */
-export function siteInfoJson(version: string): string {
-  return `${JSON.stringify({ app: 'Hippo', name: 'Hippo', version, protocol: HIPPO_PROTOCOL_VERSION, relays: [...DEFAULT_RELAYS] }, null, 2)}\n`
+export function siteInfoJson(version: string, site?: string): string {
+  const info = { app: 'Hippo', name: 'Hippo', version, protocol: HIPPO_PROTOCOL_VERSION, ...(site ? { site } : {}), relays: [...DEFAULT_RELAYS] }
+  return `${JSON.stringify(info, null, 2)}\n`
 }
 
-function siteInfoFile(): Plugin {
+function siteInfoFile(site: string | undefined): Plugin {
   return {
     name: 'hippo-site-info',
     apply: 'build',
     generateBundle() {
       const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
-      this.emitFile({ type: 'asset', fileName: 'hippo.json', source: siteInfoJson(pkg.version) })
+      this.emitFile({ type: 'asset', fileName: 'hippo.json', source: siteInfoJson(pkg.version, site) })
     },
   }
 }
@@ -152,7 +179,7 @@ function openGraphUrls(site: string | undefined): Plugin {
 export default defineConfig(({ mode }) => {
   // `vite build --mode native` (npm run android:web) builds the web assets that go inside the Android app.
   const native = mode === NATIVE_MODE
-  const site = siteUrlFromEnv(process.env.HIPPO_SITE_URL)
+  const site = resolveSiteUrl(process.env)
   if (native && !site) {
     throw new Error(
       'The Android app build needs the public website address, because share links made in the app must point at it. Set HIPPO_SITE_URL, for example HIPPO_SITE_URL=https://owner.github.io/Hippo/',
@@ -241,7 +268,7 @@ export default defineConfig(({ mode }) => {
       openGraphUrls(native ? undefined : site),
       ...(native && site ? [siteAddressFile(site)] : []),
       // The website says what it is at hippo.json (the app's "Use my own Hippo site" check).
-      ...(native ? [] : [siteInfoFile()]),
+      ...(native ? [] : [siteInfoFile(site)]),
     ],
     test: {
       environment: 'jsdom',

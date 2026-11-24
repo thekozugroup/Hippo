@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkDeployment, type DeploymentCheck, type DeploymentEnv, type ProbeSocket } from './deployment.ts'
+import { checkDeployment, headersForbidFraming, type DeploymentCheck, type DeploymentEnv, type ProbeSocket } from './deployment.ts'
 
 type Behaviour = 'open' | 'error' | 'close' | 'hang' | 'throw'
 
@@ -109,6 +109,26 @@ describe('checkDeployment', () => {
   describe('not-framed', () => {
     it('ok when not framed', async () => expect((await check(good(), 'not-framed')).status).toBe('ok'))
     it('problem when framed', async () => expect((await check(good({ framed: true }), 'not-framed')).status).toBe('problem'))
+    it('says when the host forbids framing, when it does not, and says nothing when it cannot tell', async () => {
+      const yes = await check(good({ probeFramingHeader: () => Promise.resolve(true) }), 'not-framed')
+      expect(yes.status).toBe('ok')
+      expect(yes.finding).toMatch(/never to show it in a frame/)
+      const no = await check(good({ probeFramingHeader: () => Promise.resolve(false) }), 'not-framed')
+      expect(no.status).toBe('ok')
+      expect(no.finding).toMatch(/does not send a header/)
+      for (const probe of [() => Promise.resolve(undefined), () => Promise.reject(new Error('offline'))]) {
+        const c = await check(good({ probeFramingHeader: probe }), 'not-framed')
+        expect(c).toEqual({ id: 'not-framed', status: 'ok', finding: 'Hippo is not inside another site.', fix: '' })
+      }
+    })
+    it('reads framing protection from response headers', () => {
+      const h = (o: Record<string, string>) => (n: string) => o[n] ?? null
+      expect(headersForbidFraming(h({ 'content-security-policy': "default-src 'self'; frame-ancestors 'none'" }))).toBe(true)
+      expect(headersForbidFraming(h({ 'content-security-policy': "frame-ancestors 'self'" }))).toBe(true)
+      expect(headersForbidFraming(h({ 'x-frame-options': 'DENY' }))).toBe(true)
+      expect(headersForbidFraming(h({ 'content-security-policy': "default-src 'self'" }))).toBe(false)
+      expect(headersForbidFraming(h({}))).toBe(false)
+    })
   })
 
   describe('service-worker', () => {
