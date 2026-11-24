@@ -408,7 +408,7 @@ function ListEditor({ list }: { list: SharedList }) {
 
   return (
     <div className="app-sheet list-editor">
-      <section className="app-stack" aria-labelledby="share-title">
+      <section className="app-stack list-editor__share" aria-labelledby="share-title">
         <h2 id="share-title" className="app-section-title">
           Sharing
         </h2>
@@ -491,7 +491,7 @@ function ListEditor({ list }: { list: SharedList }) {
         />
       </section>
 
-      <fieldset className="list-fieldset">
+      <fieldset className="list-fieldset list-editor__wishes">
         <legend className="app-section-title">{`Wishes on this list (${liveCount})`}</legend>
         {allItems === undefined ? <Skeleton height={48} shape="tile" /> : <ItemPicker items={active} selected={list.itemIds} onToggle={toggleItem} />}
         {archivedOnList.length > 0 ? (
@@ -586,13 +586,15 @@ export function ListEditorScreen({ id }: { id?: string }) {
   const list = useSharedList(id)
   if (id === undefined) {
     return (
-      <AppScreen title="New list" back="#/lists" backLabel="Back to lists">
+      <AppScreen area="lists" title="New list" back="#/lists" backLabel="Back to lists">
         <NewListForm />
       </AppScreen>
     )
   }
   return (
     <AppScreen
+      area="lists"
+      width="wide"
       title={list ? list.name : 'List'}
       compactTitle
       intro={list?.eventDate ? <p>{formatEventDate(list.eventDate)}</p> : null}

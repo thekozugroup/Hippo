@@ -15,6 +15,7 @@
    hippo-headline  the hero title: slides with the page
    hippo-page      the sheet's content: slides in the direction of travel
    hippo-nav       the bottom navigation: stays; its items grow and shrink live (BottomNav)
+   hippo-rail      the side navigation on wider windows: stays
    hippo-step*     the setup flow: content slides, dots and actions stay */
 
 /* Taps go straight to the new screen while it animates in. */
@@ -153,6 +154,41 @@
 ::view-transition-new(hippo-step-progress),
 ::view-transition-new(hippo-step-actions) {
   animation: none;
+}
+
+/* Side navigation (wider windows): stays put between screens; fades when a screen has none. */
+::view-transition-group(hippo-rail) {
+  animation: none;
+}
+::view-transition-old(hippo-rail) {
+  display: none;
+}
+::view-transition-new(hippo-rail) {
+  animation: none;
+}
+::view-transition-old(hippo-rail):only-child {
+  display: block;
+  animation: vt-fade-out var(--dur-exit) var(--ease) both;
+}
+::view-transition-new(hippo-rail):only-child {
+  animation: vt-fade-in var(--dur) var(--ease) both;
+}
+
+/* Medium and expanded windows (src/ui/layout.ts): going deeper or back is a quick cross-fade, as
+   between destinations, not a phone's sideways slide. */
+@media (min-width: 45em) and ((hover: hover) or (min-height: 32em)) {
+  :root[data-nav-dir]::view-transition-old(hippo-headline),
+  :root[data-nav-dir]::view-transition-old(hippo-page),
+  :root[data-nav-dir]::view-transition-old(hippo-step) {
+    animation: vt-fade-out var(--dur-press) var(--ease) both;
+  }
+  :root[data-nav-dir]::view-transition-new(hippo-page),
+  :root[data-nav-dir]::view-transition-new(hippo-step) {
+    animation: vt-fade-in var(--dur) var(--ease) calc(var(--dur-press) * 0.6) both;
+  }
+  :root[data-nav-dir]::view-transition-new(hippo-headline) {
+    animation: vt-fade-in var(--dur) var(--ease) var(--dur-press) both;
+  }
 }
 
 @keyframes vt-fade-out {

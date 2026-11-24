@@ -30,7 +30,16 @@ export interface InstallEnv {
   standalone: boolean
   /** The browser has offered its install prompt (`beforeinstallprompt`). */
   canPrompt: boolean
+  /** `navigator.userAgentData.mobile`, when the browser has it. */
+  mobile?: boolean
+  /** The primary pointer (`pointer` media feature). */
+  pointer?: 'coarse' | 'fine' | 'none'
+  /** The window's width in CSS pixels. */
+  viewportWidth?: number
 }
+
+/** Where installing makes sense: a phone or tablet. */
+export type DeviceKind = 'handheld' | 'computer'
 
 export type InstallKind =
   | 'installed'
@@ -81,6 +90,11 @@ export interface InstallGuide {
   place: 'Home Screen' | 'home screen' | 'Dock' | 'apps'
   /** The browser to name when this one cannot install: "Safari", "Chrome" or "your browser". */
   realBrowser: string
+  /**
+   * A phone or tablet (`deviceKindOf`). Only there do setup and the Home checklist ask people to
+   * install; on a computer installing stays a quiet entry in Settings.
+   */
+  handheld: boolean
 }
 
 /** Where the install step sits in setup. */
@@ -122,6 +136,7 @@ function base(kind: InstallKind, platform: Platform, steps: readonly GuideStep[]
     kind,
     platform,
     steps,
+    handheld: false,
     canInstall: true,
     ownStorage: false,
     shareSheet: false,
@@ -275,8 +290,29 @@ function desktopGuide(env: InstallEnv): InstallGuide {
   ])
 }
 
+/**
+ * A phone or tablet, or a computer, from the described environment. Errs toward "computer" (which
+ * never prompts): only an iPhone or iPad (iPadOS reads as a Mac with a touch screen), an Android
+ * device, or a browser whose client hints say "mobile" counts as handheld. An Android device driven
+ * by a mouse in a wide window (Samsung DeX, a Chromebook, a desktop mode) counts as a computer. A
+ * touch laptop or a Windows tablet is a computer.
+ */
+export function deviceKindOf(env: InstallEnv): DeviceKind {
+  if (iosPlatform(env)) return 'handheld'
+  if (/Android/.test(env.userAgent)) {
+    const desktopLike = env.pointer === 'fine' && (env.viewportWidth ?? 0) >= 1080 && env.mobile !== true
+    return desktopLike ? 'computer' : 'handheld'
+  }
+  return env.mobile === true ? 'handheld' : 'computer'
+}
+
 /** The instructions for this environment. */
 export function installGuideFor(env: InstallEnv): InstallGuide {
+  const guide = guideFor(env)
+  return deviceKindOf(env) === 'handheld' ? { ...guide, handheld: true } : guide
+}
+
+function guideFor(env: InstallEnv): InstallGuide {
   const ua = env.userAgent
   const ios = iosPlatform(env)
   const android = /Android/.test(ua)
@@ -309,10 +345,11 @@ export function installGuideFor(env: InstallEnv): InstallGuide {
 /**
  * Where setup puts the install step: first where the installed app keeps its own storage (so
  * nothing answered in the browser is left behind), near the end where it shares the browser's
- * storage, and nowhere once Hippo runs installed.
+ * storage, and nowhere once Hippo runs installed or on a computer.
  */
-export function installPlacement(g: Pick<InstallGuide, 'kind' | 'ownStorage'>): InstallPlacement {
-  if (g.kind === 'installed') return 'none'
+export function installPlacement(g: Pick<InstallGuide, 'kind' | 'ownStorage' | 'handheld'>): InstallPlacement {
+  // On a computer setup never asks to install (Settings still shows how).
+  if (g.kind === 'installed' || !g.handheld) return 'none'
   return g.ownStorage ? 'first' : 'late'
 }
 
@@ -375,11 +412,17 @@ export function readInstallEnv(canPrompt: boolean): InstallEnv {
     (typeof window !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
       (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: window-controls-overlay)').matches))
+  const media = (q: string) => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(q).matches
+  const pointer = media('(pointer: coarse)') ? 'coarse' : media('(pointer: fine)') ? 'fine' : media('(pointer: none)') ? 'none' : undefined
+  const mobile = (data as { mobile?: unknown } | undefined)?.mobile
   return {
     userAgent: nav?.userAgent ?? '',
     ...(brands && brands.length > 0 ? { brands } : {}),
     maxTouchPoints: nav?.maxTouchPoints ?? 0,
     standalone,
     canPrompt,
+    ...(typeof mobile === 'boolean' ? { mobile } : {}),
+    ...(pointer ? { pointer } : {}),
+    ...(typeof window !== 'undefined' && Number.isFinite(window.innerWidth) ? { viewportWidth: window.innerWidth } : {}),
   }
 }

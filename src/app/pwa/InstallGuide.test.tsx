@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { createCore, MemoryTransport } from '../../core/index.ts'
 import { App } from '../App.tsx'
 import { NotifyProvider } from '../core/NotifyProvider.tsx'
-import { installGuideFor, type InstallEnv } from './guide.ts'
+import { installGuideFor, installPlacement, readInstallEnv, type InstallEnv } from './guide.ts'
+import { welcomeStepsFor } from '../core/onboarding.ts'
+import { setWelcomeOrder, welcomeOrder } from '../layout/routeMotion.ts'
 import { InstallGuide } from './InstallGuide.tsx'
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1'
@@ -27,9 +29,12 @@ function firePrompt(outcome: 'accepted' | 'dismissed') {
 }
 
 const realUa = navigator.userAgent
+const realOrder = welcomeOrder()
+/** Pretends to be another device. Setup's step order is fixed when the app starts, so it is worked out again here as App.tsx does. */
 function setUserAgent(ua: string, touch = 0) {
   Object.defineProperty(window.navigator, 'userAgent', { value: ua, configurable: true })
   Object.defineProperty(window.navigator, 'maxTouchPoints', { value: touch, configurable: true })
+  setWelcomeOrder(ua === realUa ? realOrder : welcomeStepsFor(installPlacement(installGuideFor(readInstallEnv(false)))))
 }
 
 // An accepted prompt marks Hippo installed for the rest of the page's life (as in a real tab), so

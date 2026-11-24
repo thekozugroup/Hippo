@@ -17,6 +17,12 @@ html {
 html:has(.screen--has-nav) {
   scroll-padding-block-end: calc(var(--h-lg) + var(--sp-9) + var(--inset-bottom));
 }
+/* Wider windows have no floating navigation (src/ui/layout.ts). */
+@media (min-width: 45em) and ((hover: hover) or (min-height: 32em)) {
+  html:has(.screen--has-nav) {
+    scroll-padding-block-end: 0;
+  }
+}
 
 /* Modal bottom sheet open: the page behind does not scroll. */
 body:has(dialog.bottom-sheet[open]) {
@@ -98,6 +104,33 @@ svg {
 /* A heading that only receives focus from script (after a screen change, so a screen reader
    starts there) is not a control. It takes focus without drawing the ring. */
 :is(h1, h2, h3)[tabindex='-1']:focus-visible {
+  outline: none;
+}
+
+/* Skip link (src/app/App.tsx): off screen until focused, then a pill at the top start. */
+.skip-link {
+  position: fixed;
+  inset-block-start: calc(var(--sp-2) + var(--inset-top));
+  inset-inline-start: var(--sp-2);
+  z-index: 70;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--h-min);
+  padding-inline: var(--sp-5);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+  --focus-ring: var(--accent);
+  transform: translateY(calc(-100% - var(--sp-4) - var(--inset-top)));
+}
+.skip-link:focus {
+  transform: none;
+  box-shadow: var(--shadow-nav);
+}
+
+/* The content area takes focus from the skip link without drawing a ring around the whole page. */
+main:focus {
   outline: none;
 }
 

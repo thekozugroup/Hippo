@@ -11,8 +11,10 @@ export interface ScreenProps extends Omit<ComponentPropsWithRef<'div'>, 'childre
   headline?: ReactNode
   /** Sheet content. */
   children?: ReactNode
-  /** Floating navigation, pinned to the bottom of the column. */
+  /** Floating navigation, pinned to the bottom of the column (compact windows only). */
   nav?: ReactNode
+  /** Side navigation at the inline start (`SideNav`), shown on medium and expanded windows only. */
+  rail?: ReactNode
   /** Hero field variant. */
   variant?: 'blue' | 'dark'
   /** Render the sheet as `main` (default) or a plain `div`. */
@@ -21,12 +23,17 @@ export interface ScreenProps extends Omit<ComponentPropsWithRef<'div'>, 'childre
   contained?: boolean
 }
 
-/** Page layout: hero area on top, sheet rising over it, optional floating nav. */
+/**
+ * Page layout: hero area on top, sheet rising over it, optional floating nav. On medium and expanded
+ * windows (src/ui/layout.ts) the hero becomes a band across the top of the content area holding the
+ * title and its actions, the sheet fills the content area under it, and `rail` replaces `nav`.
+ */
 export function Screen({
   hero,
   headline,
   children,
   nav,
+  rail,
   variant = 'blue',
   sheetAs = 'main',
   contained = false,
@@ -34,12 +41,18 @@ export function Screen({
   ...rest
 }: ScreenProps) {
   return (
-    <div {...rest} className={cx('screen', contained && 'screen--contained', variant === 'dark' && 'screen--dark', nav ? 'screen--has-nav' : false, className)}>
+    <div
+      {...rest}
+      className={cx('screen', contained && 'screen--contained', variant === 'dark' && 'screen--dark', nav ? 'screen--has-nav' : false, rail ? 'screen--has-rail' : false, className)}
+    >
+      {rail ? <div className="screen__rail">{rail}</div> : null}
       <div className="screen__top">
         <HeroBackground variant={variant} />
         <div className="screen__col screen__hero">
-          {hero}
-          {headline ? <div className="screen__headline">{headline}</div> : null}
+          <div className="screen__hero-inner">
+            {hero}
+            {headline ? <div className="screen__headline">{headline}</div> : null}
+          </div>
         </div>
       </div>
       <div className="screen__body">

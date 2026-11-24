@@ -30,6 +30,4 @@
   color: var(--text-2);
   border-radius: var(--r-pill);
 }
-.section-header__action:hover {
-  color: var(--text);
-}
+

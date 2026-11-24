@@ -116,6 +116,10 @@
   gap: var(--sp-3);
 }
 
+.step-screen__continue--button {
+  flex: 1 1 12rem;
+}
+
 .step-screen__back.icon-btn--lg {
   width: var(--h-lg);
   height: var(--h-lg);
@@ -139,11 +143,6 @@
   font-weight: 500;
   transition: transform var(--dur) var(--ease);
 }
-.step-screen__link:hover {
-  color: var(--white);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
 .step-screen__link:active {
   transform: scale(0.97);
   transition-duration: var(--dur-press);
@@ -164,4 +163,34 @@
    browser's swipe back. */
 html:has(.step-screen:not(.step-screen--contained)) {
   overscroll-behavior-x: none;
+}
+
+/* ---- Medium and expanded windows (src/ui/layout.ts) ----
+   A centred composition on the night field instead of a phone column: the logo (and Close) at the
+   top of the window, the question, progress and controls in one column at a reading measure in
+   the middle. Nothing depends on the window being tall: a short window scrolls. */
+@media (min-width: 45em) and ((hover: hover) or (min-height: 32em)) {
+  .step-screen:not(.step-screen--contained) .step-screen__col {
+    max-width: none;
+    padding: calc(var(--sp-6) + var(--inset-top)) var(--page-pad) calc(var(--sp-8) + var(--inset-bottom));
+  }
+  .step-screen:not(.step-screen--contained) .step-screen__main {
+    justify-content: center;
+    padding-block: var(--sp-8);
+  }
+  .step-screen:not(.step-screen--contained) .step-screen__form {
+    width: 100%;
+    max-width: var(--measure);
+    margin-inline: auto;
+  }
+  .step-screen:not(.step-screen--contained) .step-screen__secondary {
+    justify-content: flex-start;
+    margin-inline-start: calc(-1 * var(--sp-4));
+  }
+}
+@media (min-width: 67.5em) and ((hover: hover) or (min-height: 32em)) {
+  .step-screen:not(.step-screen--contained) .step-screen__title {
+    font-size: var(--fs-display-sm);
+    line-height: var(--lh-display-sm);
+  }
 }

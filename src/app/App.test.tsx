@@ -15,10 +15,13 @@ describe('App shell', () => {
   it('takes a new owner through setup and lands on Home with their wish and list', async () => {
     const user = userEvent.setup()
     render(<App core={testCore()} />)
-    expect(await screen.findByRole('heading', { level: 1, name: /Make a wishlist/ })).toHaveAccessibleDescription('Step 1 of 6')
+    expect(await screen.findByRole('heading', { level: 1, name: /Make a wishlist/ })).toHaveAccessibleDescription('Step 1 of 5')
+    // The slide control is on the first step only.
+    expect(document.querySelector('.slide-btn')).not.toBeNull()
     await user.click(screen.getByRole('button', { name: 'Get started' }))
 
-    expect(await screen.findByRole('heading', { level: 1, name: /What should we\s*call you\?/ })).toHaveAccessibleDescription('Step 2 of 6')
+    expect(await screen.findByRole('heading', { level: 1, name: /What should we\s*call you\?/ })).toHaveAccessibleDescription('Step 2 of 5')
+    expect(document.querySelector('.slide-btn')).toBeNull()
     await user.type(screen.getByRole('textbox', { name: 'Your name' }), 'Ann')
     expect(screen.getByText(/Ann\u2019s list/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Continue' }))
@@ -33,11 +36,8 @@ describe('App shell', () => {
     await user.type(screen.getByRole('textbox', { name: 'Your wish, or a link to it' }), 'Teapot')
     await user.click(screen.getByRole('button', { name: 'Save wish' }))
 
-    // A computer whose browser cannot be told apart: the generic install steps, skippable.
-    expect(await screen.findByRole('heading', { level: 1, name: /Install Hippo\s*as an app/ })).toHaveAccessibleDescription('Step 5 of 6')
-    await user.click(screen.getByRole('button', { name: 'Skip' }))
-
-    expect(await screen.findByRole('heading', { level: 1, name: /Add wishes\s*from anywhere/ })).toBeInTheDocument()
+    // A computer (the test browser's user agent): setup never asks to install there.
+    expect(await screen.findByRole('heading', { level: 1, name: /Add wishes\s*from anywhere/ })).toHaveAccessibleDescription('Step 5 of 5')
     expect(await screen.findByText('\u201cTeapot\u201d is on your list Birthday.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Finish' }))
 

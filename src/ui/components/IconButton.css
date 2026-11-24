@@ -52,9 +52,6 @@
   background: transparent;
   color: var(--text);
 }
-.icon-btn--ghost:hover:not(:disabled) {
-  background: var(--overlay-hover);
-}
 
 @media (forced-colors: active) {
   .icon-btn {

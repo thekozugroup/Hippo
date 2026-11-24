@@ -16,6 +16,9 @@ import { AppScreen } from '../../layout/AppScreen.tsx'
 import { cameIn } from '../../lib/format.ts'
 import { clearTransferPayload, heldTransferPayload, transferPayloadInText } from '../../lib/transfer-inbox.ts'
 import { transferErrorText } from './move-text.ts'
+import { offersOpenInApp } from '../../pwa/open-in-app.ts'
+import { OpenInAppLink } from '../../pwa/OpenInAppLink.tsx'
+import { installGuideFor, readInstallEnv } from '../../pwa/guide.ts'
 import './move.css'
 
 type State = { kind: 'enter' } | { kind: 'fetching' } | { kind: 'ready'; t: IncomingTransfer; hasData: boolean } | { kind: 'saving'; t: IncomingTransfer; hasData: boolean }
@@ -29,6 +32,10 @@ export default function ReceiveScreen() {
   const [text, setText] = useState('')
   const [error, setError] = useState<string | undefined>()
   const started = useRef(false)
+  // A transfer link opened in an Android browser can be handed to the Hippo app instead. The payload
+  // is a secret: it stays in memory and in that one link, never in the address or a log.
+  const [forApp, setForApp] = useState<string | undefined>()
+  const [androidBrowser] = useState(() => offersOpenInApp(installGuideFor(readInstallEnv(false))))
   const inSetup = settings?.onboarding?.status === 'active'
 
   const open = async (payload: string) => {
@@ -50,7 +57,10 @@ export default function ReceiveScreen() {
     if (started.current) return
     started.current = true
     const held = heldTransferPayload()
-    if (held) void open(held)
+    if (held) {
+      if (androidBrowser) setForApp(held)
+      void open(held)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -79,7 +89,7 @@ export default function ReceiveScreen() {
 
   const back = inSetup ? '#/existing' : '#/settings'
   return (
-    <AppScreen title="Receive from another device" back={back} backLabel="Back" busy={state.kind === 'fetching'}>
+    <AppScreen area="settings" title="Receive from another device" back={back} backLabel="Back" busy={state.kind === 'fetching'}>
       {/* Announced; on screen the summary below says it once. */}
       <p className="move-status sr-only" role="status" aria-live="polite">
         {state.kind === 'fetching' ? 'Getting your wishes from the other device…' : state.kind === 'ready' ? `${cameIn(state.t.summary.items, state.t.summary.lists)} are ready to come in.` : ''}
@@ -107,6 +117,7 @@ export default function ReceiveScreen() {
               Cancel
             </Button>
           </div>
+          {forApp ? <OpenInAppLink route={{ kind: 'transfer', payload: forApp }} /> : null}
         </section>
       ) : (
         <form

@@ -766,7 +766,7 @@ function ItemEditor({ id }: { id?: string }) {
   const isNew = id === undefined
   const title = isNew ? 'Add a wish' : item ? 'Edit wish' : 'Wish'
   return (
-    <AppScreen title={title} back={isNew ? '#/' : '#/wishlist'} backLabel={isNew ? 'Back to home' : 'Back to wishlist'} busy={!isNew && item === undefined}>
+    <AppScreen area="wishlist" title={title} back={isNew ? '#/' : '#/wishlist'} backLabel={isNew ? 'Back to home' : 'Back to wishlist'} busy={!isNew && item === undefined}>
       {isNew ? (
         <ItemForm item={null} draft={draft} />
       ) : item === undefined ? (

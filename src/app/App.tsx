@@ -15,7 +15,7 @@ import { checkStorage } from './core/storage.ts'
 import { applyTheme } from './core/theme.ts'
 import { ErrorBoundary } from './layout/ErrorBoundary.tsx'
 import { lazyScreen } from './layout/lazyScreen.tsx'
-import { setRoutePreloader, useMotionLocation, useRouteEpoch } from './layout/motionLocation.ts'
+import { setRoutePreloader, takeRestoredScroll, useMotionLocation, useRouteEpoch } from './layout/motionLocation.ts'
 import { titleFor } from './layout/titles.ts'
 import { HomeScreen } from './screens/HomeScreen.tsx'
 import { ListsScreen } from './screens/lists/ListsScreen.tsx'
@@ -65,39 +65,106 @@ function preloadFor(path: string): Promise<unknown> | undefined {
 }
 setRoutePreloader(preloadFor)
 
-/** True when focus is now on something other than the page and other than `before`. */
-function movedOn(before: Element | null): boolean {
-  const now = document.activeElement
-  return now !== null && now !== document.body && now !== document.documentElement && now !== before && now.isConnected
+/**
+ * Whether the person already acted on the screen that just arrived: pressed a key, touched or
+ * clicked, or moved focus. Recorded from the moment the new screen is committed (a layout effect,
+ * before anything can be typed into it), so the heading never takes focus from a field someone
+ * has started typing into, however soon after arriving they began.
+ */
+function watchArrival(): { acted: () => boolean; stop: () => void } {
+  let acted = false
+  const mark = () => {
+    acted = true
+  }
+  const events = ['keydown', 'pointerdown', 'focusin'] as const
+  for (const ev of events) document.addEventListener(ev, mark, true)
+  return {
+    acted: () => acted,
+    stop: () => {
+      for (const ev of events) document.removeEventListener(ev, mark, true)
+    },
+  }
 }
 
-/** Moves focus to the new screen's heading and scrolls to the top after navigation. */
+/**
+ * Back or Forward to a screen that was scrolled: scroll there once its content is tall enough (lists
+ * load a moment after the screen). Gives up after a second, or as soon as the person scrolls,
+ * presses a key or touches the page.
+ */
+function restoreScroll(y: number): void {
+  const until = performance.now() + 1000
+  let stop = false
+  const cancel = () => {
+    stop = true
+  }
+  const opts = { once: true, passive: true, capture: true } as const
+  for (const ev of ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const) window.addEventListener(ev, cancel, opts)
+  const tick = () => {
+    if (stop) return
+    window.scrollTo(0, y)
+    if (Math.abs(window.scrollY - y) < 2 || performance.now() > until) {
+      for (const ev of ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const) window.removeEventListener(ev, cancel, opts)
+      return
+    }
+    window.requestAnimationFrame(tick)
+  }
+  tick()
+}
+
+/**
+ * Moves focus to the new screen's heading after navigation, and scrolls to the top (or, after Back
+ * and Forward, to where that screen was).
+ */
 function RouteFocus() {
   const [location] = useLocation()
   const first = useRef(true)
-  // Scroll before paint (inside a route transition's update), focus after it.
+  // Scroll before paint (inside a route transition's update), and start watching for input at
+  // once; focus the heading on the next frame unless the person got there first.
   useLayoutEffect(() => {
-    if (first.current) return
-    window.scrollTo(0, 0)
-    // Leaving Home or setup: whatever shows now has its own background.
-    if (!location.startsWith('/welcome/') && location !== '/') endBoot()
-  }, [location])
-  useEffect(() => {
     if (first.current) {
       first.current = false
       return
     }
-    // What has focus once the new screen is in place: the page itself (the control that was pressed
-    // went with the old screen), or a control that stays, such as the navigation.
-    const before = document.activeElement
+    const y = takeRestoredScroll()
+    window.scrollTo(0, 0)
+    if (y !== undefined && y > 0) restoreScroll(y)
+    // Leaving Home or setup: whatever shows now has its own background.
+    if (!location.startsWith('/welcome/') && location !== '/') endBoot()
+    const arrival = watchArrival()
     const id = window.requestAnimationFrame(() => {
-      // Someone who already moved on to a control on the new screen (Tab, or a quick press) keeps it.
-      if (movedOn(before)) return
+      arrival.stop()
+      // Someone who already moved on to a control on the new screen (Tab, a tap, typing) keeps it.
+      if (arrival.acted()) return
       document.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true })
     })
-    return () => window.cancelAnimationFrame(id)
+    return () => {
+      window.cancelAnimationFrame(id)
+      arrival.stop()
+    }
   }, [location])
   return null
+}
+
+/**
+ * The first stop for keyboard users: skips the navigation and the top bar to the screen's content
+ * (its `main`). Hidden until focused.
+ */
+function SkipLink() {
+  return (
+    <a
+      className="skip-link"
+      href="#main"
+      onClick={(e) => {
+        e.preventDefault()
+        const main = document.querySelector<HTMLElement>('main')
+        if (!main) return
+        if (!main.hasAttribute('tabindex')) main.setAttribute('tabindex', '-1')
+        main.focus()
+      }}
+    >
+      Skip to content
+    </a>
+  )
 }
 
 /** Marks the app as booted shortly after the first screen, so small enter effects never delay first paint. */
@@ -260,6 +327,7 @@ export function App({ core }: { core?: Core }) {
                 <RouteFocus />
                 <BootFlag />
                 <DocumentTitle />
+                <SkipLink />
                 <Routes />
                 {import.meta.env.PROD && !__HIPPO_NATIVE__ && 'serviceWorker' in navigator ? (
                   <Suspense fallback={null}>

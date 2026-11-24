@@ -22,7 +22,8 @@ export function SetupChecklist({
   tasks: ChecklistTask[]
   wishes: number
   lists: readonly SharedList[]
-  install?: { guide: InstallGuide; installed: boolean }
+  /** `openHref`: the Hippo Android app is installed here; the task opens it instead of the install steps. */
+  install?: { guide: InstallGuide; installed: boolean; openHref?: string }
 }) {
   const core = useCore()
   // null until first opened, so the sheet's code loads on first use and then stays mounted (focus returns to the row on close).
@@ -30,10 +31,12 @@ export function SetupChecklist({
   const done = tasks.filter((t) => t.done).length
   const draft = lists.find((l) => l.status !== 'published')
   const text: Record<ChecklistTask['id'], { title: string; secondary?: string; href?: string }> = {
-    install: {
-      title: install ? installTaskName(install.guide) : 'Install Hippo',
-      secondary: install?.guide.kind === 'in-app' ? `Open Hippo in ${install.guide.realBrowser} first` : 'Opens like an app',
-    },
+    install: install?.openHref
+      ? { title: 'Open Hippo in the app', secondary: 'It is installed on this phone', href: install.openHref }
+      : {
+          title: install ? installTaskName(install.guide) : 'Install Hippo',
+          secondary: install?.guide.kind === 'in-app' ? `Open Hippo in ${install.guide.realBrowser} first` : 'Opens like an app',
+        },
     wishes: { title: 'Add three wishes', secondary: `${Math.min(wishes, CHECKLIST_WISHES)} of ${CHECKLIST_WISHES}`, href: '#/item/new' },
     share: { title: 'Share your list', secondary: 'Friends get a private link', href: draft ? `#/list/${draft.id}` : '#/list/new' },
     backup: { title: 'Save a backup', secondary: 'A file that brings your wishes back on any device', href: '#/settings' },

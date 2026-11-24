@@ -45,6 +45,16 @@ let pending: { idx: number; path: string } | null = null
 let preload: (path: string) => Promise<unknown> | undefined = () => undefined
 /** The transition on screen, if any. */
 let running: ViewTransition | null = null
+/** Where each history entry was scrolled to when it was left, so Back and Forward return there. */
+const scrollByIdx = new Map<number, number>()
+/** A scroll position waiting to be restored for the entry just shown (Back or Forward only). */
+let restoreScroll: number | undefined
+
+function rememberScroll(): void {
+  scrollByIdx.set(index, window.scrollY)
+  // Only the last few hundred entries matter.
+  if (scrollByIdx.size > 200) scrollByIdx.delete(scrollByIdx.keys().next().value ?? 0)
+}
 
 const INTERACTIVE = 'a[href], button, input, select, textarea, label, summary, [role="button"], [role="link"]'
 
@@ -190,17 +200,30 @@ function onHistoryChange(): void {
     handle(from, seen, 'push', 'forward')
     return
   }
-  if (to === seen) return
+  if (to === seen) {
+    // The same address opened again in this tab (typed into the address bar, or a link to the
+    // screen on display from outside Hippo): the browser adds an entry with no state and sends only
+    // popstate. Number it, so Back and Forward through it keep their direction and scroll position.
+    if (idx === undefined) {
+      rememberScroll()
+      index += 1
+      window.history.replaceState(withIdx(state, index), '')
+    }
+    return
+  }
   const from = seen
   seen = to
+  rememberScroll()
   let kind: NavKind
   if (idx === undefined) {
     index += 1
     window.history.replaceState(withIdx(state, index), '')
     kind = 'push'
+    restoreScroll = undefined
   } else {
     kind = idx < index ? 'pop-back' : idx > index ? 'pop-forward' : 'replace'
     index = idx
+    restoreScroll = kind === 'replace' ? undefined : scrollByIdx.get(idx)
   }
   handle(from, to, kind)
 }
@@ -212,6 +235,9 @@ function ensureStarted(): void {
   if (idx === undefined) window.history.replaceState(withIdx(window.history.state, 0), '')
   index = idx ?? 0
   seen = hashPath()
+  // Back and Forward return to where the page was scrolled (RouteFocus applies it once the screen
+  // has rendered), so the browser must not jump on its own first.
+  if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual'
   committed = seen
   window.addEventListener('hashchange', onHistoryChange)
   window.addEventListener('popstate', onHistoryChange)
@@ -229,6 +255,8 @@ export function navigate(to: string, opts: { replace?: boolean } = {}): void {
   ensureStarted()
   const href = urlFor(to)
   const from = seen
+  restoreScroll = undefined
+  if (!opts.replace) rememberScroll()
   if (opts.replace) {
     window.history.replaceState(withIdx(window.history.state, index), '', href)
   } else {
@@ -265,6 +293,16 @@ export function returnTo(idx: number, path: string): void {
       navigate(path, { replace: true })
     }
   }, 1000)
+}
+
+/**
+ * The scroll position to return to on the screen just shown, when it was reached with Back or
+ * Forward and had been scrolled; undefined after a push or a redirect. Reading it uses it up.
+ */
+export function takeRestoredScroll(): number | undefined {
+  const y = restoreScroll
+  restoreScroll = undefined
+  return y
 }
 
 /** Lets the app load a lazy screen's code before a transition shows it. */

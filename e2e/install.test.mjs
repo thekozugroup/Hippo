@@ -22,6 +22,7 @@ export const DEVICES = {
     hasTouch: true,
   },
   desktop: { viewport: { width: 390, height: 844 } },
+  computer: { viewport: { width: 1440, height: 900 } },
 }
 
 const h1 = (page, name) => page.getByRole('heading', { level: 1, name })
@@ -231,30 +232,59 @@ test('install: running installed (display-mode standalone) skips the step and le
   }
 })
 
-test('install: after skipping setup, the checklist offers installing and opens the same steps', async ({ browser, relay, baseUrl, state }) => {
-  const u = await deviceUser(browser, relay, 'i-checklist', 'desktop', state)
+test('install: on a phone, after skipping setup, the checklist offers installing and opens the same steps, with Open in the Hippo app', async ({ browser, relay, baseUrl, state }) => {
+  const u = await deviceUser(browser, relay, 'i-checklist', 'android', state)
   const { page } = u
   try {
     await page.goto(baseUrl)
     await page.getByRole('button', { name: 'Skip setup' }).click()
     await page.getByRole('heading', { name: 'Get set up · 0 of 4' }).waitFor()
-    const row = page.getByRole('button', { name: /Install Hippo/ })
+    const row = page.getByRole('button', { name: /Put Hippo on your home screen/ })
     await row.click()
-    const sheet = page.getByRole('dialog', { name: 'Install Hippo' })
+    const sheet = page.getByRole('dialog', { name: 'Put Hippo on your home screen' })
     await sheet.waitFor()
-    await sheet.getByText('Installed, Hippo opens in its own window like an app.').waitFor()
-    await sheet.getByRole('list').getByText('Cast, save, and share').waitFor()
+    await sheet.getByRole('list').getByText('Add to home screen').waitFor()
+    // The quiet alternative on Android: an intent link to the app, falling back to this page.
+    const open = sheet.getByRole('link', { name: 'Open in the Hippo app' })
+    const href = await open.getAttribute('href')
+    assert.equal(href, `intent://open/#Intent;scheme=hippo;package=io.github.thekozugroup.hippo;S.browser_fallback_url=${encodeURIComponent(page.url())};end`)
     const violations = await axe(page, 'checklist sheet')
     await page.keyboard.press('Escape')
     await sheet.waitFor({ state: 'hidden' })
-    await page.waitForFunction(() => document.activeElement?.textContent?.includes('Install Hippo'))
+    await page.waitForFunction(() => document.activeElement?.textContent?.includes('Put Hippo on your home screen'))
     // Settings has the same guidance.
     await page.goto(baseUrl + '#/settings')
     const section = page.getByRole('region', { name: 'Install Hippo' })
-    await section.getByRole('list').getByText('Cast, save, and share').waitFor()
+    await section.getByRole('list').getByText('Add to home screen').waitFor()
     await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running')) // contrast is measured at rest
     violations.push(...(await axe(page, 'settings')))
     assert.deepEqual(violations, [])
+    assertNoProblems(u.problems)
+  } finally {
+    await u.context.close()
+  }
+})
+
+test('install: on a computer there is no install step, no checklist item and no Open in the app; Settings keeps a quiet Install Hippo', async ({ browser, relay, baseUrl, state }) => {
+  const u = await deviceUser(browser, relay, 'i-desktop', 'computer', state)
+  const { page } = u
+  try {
+    await page.goto(baseUrl)
+    await h1(page, /Make a wishlist/).waitFor()
+    // Even when the browser offers its prompt, setup does not ask.
+    await offerInstallPrompt(page)
+    assert.equal(await page.getByText('Step 1 of 5').count(), 1)
+    await page.getByRole('button', { name: 'Skip setup' }).click()
+    await page.getByRole('heading', { name: 'Get set up · 0 of 3' }).waitFor()
+    assert.equal(await page.getByText(/Install Hippo|home screen/i).count(), 0)
+    assert.equal(await page.getByRole('link', { name: 'Open in the Hippo app' }).count(), 0)
+    await page.goto(baseUrl + '#/welcome/install')
+    await page.waitForURL(/#\/$|welcome\/(?!install)/)
+    await page.goto(baseUrl + '#/settings')
+    // The browser offered its prompt on this page, so Settings offers its button (quietly, on request).
+    const section = page.getByRole('region', { name: 'Install Hippo' })
+    await section.getByRole('button', { name: 'Install Hippo' }).waitFor()
+    assert.equal(await page.getByRole('link', { name: 'Open in the Hippo app' }).count(), 0)
     assertNoProblems(u.problems)
   } finally {
     await u.context.close()
@@ -273,6 +303,16 @@ test('install: a giver opening a share link sees nothing about installing, even 
     await page.waitForTimeout(300)
     assert.equal(await page.getByText(/home screen|Install Hippo/i).count(), 0)
     assert.equal(await page.getByRole('button', { name: 'Install Hippo' }).count(), 0)
+    // Only a quiet "Open in the Hippo app" in the footer: the list's own route, and this page (no secret) as the fallback.
+    const payload = state.o.link.split('#/l/')[1]
+    const open = page.getByRole('link', { name: 'Open in the Hippo app' })
+    assert.equal(await open.count(), 1)
+    assert.equal(
+      await open.getAttribute('href'),
+      `intent://open/l/${payload}#Intent;scheme=hippo;package=io.github.thekozugroup.hippo;S.browser_fallback_url=${encodeURIComponent(page.url())};end`,
+    )
+    assert.doesNotMatch(page.url(), new RegExp(payload))
+    assert.ok((await open.boundingBox()).y > (await page.getByRole('article').last().boundingBox()).y, 'in the footer, after the wishes')
     // Home on a giver's device: no setup and no checklist, so no install item.
     await page.goto(state.o.link.split('#')[0] + '#/')
     await page.getByRole('heading', { name: 'Shared with me' }).waitFor()

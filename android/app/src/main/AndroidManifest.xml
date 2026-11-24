@@ -53,7 +53,23 @@
                 <data android:pathPrefix="${hippoSitePath}" />
             </intent-filter>
 
+            <!-- "Open in the Hippo app" from a browser: an Android intent link names this package and
+                 hippo://open/<route>. Needs no verification. Only known routes are followed
+                 (OpenRoute.java, then src/app/lib/app-route.ts); anything else opens Home. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="hippo" android:host="open" />
+            </intent-filter>
+
         </activity>
+
+        <!-- Tells Chrome which website this app belongs to (the public site, HIPPO_SITE_URL), so
+             the site can find out that the app is installed (navigator.getInstalledRelatedApps).
+             The site names the app back in /.well-known/assetlinks.json and its manifest, when it
+             is built with HIPPO_ANDROID_PACKAGE and HIPPO_ANDROID_CERT_SHA256 (vite.config.ts). -->
+        <meta-data android:name="asset_statements" android:resource="@string/asset_statements" />
 
         <!-- Lets the share sheet hand a backup file to another app (res/xml/file_paths.xml). -->
         <provider

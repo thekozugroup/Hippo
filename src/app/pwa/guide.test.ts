@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { installGuideFor, installHeading, installPlacement, installTaskName, moveWishesNote, ownStorageReason, whyInstall, type GuideText, type InstallEnv, type InstallKind } from './guide.ts'
+import { deviceKindOf, installGuideFor, installHeading, installPlacement, installTaskName, moveWishesNote, ownStorageReason, whyInstall, type GuideText, type InstallEnv, type InstallKind } from './guide.ts'
 
 // Real user-agent strings, as each browser sends them (iOS 26 Safari reports its OS as 18_6).
 const UA = {
@@ -139,17 +139,39 @@ describe('the steps, in the words each device shows', () => {
   })
 })
 
+describe('phone or tablet, or computer', () => {
+  it('counts iPhones, iPads (also in desktop mode) and Android devices as handheld', () => {
+    expect(deviceKindOf(env(UA.iphoneSafari26, { maxTouchPoints: 5 }))).toBe('handheld')
+    expect(deviceKindOf(env(UA.ipadDesktopMode, { maxTouchPoints: 5 }))).toBe('handheld')
+    expect(deviceKindOf(env(UA.androidChrome, { pointer: 'coarse', viewportWidth: 412 }))).toBe('handheld')
+    // An Android tablet or unfolded foldable in a wide window is still handheld.
+    expect(deviceKindOf(env(UA.androidChrome, { pointer: 'coarse', viewportWidth: 1280 }))).toBe('handheld')
+    expect(deviceKindOf(env(UA.unknown, { mobile: true }))).toBe('handheld')
+    expect(installGuideFor(env(UA.androidChrome)).handheld).toBe(true)
+  })
+  it('errs toward computer: desktops, touch laptops, a Mac without touch, Android driven by a mouse in a wide window', () => {
+    expect(deviceKindOf(env(UA.windowsChrome, { maxTouchPoints: 10, pointer: 'coarse' }))).toBe('computer')
+    expect(deviceKindOf(env(UA.macSafari26))).toBe('computer')
+    expect(deviceKindOf(env(UA.unknown))).toBe('computer')
+    expect(deviceKindOf(env(UA.windowsChrome, { mobile: false }))).toBe('computer')
+    expect(deviceKindOf(env(UA.androidChrome, { pointer: 'fine', viewportWidth: 1440, mobile: false }))).toBe('computer')
+    expect(installGuideFor(env(UA.windowsChrome)).handheld).toBe(false)
+  })
+})
+
 describe('where installing fits and what it is called', () => {
-  it('comes first where the installed app keeps its own storage, late elsewhere, and not at all once installed', () => {
+  it('comes first where the installed app keeps its own storage, late elsewhere, and not at all once installed or on a computer', () => {
     expect(installPlacement(installGuideFor(env(UA.iphoneSafari26, { maxTouchPoints: 5 })))).toBe('first')
     expect(installPlacement(installGuideFor(env(UA.iphoneChrome, { maxTouchPoints: 5 })))).toBe('first')
     expect(installPlacement(installGuideFor(env(UA.ipadDesktopMode, { maxTouchPoints: 5 })))).toBe('first')
-    expect(installPlacement(installGuideFor(env(UA.macSafari26)))).toBe('first')
+    // Computers are never asked to install (Settings still shows how).
+    expect(installPlacement(installGuideFor(env(UA.macSafari26)))).toBe('none')
     expect(installPlacement(installGuideFor(env(UA.androidInstagram)))).toBe('first')
     expect(installPlacement(installGuideFor(env(UA.androidChrome)))).toBe('late')
     expect(installPlacement(installGuideFor(env(UA.androidChrome, { canPrompt: true })))).toBe('late')
-    expect(installPlacement(installGuideFor(env(UA.windowsChrome)))).toBe('late')
-    expect(installPlacement(installGuideFor(env(UA.windowsFirefox)))).toBe('late')
+    expect(installPlacement(installGuideFor(env(UA.windowsChrome)))).toBe('none')
+    expect(installPlacement(installGuideFor(env(UA.windowsFirefox)))).toBe('none')
+    expect(installPlacement(installGuideFor(env(UA.windowsChrome, { canPrompt: true })))).toBe('none')
     expect(installPlacement(installGuideFor(env(UA.iphoneSafari26, { maxTouchPoints: 5, standalone: true })))).toBe('none')
   })
   it('says why in one sentence, and the share sheet only where it is true', () => {

@@ -74,10 +74,12 @@ async function sliderChecks(browser, relay, state, baseUrl, label, app) {
     let c = await control(u.page, 'Get started')
     await u.page.touchscreen.tap(c.box.x + c.box.width / 2, c.box.y + c.box.height / 2)
     await h1(u.page, /call you/).waitFor({ timeout: 3000 })
-    // A later step: a drag on Continue, then Back, Skip and an occasion with touch.
+    // A later step: no slide control there, an ordinary button. A tap on Continue, then Back, Skip
+    // and an occasion with touch.
     await transitionDone(u.page)
+    assert.equal(await u.page.locator('.slide-btn').count(), 0, 'only the first step has the slide control')
     c = await control(u.page, 'Continue')
-    await touchDrag(u.page, u.cdp, c.knob, c.end)
+    await u.page.touchscreen.tap(c.box.x + c.box.width / 2, c.box.y + c.box.height / 2)
     await h1(u.page, /the occasion/).waitFor({ timeout: 3000 })
     await transitionDone(u.page)
     const choice = await u.page.locator('.setup-choice', { hasText: 'Birthday' }).boundingBox()
@@ -128,7 +130,7 @@ async function sliderChecks(browser, relay, state, baseUrl, label, app) {
   }
 }
 
-test('slide control: touch taps and drags work on every setup step, during and after the intro (website build)', async ({ browser, relay, baseUrl, state }) => {
+test('slide control: touch taps and drags work on the first setup step, later steps use a button, during and after the intro (website build)', async ({ browser, relay, baseUrl, state }) => {
   await sliderChecks(browser, relay, state, baseUrl, 'web', false)
 })
 

@@ -1,0 +1,30 @@
+/* Home. Phones and medium windows: one column, in this order. Expanded windows (src/ui/layout.ts):
+   the wishlist summary and recent wishes on the start side; setup, lists and shared lists beside it. */
+.home-layout {
+  display: contents;
+}
+
+@media (min-width: 67.5em) and ((hover: hover) or (min-height: 32em)) {
+  .home-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    /* The start column spans every row and the last row takes up its extra height, so the
+       sections beside it keep their own spacing however long it is. */
+    grid-template-rows: repeat(5, auto) 1fr;
+    align-items: start;
+    column-gap: var(--sp-9);
+    row-gap: var(--space-section);
+  }
+  .home-layout > .home-layout__main {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+  .home-layout > :not(.home-layout__main) {
+    grid-column: 2;
+  }
+  /* "Share a list" alone (Add a wish is in the side navigation): as wide as its label. */
+  .home-layout__main > .app-row--fill > * {
+    flex: 0 1 auto;
+    min-width: 14rem;
+  }
+}

@@ -26,6 +26,7 @@ import { SectionHeader } from './components/SectionHeader.tsx'
 import { SegmentedControl } from './components/SegmentedControl.tsx'
 import { Select } from './components/Select.tsx'
 import { Sheet } from './components/Sheet.tsx'
+import { SideNav } from './components/SideNav.tsx'
 import { Skeleton } from './components/Skeleton.tsx'
 import { StatusPill } from './components/StatusPill.tsx'
 import type { Status } from './components/StatusPill.tsx'
@@ -48,6 +49,12 @@ const NAV_ITEMS = [
   { id: 'lists', label: 'Lists', icon: <ListChecks /> },
   { id: 'share', label: 'Share', icon: <Share2 /> },
   { id: 'settings', label: 'Settings', icon: <Settings /> },
+] as const
+
+const SIDE_ITEMS = [
+  { id: 'home', label: 'Home', icon: <House />, href: '#/design' },
+  { id: 'lists', label: 'Lists', icon: <ListChecks />, href: '#/design' },
+  { id: 'settings', label: 'Settings', icon: <Settings />, href: '#/design' },
 ] as const
 
 const SWATCHES: ReadonlyArray<readonly [string, string]> = [
@@ -213,22 +220,22 @@ function Showcase({ theme }: { theme: Theme }) {
 
       <Section
         title="Slide button"
-        note="Tap anywhere on it, press Enter or Space, or slide the knob past 60 percent of the track. A short slide springs back. Busy and disabled states cannot be dragged; disabled says why."
+        note="Only on the first setup screen (Get started). Tap anywhere on it, press Enter or Space, or slide the knob past 60 percent of the track. A short slide springs back. Busy and disabled states cannot be dragged; disabled says why. Later steps use an ordinary primary button."
       >
         <div className="gx-on-field gx-on-field--short" data-theme="dark">
           <HeroBackground variant="night" />
           <div className="gx-on-field__inner gx-stack">
             <SlideButton label="Get started" onActivate={() => undefined} />
-            <SlideButton label="Continue" busy onActivate={() => undefined} />
-            <SlideButton label="Continue" disabled disabledReason="Choose an occasion first." onActivate={() => undefined} />
+            <SlideButton label="Get started" busy onActivate={() => undefined} />
+            <SlideButton label="Get started" disabled disabledReason="Hippo cannot save on this device." onActivate={() => undefined} />
             <div dir="rtl">
-              <SlideButton label="Continue" onActivate={() => undefined} />
+              <SlideButton label="Get started" onActivate={() => undefined} />
             </div>
           </div>
         </div>
       </Section>
 
-      <Section title="Step screen, step progress" note="One question per screen on the setup field (dark in both themes). Dots start partly done; Back, a wide pill to continue, one quiet secondary action.">
+      <Section title="Step screen, step progress" note="One question per screen on the setup field (dark in both themes). Dots start partly done; Back, a primary button to continue (the slide control only on the first screen), one quiet secondary action.">
         <StepScreen
           contained
           step={2}
@@ -494,6 +501,29 @@ function Showcase({ theme }: { theme: Theme }) {
         <div className="gx-nav-demo">
           <BottomNav items={NAV_ITEMS} activeId="lists" label={`Lists nav (${theme})`} />
         </div>
+      </Section>
+
+      <Section
+        title="Side navigation"
+        note="Tablets and computers, in place of the bottom nav (src/ui/layout.ts). A rail on medium windows, a sidebar on expanded ones: the Hippo mark, Add a wish, then the destinations; the current one is a white pill with aria-current. On a screen it is sticky at the inline start, on the hero field."
+      >
+        <div className="gx-on-hero gx-side-demo">
+          <HeroBackground />
+          <div className="gx-on-hero__inner gx-side-demo__row">
+            <SideNav form="rail" items={SIDE_ITEMS} activeId="lists" homeHref="#/design" label={`Rail (${theme})`} action={{ label: 'Add a wish', icon: <Plus />, href: '#/design' }} />
+            <SideNav form="sidebar" items={SIDE_ITEMS} activeId="home" homeHref="#/design" label={`Sidebar (${theme})`} action={{ label: 'Add a wish', icon: <Plus />, href: '#/design' }} />
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="List layouts"
+        note="On medium and expanded windows a List can flow its rows into columns (the wishlist) or show each row as a card in a grid (Lists). Phones always show one column of rows. Resize the window past 720px to see it."
+      >
+        <List aria-label={`Lists as cards (${theme})`} layout="cards">
+          <ListRow href="#/design" leading={<Thumb name="Christmas 2026" size="sm" />} title="Christmas 2026" secondary="8 wishes · Fri, Dec 25" />
+          <ListRow href="#/design" leading={<Thumb name="Birthday" size="sm" />} title="Birthday" secondary="3 wishes" trailing={<StatusPill status="draft" label="Not shared yet" />} />
+        </List>
       </Section>
 
       <Section title="Bottom sheet, toast">

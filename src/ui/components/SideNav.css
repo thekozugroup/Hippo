@@ -1,0 +1,196 @@
+/* Side navigation for medium and expanded windows (DESIGN.md section 5). A frosted panel on the
+   hero field. Two forms: a rail (icons over short labels) and a sidebar (icons beside labels).
+   `side-nav--auto` picks the rail on medium windows and the sidebar on expanded ones; the media
+   queries are the two in src/ui/layout.ts, written out in full. */
+
+.side-nav {
+  --frost-elev: var(--shadow-nav);
+  --focus-ring: var(--white);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  box-sizing: border-box;
+  min-height: 100%;
+  border-radius: var(--r-card);
+  color: var(--white);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
+}
+
+.side-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: var(--h-min);
+  padding-inline: var(--sp-2);
+  border-radius: var(--r-pill);
+  color: var(--white);
+}
+
+.side-nav__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.side-nav__item,
+.side-nav__action {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--h-md);
+  border-radius: var(--r-pill);
+  color: var(--white);
+  font-weight: 500;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.side-nav__icon,
+.side-nav__icon svg {
+  display: inline-flex;
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+
+.side-nav__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The current destination: a white pill with dark ink, as the bottom navigation's active disc. */
+.side-nav__item.is-active {
+  background: var(--white);
+  color: var(--ink-on-white);
+}
+
+/* The primary action: a white pill as well, set apart from the destinations by space. */
+.side-nav__action {
+  background: var(--white);
+  color: var(--ink-on-white);
+  box-shadow: var(--shadow-nav);
+}
+
+.side-nav__item:active,
+.side-nav__action:active {
+  transform: scale(0.97);
+  transition-duration: var(--dur-press);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .side-nav__item:not(.is-active):hover {
+    background: color-mix(in srgb, var(--white) 14%, transparent);
+  }
+  .side-nav__action:hover,
+  .side-nav__item.is-active:hover {
+    background: color-mix(in srgb, var(--white) 86%, var(--ink-on-white));
+  }
+  .side-nav__brand:hover {
+    background: color-mix(in srgb, var(--white) 14%, transparent);
+  }
+}
+
+/* ---- Sidebar: icons beside labels ---- */
+.side-nav--sidebar {
+  padding: var(--sp-4) var(--sp-3);
+}
+.side-nav--sidebar .side-nav__item,
+.side-nav--sidebar .side-nav__action {
+  padding-inline: var(--sp-4) var(--sp-5);
+}
+.side-nav--sidebar .side-nav__action {
+  min-height: var(--h-lg);
+}
+
+/* ---- Rail: icons over short labels ---- */
+.side-nav--rail {
+  align-items: stretch;
+  padding: var(--sp-4) var(--sp-2);
+}
+.side-nav--rail .side-nav__brand {
+  align-self: center;
+}
+.side-nav--rail .side-nav__brand .logo__word {
+  display: none;
+}
+.side-nav--rail .side-nav__item,
+.side-nav--rail .side-nav__action {
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-height: var(--h-lg);
+  padding: var(--sp-2) var(--sp-1);
+  border-radius: var(--r-tile);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  text-align: center;
+}
+
+/* ---- Auto: the rail on medium windows, the sidebar on expanded ones ---- */
+@media (min-width: 45em) and ((hover: hover) or (min-height: 32em)) {
+  .side-nav--auto {
+    align-items: stretch;
+    padding: var(--sp-4) var(--sp-2);
+  }
+  .side-nav--auto .side-nav__brand {
+    align-self: center;
+  }
+  .side-nav--auto .side-nav__brand .logo__word {
+    display: none;
+  }
+  .side-nav--auto .side-nav__item,
+  .side-nav--auto .side-nav__action {
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--sp-1);
+    min-height: var(--h-lg);
+    padding: var(--sp-2) var(--sp-1);
+    border-radius: var(--r-tile);
+    font-size: var(--fs-label);
+    line-height: var(--lh-label);
+    text-align: center;
+  }
+}
+@media (min-width: 67.5em) and ((hover: hover) or (min-height: 32em)) {
+  .side-nav--auto {
+    align-items: stretch;
+    padding: var(--sp-4) var(--sp-3);
+  }
+  .side-nav--auto .side-nav__brand {
+    align-self: flex-start;
+  }
+  .side-nav--auto .side-nav__brand .logo__word {
+    display: inline;
+  }
+  .side-nav--auto .side-nav__item,
+  .side-nav--auto .side-nav__action {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--sp-3);
+    min-height: var(--h-md);
+    padding: 0 var(--sp-5) 0 var(--sp-4);
+    border-radius: var(--r-pill);
+    font-size: var(--fs-secondary);
+    line-height: var(--lh-secondary);
+    text-align: start;
+  }
+  .side-nav--auto .side-nav__action {
+    min-height: var(--h-lg);
+  }
+}
+
+@media (forced-colors: active) {
+  .side-nav__item.is-active,
+  .side-nav__action {
+    background: Highlight;
+    color: HighlightText;
+    forced-color-adjust: none;
+  }
+  .side-nav__item,
+  .side-nav__brand {
+    color: LinkText;
+  }
+}

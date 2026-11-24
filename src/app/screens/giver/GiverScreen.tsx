@@ -4,6 +4,7 @@ import { useLocation } from 'wouter'
 import { BottomSheet, Button, Chip, EmptyState, IconButton, LinkButton, SectionHeader, Skeleton, StatusPill, TwoTone } from '../../../ui/index.ts'
 import {
   buildGuestShareLink,
+  extractSharePayload,
   getGuestList,
   hideGuestList,
   markSeen,
@@ -25,6 +26,9 @@ import { formatEventDate, plural, possessive } from '../../lib/format.ts'
 import { ClaimSheet, type SheetRequest } from './ClaimSheet.tsx'
 import { GiverItemCard, MyGiftLine } from './GiverItemCard.tsx'
 import { actionErrorMessage, claimResultMessage, describeRow, isCounted, itemHeadingId, OWNER_HIDDEN_NOTE, requestItemId } from './giverText.ts'
+import { offersOpenInApp } from '../../pwa/open-in-app.ts'
+import { OpenInAppLink } from '../../pwa/OpenInAppLink.tsx'
+import { installGuideFor, readInstallEnv } from '../../pwa/guide.ts'
 import './GiverScreen.css'
 
 function Banner({ icon, title, children }: { icon: ReactNode; title: string; children?: ReactNode }) {
@@ -174,6 +178,30 @@ function useGiverIntro(): [boolean, () => void] {
   return [show === true, () => setShow(false)]
 }
 
+/**
+ * On an Android phone's browser, a quiet way to open this list in the Hippo app (nothing on a
+ * computer, an iPhone or inside the app). The link carries the list's own link payload, built from
+ * what this device saved; the page's address (the fallback) holds no secret.
+ */
+function OpenListInApp({ topic }: { topic: string }) {
+  const core = useCore()
+  const [offered] = useState(() => offersOpenInApp(installGuideFor(readInstallEnv(false))))
+  const [payload, setPayload] = useState<string | undefined>()
+  useEffect(() => {
+    if (!offered) return
+    let live = true
+    void getGuestList(core.db, topic)
+      .then((guest) => {
+        if (live && guest) setPayload(extractSharePayload(buildGuestShareLink(guest, shareBaseUrl())))
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [offered, core, topic])
+  return payload ? <OpenInAppLink route={{ kind: 'list', payload }} /> : null
+}
+
 function InviteOthers({ topic, listName }: { topic: string; listName: string }) {
   const core = useCore()
   const notify = useNotify()
@@ -202,7 +230,7 @@ function InviteOthers({ topic, listName }: { topic: string; listName: string }) 
   }
 
   return (
-    <section className="app-stack" aria-labelledby="giver-invite">
+    <section className="app-stack giver-footer" aria-labelledby="giver-invite">
       <SectionHeader title={<span id="giver-invite">Invite others</span>} />
       <p className="app-note">Anyone with the link can see the list and who is getting what.</p>
       <SiteReachNote what="the link" />
@@ -293,6 +321,7 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
 
   return (
     <AppScreen
+      width="wide"
       title={title}
       compactTitle
       intro={intro}
@@ -375,10 +404,11 @@ function GiverList({ session, view }: { session: GiverListSession; view: GiverLi
 
       {meta && view.status !== 'unpublished' ? <InviteOthers topic={view.topic} listName={meta.name} /> : null}
 
-      <section className="app-stack app-stack--tight" aria-label="About this list">
+      <section className="app-stack app-stack--tight giver-footer" aria-label="About this list">
         <p className="app-note giver-privacy">
           <LockKeyhole aria-hidden="true" size={16} /> {OWNER_HIDDEN_NOTE}
         </p>
+        {meta && view.status !== 'unpublished' ? <OpenListInApp topic={view.topic} /> : null}
         <div>
           <Button variant="ghost" size="md" onClick={() => setConfirmForget(true)}>
             Remove from this device

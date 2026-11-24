@@ -60,13 +60,14 @@ export function WishlistScreen() {
   return (
     <AppScreen
       nav="wishlist"
+      width="wide"
       title="Wishlist"
       busy={allItems === undefined}
       // While the wishlist is empty, the empty state offers the same action, so the icon is left out.
-      actions={activeCount > 0 ? <IconLink href="#/item/new" variant="frost" aria-label="Add a wish" icon={<Plus />} /> : undefined}
+      actions={activeCount > 0 ? <IconLink href="#/item/new" variant="frost" aria-label="Add a wish" icon={<Plus />} className="app-hide-wide" /> : undefined}
     >
       {(allItems?.length ?? 0) > 0 ? (
-      <section className="app-stack app-stack--tight" aria-label="Filter and sort">
+      <section className="app-stack app-stack--tight wishlist-toolbar" aria-label="Filter and sort">
         <div className="app-chips" role="group" aria-label="Category">
           <Chip selected={validCategory === undefined} onClick={() => setCategoryId(undefined)}>
             All categories
@@ -147,7 +148,7 @@ export function WishlistScreen() {
             />
           )
         ) : (
-          <List>
+          <List layout="columns">
             {shown.map((item) => {
               const cats = item.categoryIds.map((id) => catName.get(id)).filter((n): n is string => Boolean(n))
               return (

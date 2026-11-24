@@ -36,7 +36,7 @@ export default function SiteScreen() {
   }
 
   return (
-    <AppScreen title="Your Hippo site" back={inSetup ? '#/existing' : '#/settings'} backLabel="Back">
+    <AppScreen area="settings" title="Your Hippo site" back={inSetup ? '#/existing' : '#/settings'} backLabel="Back">
       <section className="app-stack" aria-labelledby="site-now">
         <h2 id="site-now" className="app-section-title">
           Links open on

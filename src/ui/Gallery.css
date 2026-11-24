@@ -280,3 +280,16 @@
   letter-spacing: -0.01em;
   min-width: 0;
 }
+
+.gx-side-demo__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--sp-4);
+}
+.gx-side-demo__row > .side-nav--rail {
+  width: 5.75rem;
+}
+.gx-side-demo__row > .side-nav--sidebar {
+  width: 15rem;
+}

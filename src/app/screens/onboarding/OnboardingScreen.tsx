@@ -58,6 +58,8 @@ import { InstallGuide } from '../../pwa/InstallGuide.tsx'
 import { useCopyLink, useInstallAction, useInstallGuide } from '../../pwa/useInstall.ts'
 import { isStandalone, wasInstalledHere } from '../../pwa/install.ts'
 import { isNativeApp } from '../../native/platform.ts'
+import { HOME_ROUTE } from '../../lib/app-route.ts'
+import { offersOpenInApp, openInAppLink, useInstalledHere } from '../../pwa/open-in-app.ts'
 import { captureMethodFor, hostOf, parseWish, wishError } from './flow.ts'
 import { ensureSetupList, ensureSetupWish, persistFlow } from './store.ts'
 import './OnboardingScreen.css'
@@ -337,6 +339,7 @@ function SetupFlow({ initial, step }: { initial: Flow; step: WelcomeStep }) {
           title={<TwoTone tone="on-hero" muted="Make a wishlist, share one link," bright="and friends pick gifts without spoiling the surprise." />}
           description={<p>No account needed. Setting up takes about a minute.</p>}
           continueLabel="Get started"
+          continueStyle="slide"
           onContinue={goNext}
           secondaryAction={[
             { label: 'I already use Hippo', onClick: () => navigate('/existing') },
@@ -507,11 +510,27 @@ function InstallStep({ common, onNext }: { common: CommonProps; onNext: () => vo
   const first = installPlacement(guide) === 'first'
   const heading = installHeading(guide)
   const reason = first ? ownStorageReason(guide) : undefined
+  // On Android, Chrome can say whether Hippo is already installed here (open-in-app.ts).
+  const here = useInstalledHere(offersOpenInApp(guide))
   const installed = installedHere || guide.kind === 'installed'
+  const webAppHere = !installed && here?.webApp === true && here.androidApp !== true
 
   let main: { label: string; run: () => void }
-  let secondary: { label: string; onClick: () => void }
-  if (installed) {
+  let secondary: { label: string; onClick: () => void } | undefined
+  let title = heading
+  let why: string = whyInstall(guide)
+  if (!installed && here?.androidApp) {
+    // The Android app is here: open it instead of installing again.
+    main = { label: 'Open in the app', run: () => window.location.assign(openInAppLink(HOME_ROUTE)) }
+    secondary = { label: 'Carry on here', onClick: onNext }
+    title = { muted: 'Hippo is already', bright: 'on this phone' }
+    why = 'Open the Hippo app, or carry on here in the browser.'
+  } else if (webAppHere) {
+    // The web app is here. A browser tab cannot open it, so say where it is.
+    main = { label: 'Continue', run: onNext }
+    title = { muted: 'Hippo is already', bright: `on your ${guide.place}` }
+    why = `Open it from your ${guide.place}. It shares your wishes with this browser.`
+  } else if (installed) {
     main = { label: 'Continue', run: onNext }
     secondary = { label: 'Skip', onClick: onNext }
   } else if (guide.kind === 'in-app') {
@@ -532,18 +551,18 @@ function InstallStep({ common, onNext }: { common: CommonProps; onNext: () => vo
     <StepScreen
       {...common}
       busy={common.busy || busy}
-      title={<TwoTone tone="on-hero" muted={heading.muted} bright={heading.bright} />}
+      title={<TwoTone tone="on-hero" muted={title.muted} bright={title.bright} />}
       description={
         <>
-          <p>{whyInstall(guide)}</p>
-          {reason ? <p>{reason}</p> : null}
+          <p>{why}</p>
+          {reason && !here?.androidApp && !webAppHere ? <p>{reason}</p> : null}
         </>
       }
       continueLabel={main.label}
       onContinue={main.run}
-      secondaryAction={secondary}
+      {...(secondary ? { secondaryAction: secondary } : {})}
     >
-      <InstallGuide guide={guide} installed={installedHere} tone="hero" actions={false} />
+      {here?.androidApp || webAppHere ? null : <InstallGuide guide={guide} installed={installedHere} tone="hero" actions={false} />}
       <p className="setup-saved setup-status" role="status">
         {added ? `Now open Hippo from your ${guide.place}. Setup starts there, and you can close this page.` : ''}
       </p>

@@ -87,9 +87,6 @@
   color: var(--accent);
   background: transparent;
 }
-.btn--ghost:hover:not(:disabled) {
-  background: var(--overlay-hover);
-}
 
 .btn--frost {
   color: var(--white);

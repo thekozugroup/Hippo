@@ -56,6 +56,8 @@
   --font-sans: 'Inter Variable', system-ui, sans-serif;
   --fs-display: 3.5rem;
   --lh-display: 3.75rem;
+  --fs-display-sm: 3rem; /* setup's question on expanded windows */
+  --lh-display-sm: 3.375rem;
   --fs-headline: 2.5rem;
   --lh-headline: 2.75rem;
   --fs-headline-sm: 2rem; /* empty-state titles */
@@ -100,6 +102,15 @@
 
   --gutter: 24px;
   --col-max: 480px;
+
+  /* Adaptive layout (DESIGN.md section 5; size classes in src/ui/layout.ts). Used on medium and
+     expanded windows only: the page column's cap, the reading measure for text and forms, the
+     side navigation's width, the gap around the sheet and the sheet's inner padding. */
+  --page-max: 80rem;
+  --measure: 40rem;
+  --rail-w: 5.75rem;
+  --sheet-inset: var(--sp-4);
+  --page-pad: var(--sp-6);
 
   /* Control heights */
   --h-lg: 56px;
@@ -235,6 +246,7 @@
   --text-inverse: light-dark(var(--white), var(--slate-950));
   --surface-inverse: var(--text);
   --overlay-hover: color-mix(in srgb, var(--text) 6%, transparent);
+  --overlay-on-primary: color-mix(in srgb, var(--white) 10%, transparent); /* hovered primary button */
   --focus-ring: var(--accent);
   /* The toast is an inverse surface, so its focus ring is the inverse of the page's. */
   --toast-ring: light-dark(var(--blue-300), var(--blue-700));
@@ -259,6 +271,15 @@
   --tone-emerald-bg: light-dark(var(--emerald-100), color-mix(in srgb, var(--emerald-400) 16%, transparent));
   --tone-amber-fg: light-dark(var(--amber-800), var(--amber-200));
   --tone-amber-bg: light-dark(var(--amber-100), color-mix(in srgb, var(--amber-400) 16%, transparent));
+}
+
+/* Expanded windows: the full sidebar, and more room around and inside the sheet. */
+@media (min-width: 67.5em) and ((hover: hover) or (min-height: 32em)) {
+  :root {
+    --rail-w: 15rem;
+    --sheet-inset: var(--sp-6);
+    --page-pad: var(--sp-8);
+  }
 }
 
 /* Narrow phones: smaller gutter, and every type role steps down one level. */

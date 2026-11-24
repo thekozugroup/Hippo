@@ -4,6 +4,7 @@ import { defineConfig, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { readFileSync } from 'node:fs'
 import { DEFAULT_RELAYS } from './src/core/config.ts'
+import { androidAppFromEnv, assetLinksJson, relatedApplications, type AndroidApp } from './src/app/pwa/related-apps.ts'
 
 /** The Vite mode that builds the web assets for the Android app (Capacitor's webDir is NATIVE_OUT_DIR). */
 export const NATIVE_MODE = 'native'
@@ -160,6 +161,17 @@ function siteAddressFile(site: string): Plugin {
   }
 }
 
+/** Website build with the Android app named (src/app/pwa/related-apps.ts): its Digital Asset Links statement. */
+function assetLinksFile(app: AndroidApp): Plugin {
+  return {
+    name: 'hippo-asset-links',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: '.well-known/assetlinks.json', source: assetLinksJson(app) })
+    },
+  }
+}
+
 const escapeAttr = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
 
 function openGraphUrls(site: string | undefined): Plugin {
@@ -188,6 +200,8 @@ export default defineConfig(({ mode }) => {
   // `vite build --mode native` (npm run android:web) builds the web assets that go inside the Android app.
   const native = mode === NATIVE_MODE
   const site = resolveSiteUrl(process.env)
+  // Optional: HIPPO_ANDROID_PACKAGE and HIPPO_ANDROID_CERT_SHA256 link the website with the Android app.
+  const androidApp = native ? undefined : androidAppFromEnv(process.env)
   if (native && !site) {
     throw new Error(
       'The Android app build needs the public website address, because share links made in the app must point at it. Set HIPPO_SITE_URL, for example HIPPO_SITE_URL=https://owner.github.io/Hippo/',
@@ -230,6 +244,8 @@ export default defineConfig(({ mode }) => {
           theme_color: THEME_COLOR,
           background_color: THEME_COLOR,
           categories: ['shopping', 'lifestyle'],
+          // So a page can tell that Hippo is already installed here (getInstalledRelatedApps).
+          related_applications: relatedApplications(androidApp),
           icons: [
             { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
             { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
@@ -278,6 +294,7 @@ export default defineConfig(({ mode }) => {
       ...(native && site ? [siteAddressFile(site)] : []),
       // The website says what it is at hippo.json (the app's "Use my own Hippo site" check).
       ...(native ? [] : [siteInfoFile(site)]),
+      ...(androidApp ? [assetLinksFile(androidApp)] : []),
     ],
     test: {
       environment: 'jsdom',

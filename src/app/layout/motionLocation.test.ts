@@ -94,4 +94,20 @@ describe('router history and transitions', () => {
     await settle()
     expect(document.documentElement.dataset.navDir).toBeUndefined()
   })
+
+  it('numbers an entry the browser adds for the same address opened again, so Back through it still works', async () => {
+    navigate('/wishlist', { replace: true })
+    await settle()
+    const before = historyIndex()
+    // What a browser does for the same URL typed again: a new entry with no state, then popstate.
+    window.history.pushState(null, '', window.location.href)
+    window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
+    expect(historyIndex()).toBe(before + 1)
+    expect((window.history.state as Record<string, unknown>).hippoIdx).toBe(before + 1)
+    navigate('/item/abc')
+    window.history.back()
+    await waitForHash('#/wishlist')
+    await vi.waitFor(() => expect(historyIndex()).toBe(before + 1))
+    expect(dirs.at(-1)).toBe('back')
+  })
 })

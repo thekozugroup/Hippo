@@ -18,3 +18,40 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---- Medium and expanded windows (src/ui/layout.ts) ----
+   One toolbar over the wishes (which flow into columns, List layout="columns"): the chips wrap
+   instead of scrolling sideways. On expanded windows the filter chips sit at the start and the
+   sort at the end of the same band. */
+@media (min-width: 45em) and ((hover: hover) or (min-height: 32em)) {
+  .wishlist-toolbar {
+    padding-block-end: var(--space-group);
+    border-block-end: 1px solid var(--hairline);
+  }
+  .wishlist-toolbar > .app-chips {
+    flex-wrap: wrap;
+    margin-inline: 0;
+    padding: var(--sp-1) 0;
+    overflow: visible;
+  }
+  .wishlist-toolbar > .wishlist-tools {
+    max-width: 18rem;
+  }
+}
+@media (min-width: 67.5em) and ((hover: hover) or (min-height: 32em)) {
+  .wishlist-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
+    align-items: end;
+    column-gap: var(--sp-6);
+    row-gap: var(--space-inline);
+  }
+  .wishlist-toolbar > * {
+    grid-column: 1;
+  }
+  .wishlist-toolbar > .wishlist-tools {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    max-width: none;
+  }
+}

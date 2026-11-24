@@ -60,6 +60,16 @@
   min-height: inherit;
 }
 
+/* A plain wrapper on phones; the band's grid on wider windows (below). */
+.screen__hero-inner {
+  display: contents;
+}
+
+/* Side navigation: wider windows only. */
+.screen__rail {
+  display: none;
+}
+
 .screen__headline {
   padding: var(--sp-4) var(--gutter) var(--sp-8);
 }
@@ -121,4 +131,102 @@
 }
 .screen:not(.screen--contained) .screen__nav-inner > .bottom-nav {
   view-transition-name: hippo-nav;
+}
+
+/* ---- Medium and expanded windows (src/ui/layout.ts; the queries are written out in full) ----
+   The hero is a band across the top holding the title and its actions; the sheet fills the
+   content area under it with a page column capped at --page-max inside; the side navigation sits
+   at the inline start on the hero field and stays put while the page scrolls. Previews (contained)
+   keep the phone layout. */
+@media (min-width: 45em) and ((hover: hover) or (min-height: 32em)) {
+  .screen:not(.screen--contained) {
+    --hero-h: 0px;
+    --rail-col: 0px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+  .screen--has-rail:not(.screen--contained) {
+    --rail-col: calc(var(--rail-w) + var(--sheet-inset));
+    grid-template-columns: var(--rail-col) minmax(0, 1fr);
+  }
+  .screen:not(.screen--contained) > .screen__rail {
+    display: block;
+    grid-column: 1;
+    grid-row: 1 / -1;
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    align-self: start;
+    box-sizing: border-box;
+    width: var(--rail-col);
+    height: 100vh;
+    height: 100dvh;
+    padding-block: calc(var(--sheet-inset) + var(--inset-top)) calc(var(--sheet-inset) + var(--inset-bottom));
+    padding-inline-start: var(--sheet-inset);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .screen:not(.screen--contained) > .screen__top {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .screen:not(.screen--contained) > .screen__body {
+    grid-column: -2 / -1;
+    grid-row: 2;
+  }
+  .screen:not(.screen--contained) .screen__col {
+    max-width: none;
+  }
+  .screen:not(.screen--contained) .screen__hero {
+    padding-block: calc(var(--sp-6) + var(--inset-top)) var(--sp-7);
+    padding-inline: calc(var(--rail-col) + var(--sheet-inset) + var(--page-pad)) calc(var(--sheet-inset) + var(--page-pad));
+  }
+  /* The band: back link (when there is one) above, the title with its actions at the end. */
+  .screen:not(.screen--contained) .screen__hero-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'start start'
+      'head end';
+    align-items: end;
+    column-gap: var(--sp-6);
+    width: 100%;
+    max-width: var(--page-max);
+    margin-inline: auto;
+  }
+  .screen:not(.screen--contained) .screen__hero-inner > .top-bar {
+    display: contents;
+  }
+  .screen:not(.screen--contained) .screen__hero-inner .top-bar__start {
+    grid-area: start;
+    justify-self: start;
+    margin-block-end: var(--sp-4);
+    margin-inline-start: calc(-1 * var(--sp-1));
+  }
+  .screen:not(.screen--contained) .screen__hero-inner .top-bar__start:empty {
+    display: none;
+  }
+  .screen:not(.screen--contained) .screen__hero-inner .top-bar__end {
+    grid-area: end;
+    align-self: end;
+  }
+  .screen:not(.screen--contained) .screen__headline {
+    grid-area: head;
+    padding: 0;
+  }
+  .screen:not(.screen--contained) .screen__sheet {
+    margin-inline: var(--sheet-inset);
+    padding: var(--sp-8) var(--page-pad) calc(var(--sp-9) + var(--inset-bottom));
+  }
+  /* The bottom navigation gives way to the side navigation. */
+  .screen:not(.screen--contained) .screen__nav {
+    display: none;
+  }
+  .screen--has-nav:not(.screen--contained) .screen__sheet {
+    padding-block-end: calc(var(--sp-9) + var(--inset-bottom));
+  }
+  .screen:not(.screen--contained) > .screen__rail > * {
+    view-transition-name: hippo-rail;
+  }
 }

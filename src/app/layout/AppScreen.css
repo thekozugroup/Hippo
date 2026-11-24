@@ -282,3 +282,34 @@ ul.app-steps {
 .setup-task__icon.is-done {
   color: var(--success);
 }
+
+/* ---- Medium and expanded windows (src/ui/layout.ts) ---- */
+@media (min-width: 45em) and ((hover: hover) or (min-height: 32em)) {
+  /* The side navigation carries the Hippo mark, so the band does not repeat it. */
+  .screen--has-rail .top-bar__start:has(> .app-logo-link:only-child) {
+    display: none;
+  }
+  /* Long names (lists, wishes) get more room in the band than on a phone. */
+  .app-hero__title.t-title {
+    font-size: var(--fs-headline-sm);
+    line-height: var(--lh-headline-sm);
+    letter-spacing: -0.03em;
+  }
+  .app-hero__intro {
+    max-width: var(--measure);
+  }
+  /* The page column: wide pages use all of it, narrow ones keep text and forms at a reading
+     measure, start-aligned under the title. */
+  .app-page {
+    width: 100%;
+    max-width: var(--page-max);
+    margin-inline: auto;
+  }
+  .app-page--narrow > :not(dialog) {
+    max-width: var(--measure);
+  }
+  /* An action the side navigation already offers (Add a wish) is not repeated on the page. */
+  .screen--has-rail .app-hide-wide {
+    display: none;
+  }
+}

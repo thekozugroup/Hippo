@@ -229,3 +229,25 @@
   color: var(--text-2);
   min-width: 0;
 }
+
+/* ---- Medium and expanded windows (src/ui/layout.ts) ----
+   Wish cards in a grid of two or three columns; the cards in a row share one height and their
+   main action sits at the bottom, so the actions line up. Text under the grid keeps a reading
+   measure. */
+@media (min-width: 45em) and ((hover: hover) or (min-height: 32em)) {
+  .giver-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr));
+    gap: var(--space-card);
+  }
+  .giver-item {
+    height: 100%;
+  }
+  .giver-item__actions {
+    margin-block-start: auto;
+  }
+  .giver-intro,
+  .giver-footer {
+    max-width: var(--measure);
+  }
+}

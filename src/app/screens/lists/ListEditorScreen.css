@@ -46,3 +46,25 @@
   color: var(--danger);
   font-weight: 500;
 }
+
+/* ---- Expanded windows (src/ui/layout.ts) ----
+   The wish picker takes the wide column; sharing, details, what friends see and manage sit beside
+   it at a reading measure. The picker spans every row and the last row takes its extra height, so
+   the sections beside it keep their own spacing. Phones and medium windows: one column, in order. */
+@media (min-width: 67.5em) and ((hover: hover) or (min-height: 32em)) {
+  .list-editor {
+    display: grid;
+    grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+    grid-template-rows: repeat(4, auto) 1fr;
+    align-items: start;
+    column-gap: var(--sp-9);
+    row-gap: var(--space-section);
+  }
+  .list-editor > * {
+    grid-column: 1;
+  }
+  .list-editor > .list-editor__wishes {
+    grid-column: 2;
+    grid-row: 1 / -1;
+  }
+}

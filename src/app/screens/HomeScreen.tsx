@@ -6,10 +6,13 @@ import { AppScreen } from '../layout/AppScreen.tsx'
 import { setupChecklist } from '../core/onboarding.ts'
 import { useInstallGuide } from '../pwa/useInstall.ts'
 import { isNativeApp } from '../native/platform.ts'
+import { HOME_ROUTE } from '../lib/app-route.ts'
+import { offersOpenInApp, openInAppLink, useInstalledHere } from '../pwa/open-in-app.ts'
 import { formatAdded, safeUrl } from '../lib/format.ts'
 import { BackupReminder } from './BackupReminder.tsx'
 import { GuestListRow, OwnedListRow } from './lists/ListRows.tsx'
 import { SetupChecklist } from './SetupChecklist.tsx'
+import './HomeScreen.css'
 
 const RECENT_SHOWN = 4
 const LISTS_SHOWN = 3
@@ -41,7 +44,9 @@ export function HomeScreen() {
   const liveIds = new Set((items ?? []).map((i) => i.id))
   const shareHref = lists && lists.length > 0 ? '#/lists' : '#/list/new'
   const { guide, installedHere } = useInstallGuide()
-  const installed = guide.kind === 'installed' || installedHere || settings?.seen.appInstalled !== undefined
+  // On Android, Chrome can say whether Hippo is already installed here (pwa/open-in-app.ts).
+  const here = useInstalledHere(offersOpenInApp(guide))
+  const installed = guide.kind === 'installed' || installedHere || settings?.seen.appInstalled !== undefined || here?.webApp === true
   const checklist =
     !loading && settings
       ? setupChecklist({
@@ -50,14 +55,15 @@ export function HomeScreen() {
           wishes: count,
           sharedLists: (lists ?? []).filter((l) => l.status === 'published').length,
           lastExportAt: settings.lastExportAt,
-          // The Android app is already installed: no install task.
-          install: { possible: guide.canInstall && !isNativeApp(), done: installed },
+          // Only phones and tablets are asked to install; the Android app is already installed.
+          install: { possible: guide.canInstall && guide.handheld && !isNativeApp(), done: installed },
         })
       : null
 
   return (
     <AppScreen
       nav="home"
+      width="wide"
       busy={loading}
       title={
         empty ? (
@@ -67,7 +73,8 @@ export function HomeScreen() {
         )
       }
     >
-      <section className="app-stack" aria-labelledby="home-wishlist">
+      <div className="home-layout">
+      <section className="app-stack home-layout__main" aria-labelledby="home-wishlist">
         {empty ? (
           <h2 id="home-wishlist" className="sr-only">
             Wishlist
@@ -79,7 +86,8 @@ export function HomeScreen() {
           </div>
         )}
         <div className="app-row app-row--fill">
-          <LinkButton href="#/item/new" variant="primary" icon={<Plus />} fullWidth>
+          {/* On wider windows the side navigation holds Add a wish; it is not offered twice. */}
+          <LinkButton href="#/item/new" variant="primary" icon={<Plus />} fullWidth className={count > 0 ? 'app-hide-wide' : undefined}>
             Add a wish
           </LinkButton>
           {count > 0 ? (
@@ -104,7 +112,12 @@ export function HomeScreen() {
         ) : null}
       </section>
 
-      {checklist ? <SetupChecklist tasks={checklist} wishes={count} lists={lists ?? []} install={{ guide, installed: installedHere }} /> : empty ? <HowItWorks /> : null}
+      {checklist ? <SetupChecklist
+          tasks={checklist}
+          wishes={count}
+          lists={lists ?? []}
+          install={{ guide, installed: installedHere, ...(here?.androidApp ? { openHref: openInAppLink(HOME_ROUTE) } : {}) }}
+        /> : empty ? <HowItWorks /> : null}
 
       {!checklist && (count > 0 || (lists?.length ?? 0) > 0) ? <BackupReminder lastExportAt={settings?.lastExportAt} /> : null}
 
@@ -141,6 +154,7 @@ export function HomeScreen() {
           Test mode: sharing uses a local test server only.
         </p>
       ) : null}
+      </div>
     </AppScreen>
   )
 }

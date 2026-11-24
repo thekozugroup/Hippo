@@ -1,0 +1,25 @@
+/* "Open in the Hippo app" (Android browsers): a quiet link, never a prompt. */
+.open-in-app {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--sp-2);
+  min-height: var(--h-min);
+  border-radius: var(--r-pill);
+  color: var(--accent);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
+  font-weight: 500;
+}
+.open-in-app--hero {
+  color: var(--white);
+}
+.open-in-app svg {
+  flex: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .open-in-app:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}

@@ -127,7 +127,7 @@ export default function MoveScreen() {
 
   const waiting = s?.phase === 'waiting'
   return (
-    <AppScreen title="Move to another device" back="#/settings" backLabel="Back to Settings">
+    <AppScreen area="settings" title="Move to another device" back="#/settings" backLabel="Back to Settings">
       <section className="app-stack" aria-labelledby="move-how">
         <h2 id="move-how" className="app-section-title">
           How it works

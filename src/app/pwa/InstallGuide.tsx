@@ -9,6 +9,9 @@ import { Button } from '../../ui/index.ts'
 import { appBaseUrl } from '../lib/capture-tools.ts'
 import type { GuideIcon, GuideText, InstallGuide as Guide } from './guide.ts'
 import { installedMessage, useCopyLink, useInstallAction } from './useInstall.ts'
+import { HOME_ROUTE, type AppRoute } from '../lib/app-route.ts'
+import { offersOpenInApp } from './open-in-app.ts'
+import { OpenInAppLink } from './OpenInAppLink.tsx'
 import './InstallGuide.css'
 
 const ICONS: Record<GuideIcon, ReactNode> = {
@@ -45,13 +48,15 @@ export interface InstallGuideProps {
   tone?: 'hero' | 'sheet'
   /** Extra lines under the steps (Settings: moving wishes). */
   children?: ReactNode
+  /** On Android browsers, the quiet "Open in the Hippo app" link opens this route (Home by default); `false` leaves it out. */
+  openInApp?: AppRoute | false
 }
 
 /**
  * The steps for this device. Icons are decorative; the words name what the device shows, in bold.
  * Inside an app that cannot install, "Copy link" copies Hippo's own address (never a share link).
  */
-export function InstallGuide({ guide, installed = false, actions = true, tone = 'sheet', children }: InstallGuideProps) {
+export function InstallGuide({ guide, installed = false, actions = true, tone = 'sheet', children, openInApp = HOME_ROUTE }: InstallGuideProps) {
   const { install, busy } = useInstallAction(guide)
   const done = installed || guide.kind === 'installed'
   const buttonVariant = tone === 'hero' ? 'frost' : 'secondary'
@@ -108,6 +113,7 @@ export function InstallGuide({ guide, installed = false, actions = true, tone = 
         </>
       )}
       {children}
+      {openInApp && offersOpenInApp(guide) ? <OpenInAppLink route={openInApp} tone={tone} /> : null}
     </div>
   )
 }

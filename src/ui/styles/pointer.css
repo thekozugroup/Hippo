@@ -1,0 +1,49 @@
+/*
+ * Hover states for a mouse or trackpad. Only where the primary pointer can hover, so a tap on a
+ * phone never leaves a control looking hovered. Pressed (:active) and focus (:focus-visible)
+ * states live with each component and apply everywhere. A hover is a tint or an underline, never
+ * a change of size or place.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .btn--primary:not(:disabled):not([aria-disabled='true']):hover {
+    background:
+      linear-gradient(var(--overlay-on-primary), var(--overlay-on-primary)),
+      radial-gradient(55% 38% at 28% 112%, var(--primary-glow) 0%, transparent 100%),
+      linear-gradient(100deg, var(--primary-from) 0%, var(--primary-mid) 45%, var(--primary-to) 100%);
+  }
+  .btn--secondary:not(:disabled):not([aria-disabled='true']):hover,
+  .icon-btn--neutral:not(:disabled):hover,
+  .chip--neutral.chip--interactive:not(.is-selected):hover {
+    background: var(--surface-3);
+  }
+  .btn--ghost:not(:disabled):hover,
+  .icon-btn--ghost:not(:disabled):hover {
+    background: var(--overlay-hover);
+  }
+  .btn--danger:not(:disabled):not([aria-disabled='true']):hover {
+    background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+  }
+  .btn--frost:not(:disabled):hover,
+  .icon-btn--frost:not(:disabled):hover,
+  .chip--frost.chip--interactive:not(.is-selected):hover {
+    --frost-tint: color-mix(in srgb, var(--frost-hero-solid) 70%, transparent);
+  }
+  .section-header__action:hover {
+    color: var(--text);
+  }
+  .app-text-link:hover,
+  .giver-item__link:hover,
+  .app-details > summary:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+  .step-screen__link:hover {
+    color: var(--white);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .app-logo-link:hover {
+    background: color-mix(in srgb, var(--white) 14%, transparent);
+  }
+}

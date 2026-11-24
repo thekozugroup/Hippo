@@ -1,12 +1,41 @@
-import { useId, type ComponentPropsWithRef, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, type ComponentPropsWithRef, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { cx } from '../cx.ts'
 import { HeroBackground } from './HeroBackground.tsx'
+import { Button } from './Button.tsx'
 import { IconButton } from './IconButton.tsx'
 import { LogoIntro } from './LogoIntro.tsx'
 import { SlideButton } from './SlideButton.tsx'
+import { isRepeatPress } from './slide.ts'
 import { StepProgress } from './StepProgress.tsx'
 import './StepScreen.css'
+
+/**
+ * The ordinary continue button of later steps, with the slide control's guard: the second tap of a
+ * double tap on this same control counts once (the click's `detail` counts the taps), and nothing
+ * else is held back, so a quick press on a new step (a new instance, keyed by step) always counts.
+ * Enter and Space (`detail` 0) are held back only while busy; a held-down Enter is stopped by
+ * StepScreen's key handler.
+ */
+function ContinueButton({ label, busy, busyLabel }: { label: string; busy: boolean; busyLabel?: string }) {
+  const lastTaps = useRef<number | undefined>(undefined)
+  useLayoutEffect(() => {
+    lastTaps.current = undefined
+  }, [label])
+  const onClick = (e: MouseEvent<HTMLButtonElement>) => {
+    if (e.detail === 0) return
+    if (isRepeatPress(e.detail, lastTaps.current)) {
+      e.preventDefault()
+      return
+    }
+    lastTaps.current = e.detail
+  }
+  return (
+    <Button type="submit" variant="primary" className="step-screen__continue step-screen__continue--button" loading={busy} onClick={onClick}>
+      {busy ? (busyLabel ?? 'Saving…') : label}
+    </Button>
+  )
+}
 
 export interface StepAction {
   label: string
@@ -28,8 +57,13 @@ export interface StepScreenProps extends Omit<ComponentPropsWithRef<'div'>, 'tit
   /** Goes to the previous step; omitted on the first step. Escape does the same, outside open pickers. */
   onBack?: () => void
   backLabel?: string
-  /** The wide slide control (`SlideButton`). Runs on a tap, a completed slide, and Enter in a field. */
+  /** The continue control's label. Runs on a press (or a completed slide) and on Enter in a field. */
   continueLabel?: string
+  /**
+   * `button` (default): an ordinary primary button. `slide`: the wide slide control (`SlideButton`),
+   * used only on the very first setup screen.
+   */
+  continueStyle?: 'button' | 'slide'
   onContinue?: () => void
   /** Busy (a step is saving): the control shows it, ignores presses and cannot be dragged. */
   busy?: boolean
@@ -50,7 +84,8 @@ export interface StepScreenProps extends Omit<ComponentPropsWithRef<'div'>, 'tit
 
 /**
  * One step of a stepped flow on the dark setup field: logo at the top, the question low on the
- * screen where the thumb is, progress dots, then a round Back button and a wide pill to continue.
+ * screen where the thumb is, progress dots, then a round Back button and a primary button to continue
+ * (the slide control on the first screen only).
  */
 export function StepScreen({
   step,
@@ -62,6 +97,7 @@ export function StepScreen({
   onBack,
   backLabel = 'Back',
   continueLabel,
+  continueStyle = 'button',
   onContinue,
   busy = false,
   busyLabel,
@@ -114,7 +150,11 @@ export function StepScreen({
             <div className="step-screen__actions">
               {onBack ? <IconButton type="button" variant="frost" size="lg" className="step-screen__back" aria-label={backLabel} icon={<ArrowLeft />} onClick={onBack} /> : null}
               {/* Keyed by step: each question gets its own control, so a press on it is never taken for a repeat of the last step's. */}
-              {continueLabel ? <SlideButton key={step ?? 'step'} type="submit" className="step-screen__continue" label={continueLabel} busy={busy} {...(busyLabel ? { busyLabel } : {})} /> : null}
+              {continueLabel && continueStyle === 'slide' ? (
+                <SlideButton key={step ?? 'step'} type="submit" className="step-screen__continue" label={continueLabel} busy={busy} {...(busyLabel ? { busyLabel } : {})} />
+              ) : continueLabel ? (
+                <ContinueButton key={step ?? 'step'} label={continueLabel} busy={busy} {...(busyLabel ? { busyLabel } : {})} />
+              ) : null}
             </div>
             {secondary.length > 0 ? (
               <div className="step-screen__secondary">

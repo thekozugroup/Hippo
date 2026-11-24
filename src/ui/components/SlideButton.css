@@ -56,8 +56,10 @@
   cursor: grabbing;
   transition: none;
 }
-.slide-btn:hover:not(.is-dragging, .is-done, .is-busy, .is-disabled) .slide-btn__knob {
-  translate: 2px 0;
+@media (hover: hover) and (pointer: fine) {
+  .slide-btn:hover:not(.is-dragging, .is-done, .is-busy, .is-disabled) .slide-btn__knob {
+    translate: 2px 0;
+  }
 }
 .slide-btn__knob svg {
   width: 22px;

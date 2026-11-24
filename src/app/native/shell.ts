@@ -10,7 +10,8 @@
 //   light over the hero and dark once the light sheet is under them, navigation
 //   bar icons that follow the theme and setup's night field.
 // - Share target: text shared from another app opens Add a wish (capture.ts).
-// - Links to the public website that Android opens in the app go to the list.
+// - Links to the public website that Android opens in the app go to the list, and "Open in the
+//   Hippo app" from a browser (hippo://open/<route>) goes to its validated route.
 // - Keyboard: html[data-keyboard] while it is open, so the floating navigation
 //   steps aside.
 // - Foreground again: retry pending sync and check the clock.
@@ -21,6 +22,7 @@ import { SystemBars, SystemBarsStyle, SystemBarType } from '@capacitor/core'
 import { Keyboard } from '@capacitor/keyboard'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { captureShared } from '../core/capture.ts'
+import { appRouteFromOpenUrl, type AppRoute } from '../lib/app-route.ts'
 import { appResumed } from '../core/core.ts'
 import { historyIndex, navigate } from '../layout/motionLocation.ts'
 import { isSheetUnderStatusBar, onStatusAreaChange } from '../layout/statusArea.ts'
@@ -163,8 +165,26 @@ async function takeShare(): Promise<void> {
   if (captureShared(text)) navigate('/item/new')
 }
 
-/** A link Android opened in the app. Only share links of the public website are followed; the link itself is never logged. */
+/**
+ * "Open in the Hippo app" from a browser (`hippo://open/<route>`, see lib/app-route.ts): the one
+ * validated way in. A list or transfer payload is handled as for a link (it leaves the address and
+ * history at once); anything not on the list opens Home.
+ */
+function openAppRoute(route: AppRoute): void {
+  if (route.kind === 'list') navigate(`/l/${route.payload}`)
+  else if (route.kind === 'transfer') {
+    holdTransferPayload(route.payload)
+    navigate('/move/receive')
+  } else navigate(route.path)
+}
+
+/** A link Android opened in the app. Only Hippo's own scheme and share links of the public website are followed; the link itself is never logged. */
 function openLink(url: unknown): void {
+  const route = appRouteFromOpenUrl(url)
+  if (route) {
+    openAppRoute(route)
+    return
+  }
   if (typeof url !== 'string') return
   for (const site of new Set([siteAddress(), PUBLIC_SITE_URL])) {
     const payload = payloadFromSiteLink(url, site)

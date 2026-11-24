@@ -61,6 +61,7 @@ export function ListsScreen() {
   return (
     <AppScreen
       nav="lists"
+      width="wide"
       title="Lists"
       // With no lists yet, the empty state below offers the same action, so the icon is left out.
       actions={hasLists ? <IconLink href="#/list/new" variant="frost" aria-label="Make a list" icon={<Plus />} /> : undefined}
@@ -81,7 +82,7 @@ export function ListsScreen() {
             }
           />
         ) : (
-          <List>
+          <List layout="cards">
             {lists.map((l) => (
               <OwnedListRow key={l.id} list={l} liveCount={l.itemIds.filter((id) => live.has(id)).length} />
             ))}
@@ -96,7 +97,7 @@ export function ListsScreen() {
         ) : guests.length === 0 ? (
           <p className="app-note">Lists friends send you appear here once you open their link on this device.</p>
         ) : (
-          <List>
+          <List layout="cards">
             {guests.map((g) => (
               <GuestListRow key={g.topic} guest={g} />
             ))}
