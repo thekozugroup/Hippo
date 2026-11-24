@@ -69,7 +69,8 @@ function systemBars(tag) {
   writeFileSync(join(out, `dumpsys-${tag}.txt`), text)
   const { h } = screenSize()
   const frames = (type) =>
-    [...text.matchAll(new RegExp(`mType=${type}\\b[^\\n]*?mFrame=\\[(-?\\d+),(-?\\d+)\\]\\[(-?\\d+),(-?\\d+)\\][^\\n]*?mVisible=(true|false)`, 'g'))].map((m) => ({
+    // Android 15: "InsetsSource id=… type=statusBars frame=[0,0][320,24] visible=true …"
+    [...text.matchAll(new RegExp(`\\btype=${type} frame=\\[(-?\\d+),(-?\\d+)\\]\\[(-?\\d+),(-?\\d+)\\][^\\n]*? visible=(true|false)`, 'g'))].map((m) => ({
       top: Number(m[2]),
       bottom: Number(m[4]),
       visible: m[5] === 'true',
@@ -439,13 +440,41 @@ async function home() {
     await page.evaluate(() => window.scrollTo(0, 0))
     const top = await edgeChecks(page, 'home', 'light')
 
-    // Scroll the light sheet up under the status bar.
+    // The floating navigation: inside the screen's width and above the navigation bar.
+    const nav = await page.evaluate(() => {
+      const r = document.querySelector('.bottom-nav')?.getBoundingClientRect()
+      const probe = document.createElement('div')
+      probe.style.cssText = 'position:fixed;top:0;height:var(--inset-bottom);width:0;visibility:hidden'
+      document.body.append(probe)
+      const insetBottom = probe.getBoundingClientRect().height
+      probe.remove()
+      return r ? { left: r.left, right: r.right, top: r.top, bottom: r.bottom, innerWidth: window.innerWidth, innerHeight: window.innerHeight, insetBottom } : null
+    })
+    check(
+      nav !== null && nav.left >= 0 && nav.right <= nav.innerWidth && nav.bottom <= nav.innerHeight - nav.insetBottom,
+      'home: floating navigation inside the screen and above the navigation bar',
+      nav ? `nav ${r1(nav.left)}..${r1(nav.right)} of ${nav.innerWidth} wide, bottom ${r1(nav.bottom)}; navigation bar starts at ${r1(nav.innerHeight - nav.insetBottom)}` : 'no .bottom-nav',
+    )
+
+    // Scroll the light sheet up under the status bar. A first-run Home can be too short to scroll
+    // that far on a small screen; then a blank block is added at the end of the sheet for this
+    // check only (reported), so the real scroll, fade and icon switch can still be measured.
     const scroll = await page.evaluate(() => {
       const sheet = document.querySelector('.screen:not(.screen--contained) > .screen__body .screen__sheet')
       const want = sheet ? sheet.getBoundingClientRect().top + window.scrollY + 40 : 0
+      const room = () => (document.scrollingElement?.scrollHeight ?? 0) - window.innerHeight
+      let spacer = 0
+      if (sheet && room() < want) {
+        spacer = Math.ceil(want - room() + 80)
+        const block = document.createElement('div')
+        block.setAttribute('aria-hidden', 'true')
+        block.style.height = `${spacer}px`
+        sheet.append(block)
+      }
       window.scrollTo(0, want)
-      return { want, max: (document.scrollingElement?.scrollHeight ?? 0) - window.innerHeight, at: window.scrollY }
+      return { want, max: room(), at: window.scrollY, spacer }
     })
+    if (scroll.spacer) record('INFO', 'home scrolled', `the first-run Home was too short to scroll the sheet under the status bar; a ${scroll.spacer} px blank block was added to the sheet for this check`)
     let under = ''
     for (let i = 0; i < 30 && under !== 'sheet'; i++) {
       await sleep(100)

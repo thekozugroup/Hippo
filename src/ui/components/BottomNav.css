@@ -14,15 +14,23 @@
   box-sizing: border-box;
   --nav-natural: calc(4 * var(--h-md) + 3 * var(--nav-gap) + 2 * var(--nav-pad) + var(--nav-label-pad) + var(--nav-label-end) + 5em);
   width: min(var(--nav-natural), calc(100% - 2 * var(--sp-4)));
-  /* Same parity as the room it is centred in, so its left edge lands on a whole pixel: route
-     transitions snap a half pixel otherwise, and the bar would nudge at the start and the end. */
-  width: calc(round(down, min(var(--nav-natural), 100% - 2 * var(--sp-4)) - mod(100%, 2px), 2px) + mod(100%, 2px));
   /* .frost--bleed: the blurred box reaches past the pill above and below; layout is unchanged. */
   padding: calc(var(--nav-pad) + var(--frost-bleed, 0px)) var(--nav-pad);
   margin-block: calc(-1 * var(--frost-bleed, 0px));
   border-radius: var(--r-pill);
   color: var(--text);
   font-size: var(--fs-secondary);
+}
+
+/* Same parity as the room it is centred in, so its left edge lands on a whole pixel: route
+   transitions snap a half pixel otherwise, and the bar would nudge at the start and the end. Only
+   where round() and mod() exist (Chrome 125): the value holds var(), so an engine without them
+   would not fall back to the width above but drop to auto, and the bar would overflow the screen
+   (seen on Android WebView 124). */
+@supports (width: calc(round(down, 5px, 2px) + mod(5px, 2px))) {
+  .bottom-nav {
+    width: calc(round(down, min(var(--nav-natural), 100% - 2 * var(--sp-4)) - mod(100%, 2px), 2px) + mod(100%, 2px));
+  }
 }
 
 .bottom-nav__item {
