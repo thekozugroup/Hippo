@@ -442,7 +442,10 @@ async function home() {
 
     // The floating navigation: inside the screen's width and above the navigation bar.
     const nav = await page.evaluate(() => {
-      const r = document.querySelector('.bottom-nav')?.getBoundingClientRect()
+      // The pill's own box reaches past it above and below (the frost bleed); its buttons do not.
+      const items = [...document.querySelectorAll('.bottom-nav .bottom-nav__item')].map((el) => el.getBoundingClientRect())
+      const box = document.querySelector('.bottom-nav')?.getBoundingClientRect()
+      const r = box && items.length ? { left: box.left, right: box.right, top: Math.min(...items.map((i) => i.top)), bottom: Math.max(...items.map((i) => i.bottom)) } : null
       const probe = document.createElement('div')
       probe.style.cssText = 'position:fixed;top:0;height:var(--inset-bottom);width:0;visibility:hidden'
       document.body.append(probe)
@@ -453,7 +456,7 @@ async function home() {
     check(
       nav !== null && nav.left >= 0 && nav.right <= nav.innerWidth && nav.bottom <= nav.innerHeight - nav.insetBottom,
       'home: floating navigation inside the screen and above the navigation bar',
-      nav ? `nav ${r1(nav.left)}..${r1(nav.right)} of ${nav.innerWidth} wide, bottom ${r1(nav.bottom)}; navigation bar starts at ${r1(nav.innerHeight - nav.insetBottom)}` : 'no .bottom-nav',
+      nav ? `nav ${r1(nav.left)}..${r1(nav.right)} of ${nav.innerWidth} wide; its buttons ${r1(nav.top)}..${r1(nav.bottom)}; navigation bar starts at ${r1(nav.innerHeight - nav.insetBottom)}` : 'no .bottom-nav',
     )
 
     // Scroll the light sheet up under the status bar. A first-run Home can be too short to scroll
