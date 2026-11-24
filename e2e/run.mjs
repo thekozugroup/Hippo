@@ -13,6 +13,8 @@ import './clock.test.mjs'
 import './fixes.test.mjs'
 import './native.test.mjs'
 import './slider.test.mjs'
+import './site-setup.test.mjs'
+import './vercel.test.mjs'
 
 if (!existsSync(ROOT + 'dist/index.html')) {
   console.error('dist/ is missing: run `npm run build` first (npm run test:e2e does this).')

@@ -33,7 +33,7 @@ export type SiteCheck = { ok: true; url: string; host: string; info: SiteInfo } 
 /**
  * The address someone typed, as a site base (`https://host/path/`), or a problem. `gifts.example.org`
  * becomes `https://gifts.example.org/`; a pasted link to a page of the site keeps only the path's
- * folder; query and fragment are dropped (a share link pasted by mistake loses its secret here).
+ * folder (a file name such as index.html is dropped); query and fragment are dropped (a share link pasted by mistake loses its secret here).
  */
 export function normalizeSiteInput(input: string): { url: string } | { problem: 'invalid-address' | 'not-https' } {
   const raw = input.trim()
@@ -49,7 +49,8 @@ export function normalizeSiteInput(input: string): { url: string } | { problem: 
   if (u.username || u.password || u.port) return { problem: 'invalid-address' }
   u.search = ''
   u.hash = ''
-  if (!u.pathname.endsWith('/')) u.pathname = u.pathname.replace(/[^/]*$/, '')
+  // A last part with a dot is a file (index.html) and goes; one without is a folder (owner.github.io/Hippo).
+  if (!u.pathname.endsWith('/')) u.pathname = /\.[^/]*$/.test(u.pathname) ? u.pathname.replace(/[^/]*$/, '') : `${u.pathname}/`
   if (!isAcceptablePageUrl(u.href)) return { problem: 'invalid-address' }
   return { url: u.href }
 }

@@ -28,6 +28,7 @@ import { appBaseUrl, bookmarkletCode, shortcutScript } from '../../lib/capture-t
 import { possessive } from '../../lib/format.ts'
 import { BackupImport } from '../../lib/BackupImport.tsx'
 import { SiteReachNote } from '../../lib/SiteReach.tsx'
+import { UPSTREAM_REPO_URL } from '../../lib/hosting.ts'
 import { hostLabel, useSiteAddress } from '../../lib/site-reach.ts'
 import { resyncLists } from '../../lib/sync.ts'
 import { CategoriesSheet } from '../CategoriesSheet.tsx'
@@ -37,8 +38,6 @@ import { useInstallGuide } from '../../pwa/useInstall.ts'
 import { DeploymentChecks } from './DeploymentChecks.tsx'
 import { isNativeApp } from '../../native/platform.ts'
 import './SettingsScreen.css'
-
-const SOURCE_URL = 'https://github.com/thekozugroup/Hippo'
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -556,7 +555,7 @@ function AboutSection() {
         </li>
       </ul>
       <div className="app-row">
-        <a className="btn btn--secondary btn--md" href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
+        <a className="btn btn--secondary btn--md" href={UPSTREAM_REPO_URL} target="_blank" rel="noopener noreferrer">
           <span className="btn__icon" aria-hidden="true">
             <ExternalLink />
           </span>

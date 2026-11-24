@@ -91,3 +91,16 @@
     border: 1px solid ButtonText;
   }
 }
+
+/* "I have a Hippo site" / "Set one up, free, about two minutes": the second label is long, so the
+   two choices always stack and wrap. */
+.segmented.site-choice {
+  flex-direction: column;
+  border-radius: var(--r-tile);
+}
+.segmented.site-choice .segmented__label {
+  min-height: var(--h-md);
+  padding-block: var(--sp-2);
+  text-align: center;
+  white-space: normal;
+}

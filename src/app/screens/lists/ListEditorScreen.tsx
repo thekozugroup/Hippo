@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Check, CloudOff, Copy, Link2Off, RefreshCw, Send, Share2, Trash2 } from 'lucide-react'
 import { useLocation } from 'wouter'
 import {
@@ -38,10 +38,14 @@ import { requestPersistentStorage } from '../../core/storage.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { shareBaseUrl } from '../../lib/site-address.ts'
 import { SiteReachNote } from '../../lib/SiteReach.tsx'
+import { dismissSiteGuide, needsSiteSetup } from '../../lib/site-reach.ts'
 import { canShareSheet, shareSheet } from '../../native/index.ts'
 import { formatEventDate, plural, summariseSync, type SyncSummary } from '../../lib/format.ts'
 import { SyncFeedback } from './SyncFeedback.tsx'
 import './ListEditorScreen.css'
+
+// The guided screen before a first share is for the Android app only; the website never loads it.
+const SiteGuideSheet = __HIPPO_NATIVE__ ? lazy(() => import('./SiteGuideSheet.tsx')) : null
 
 interface DetailsState {
   name: string
@@ -245,6 +249,7 @@ function ListEditor({ list }: { list: SharedList }) {
   const [summary, setSummary] = useState<SyncSummary | null>(null)
   const [openedAs] = useState(() => (list.status === 'published' && !list.linkPending ? 'shared' : 'not-shared'))
   const [confirm, setConfirm] = useState<Confirm>(null)
+  const [guide, setGuide] = useState(false)
 
   // Repair once when the editor opens: republishes anything relays lost (owner events only).
   const repaired = useRef(false)
@@ -327,15 +332,26 @@ function ListEditor({ list }: { list: SharedList }) {
     return () => window.cancelAnimationFrame(id)
   }, [busy, list.status, list.linkPending])
 
+  const sharePublished = async (before = '') => {
+    focusShare.current = true
+    const r = await publishList(core, list.id)
+    const s = summariseSync([r])
+    setSummary(s)
+    void requestPersistentStorage()
+    if (!r.ok) nudgeSyncRetry()
+    const text = r.ok ? 'Your list is shared. Copy the link and send it to friends.' : 'Not shared yet. Hippo keeps trying and shows the link once it works.'
+    notify(before ? `${before} ${text}` : text)
+  }
+
+  // In the app, the first share checks that the site the link will open on answers; if it does not,
+  // the guided screen comes first (never blocking: "Share anyway").
   const publish = () =>
     run('publish', async () => {
-      focusShare.current = true
-      const r = await publishList(core, list.id)
-      const s = summariseSync([r])
-      setSummary(s)
-      void requestPersistentStorage()
-      if (!r.ok) nudgeSyncRetry()
-      notify(r.ok ? 'Your list is shared. Copy the link and send it to friends.' : 'Not shared yet. Hippo keeps trying and shows the link once it works.')
+      if (SiteGuideSheet && (await needsSiteSetup())) {
+        setGuide(true)
+        return
+      }
+      await sharePublished()
     })
 
   const retryNow = () =>
@@ -500,6 +516,23 @@ function ListEditor({ list }: { list: SharedList }) {
         </Button>
       </section>
 
+      {guide && SiteGuideSheet ? (
+        <Suspense fallback={null}>
+          <SiteGuideSheet
+            open={guide}
+            onClose={() => setGuide(false)}
+            onConnected={({ host }) => {
+              setGuide(false)
+              void run('publish', () => sharePublished(`Connected to ${host}.`))
+            }}
+            onShareAnyway={() => {
+              dismissSiteGuide()
+              setGuide(false)
+              void run('publish', () => sharePublished())
+            }}
+          />
+        </Suspense>
+      ) : null}
       <BottomSheet
         open={confirm === 'unpublish'}
         onClose={() => setConfirm(null)}
