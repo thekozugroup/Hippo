@@ -8,7 +8,7 @@
 // later and as plain strings, through `captureShared`, which puts them
 // through the same `captureFromSearchParams` and `draftFromCapture` path.
 
-import { captureFromSearchParams, draftFromCapture, type DraftItem } from '../../core/index.ts'
+import { captureFromSearchParams, draftFromCapture, LIMITS, type DraftItem } from '../../core/index.ts'
 
 let pendingDraft: DraftItem | null = null
 /** Changes with every share that arrives while the app runs, so an open Add a wish form starts afresh. */
@@ -36,15 +36,48 @@ export function handleStartupCapture(loc: Location = window.location, hist: Hist
  * tracking-parameter removal apply. Returns the draft, or null when nothing usable was shared.
  */
 export function captureShared(shared: { title?: unknown; text?: unknown }): DraftItem | null {
-  const params = new URLSearchParams()
-  if (typeof shared.title === 'string') params.set('title', shared.title)
-  if (typeof shared.text === 'string') params.set('text', shared.text)
-  const capture = captureFromSearchParams(params)
-  if (!capture) return null
-  pendingDraft = draftFromCapture(capture)
+  const draft = draftFromShare(shared)
+  if (!draft) return null
+  pendingDraft = draft
   epoch++
   for (const l of listeners) l()
   return pendingDraft
+}
+
+const ANY_URL = /https?:\/\/[^\s<>"'`]+/gi
+
+function oneLine(s: string): string {
+  return s.replace(/\s+/g, ' ').trim()
+}
+
+function codePoints(s: string, max: number): string {
+  const cps = Array.from(s)
+  return cps.length > max ? cps.slice(0, max).join('') : s
+}
+
+/**
+ * The draft for a share from another app, without storing it. The link (the first http(s) address
+ * in the text) and the title go through `captureFromSearchParams` and `draftFromCapture` like a
+ * deep link. The shared words around the link are kept as well: with no subject they are the
+ * wish's name (a shop app sharing "Product name https://…"), and whatever does not fit the name,
+ * or words next to a subject, go to the notes. Nothing is ever turned into a link but the link.
+ */
+export function draftFromShare(shared: { title?: unknown; text?: unknown }): DraftItem | null {
+  const title = typeof shared.title === 'string' ? oneLine(shared.title) : ''
+  const text = typeof shared.text === 'string' ? shared.text : ''
+  const words = oneLine(text.replace(ANY_URL, ' '))
+  const params = new URLSearchParams()
+  if (title) params.set('title', title)
+  else if (words) params.set('title', words)
+  if (text.trim()) params.set('text', text)
+  const capture = captureFromSearchParams(params)
+  if (!capture) return null
+  const draft = draftFromCapture(capture)
+  if (!draft.title && !draft.url) return null
+  const longerThanName = !title && Array.from(words).length > LIMITS.title
+  const besideSubject = Boolean(title) && words !== '' && words !== draft.title && !draft.title.includes(words)
+  if (longerThanName || besideSubject) draft.notes = codePoints(words, LIMITS.notes)
+  return draft
 }
 
 /** The draft from the latest share or deep link, if it has not been used yet. */
@@ -63,4 +96,14 @@ export function captureEpoch(): number {
 export function subscribeCapture(listener: () => void): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
+}
+
+/**
+ * Where Home sends a first-run owner (`step` is the setup step to resume, or null for a returning
+ * one). A share that is waiting for Add a wish wins over setup, so a first launch that begins with
+ * a share always ends on the filled-in form; setup comes back on Home afterwards.
+ */
+export function homeRedirect(step: string | null, captured: boolean): string | null {
+  if (!step) return null
+  return captured ? '/item/new' : `/welcome/${step}`
 }

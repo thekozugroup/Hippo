@@ -26,6 +26,10 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SharedTextPlugin.class);
         registerPlugin(PageFetchPlugin.class);
         registerPlugin(TouchFeedbackPlugin.class);
+        // Android hands the activity its old start intent again after recreating it (the process was
+        // stopped in the background) or reopening it from Recents. A share in it was already used, so
+        // it is marked before super.onCreate passes it to the plugins.
+        SharedTextPlugin.skipRedelivered(getIntent(), savedInstanceState != null);
         super.onCreate(savedInstanceState);
         // Capacitor installs a cookie handler that stores every cookie a native request receives and
         // sends it back later. Hippo uses no cookies, and its native requests (the clock check and

@@ -20,6 +20,8 @@ export interface DraftItem {
   url?: string
   imageUrl?: string
   price?: Money
+  /** Shared words that are neither the name nor the link (the Android app's share target only). */
+  notes?: string
 }
 
 const URL_RE = /https?:\/\/[^\s<>"'`]+/i

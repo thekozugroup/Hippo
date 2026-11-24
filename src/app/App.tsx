@@ -4,6 +4,7 @@ import type { Core } from '../core/index.ts'
 import { Skeleton } from '../ui/index.ts'
 import { useCore } from './core/context.ts'
 import { endBoot, isSetupBoot } from './core/boot.ts'
+import { homeRedirect, peekCaptureDraft } from './core/capture.ts'
 import { ClockNotice } from './core/ClockNotice.tsx'
 import { CoreProvider } from './core/CoreProvider.tsx'
 import { useGuestLists, useItems, useSettings, useSharedLists } from './core/data.ts'
@@ -178,7 +179,11 @@ function HomeRoute() {
   const step = decided ? onboardingStepFor({ stored: settings.onboarding, items: items.length, lists: lists.length, guests: guests.length }) : null
   useEffect(() => {
     if (!decided) return
-    if (step) navigate(`/welcome/${step}`, { replace: true })
+    // Home may decide after a share from another app has already opened Add a wish (Android, first
+    // launch): then it is no longer on screen and must not send the person to setup over the form.
+    if (!/^#?\/?$/.test(window.location.hash)) return
+    const to = homeRedirect(step, peekCaptureDraft() !== null)
+    if (to) navigate(to, { replace: true })
     else writeSetupHint(true, dbName)
   }, [decided, step, navigate, dbName])
   // Returning people see Home at once; a first visit waits for the answer instead of flashing Home.

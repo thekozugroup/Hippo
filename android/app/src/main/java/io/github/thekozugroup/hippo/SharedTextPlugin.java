@@ -13,68 +13,52 @@ import com.getcapacitor.annotation.CapacitorPlugin;
  * page's link as the text.
  *
  * Capacitor hands every intent to plugins: the one that started the app
- * (cold start, from BridgeActivity.load) and later ones (the app already
- * running, launchMode singleTask). Either way the share is kept here until
- * the web app takes it (src/app/native/shell.ts calls take() at start and
- * whenever "received" fires). The values are untrusted; they are only capped
- * here, and the web app validates them like a deep link. Nothing is logged.
+ * (cold start: BridgeActivity.load passes getIntent() before the web app has
+ * loaded) and later ones (the app already running, launchMode singleTask,
+ * through onNewIntent). Either way the share is kept in a ShareInbox until the
+ * web app takes it: src/app/native/shell.ts calls take() when it starts and
+ * whenever "received" fires, so a "received" sent before the web app listens
+ * loses nothing. An intent Android hands back after recreating the activity is
+ * marked by MainActivity and skipped here. The values are untrusted; they are
+ * only capped here, and the web app validates them like a deep link. Nothing
+ * is logged.
  */
 @CapacitorPlugin(name = "SharedText")
 public class SharedTextPlugin extends Plugin {
 
-    /** Longest title or text passed on, in characters. The web app's own limits are lower. */
-    static final int MAX_CHARS = 4096;
-    /** Marks an intent already read, so a recreated activity does not open the form again. */
+    /** Marks an intent already used, so it does not open the form again. */
     static final String CONSUMED = "io.github.thekozugroup.hippo.SHARE_CONSUMED";
 
-    private JSObject pending;
+    private final ShareInbox inbox = new ShareInbox();
 
     @Override
     protected void handleOnNewIntent(Intent intent) {
         super.handleOnNewIntent(intent);
-        JSObject share = read(intent);
-        if (share == null) return;
+        if (intent == null || !ShareInbox.isTextShare(intent.getAction(), intent.getType())) return;
+        if (intent.getBooleanExtra(CONSUMED, false)) return;
+        CharSequence title = intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT);
+        if (ShareInbox.cap(title) == null) title = intent.getCharSequenceExtra(Intent.EXTRA_TITLE);
+        if (!inbox.put(title, intent.getCharSequenceExtra(Intent.EXTRA_TEXT))) return;
         intent.putExtra(CONSUMED, true);
-        synchronized (this) {
-            pending = share;
-        }
         notifyListeners("received", new JSObject());
     }
 
-    /** Returns the waiting share (title and text, both optional) and forgets it. */
+    /** Marks the activity's start intent as used when Android hands an old share back (see ShareInbox.isRedelivery). */
+    static void skipRedelivered(Intent intent, boolean restoredFromSavedState) {
+        if (intent == null || !ShareInbox.isTextShare(intent.getAction(), intent.getType())) return;
+        if (ShareInbox.isRedelivery(intent.getFlags(), restoredFromSavedState)) intent.putExtra(CONSUMED, true);
+    }
+
+    /** Returns the waiting share (title and text, both optional, and its number `seq`) and forgets it. */
     @PluginMethod
     public void take(PluginCall call) {
-        JSObject share;
-        synchronized (this) {
-            share = pending;
-            pending = null;
-        }
-        call.resolve(share == null ? new JSObject() : share);
-    }
-
-    /** The title and text of a text share, capped; null for any other intent. */
-    static JSObject read(Intent intent) {
-        if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return null;
-        if (intent.getBooleanExtra(CONSUMED, false)) return null;
-        String type = intent.getType();
-        if (type == null || !type.startsWith("text/")) return null;
-        String text = cap(intent.getCharSequenceExtra(Intent.EXTRA_TEXT));
-        String title = cap(intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT));
-        if (title == null) title = cap(intent.getCharSequenceExtra(Intent.EXTRA_TITLE));
-        if (text == null && title == null) return null;
+        ShareInbox.Share share = inbox.take();
         JSObject out = new JSObject();
-        if (title != null) out.put("title", title);
-        if (text != null) out.put("text", text);
-        return out;
-    }
-
-    static String cap(CharSequence value) {
-        if (value == null) return null;
-        String s = value.toString();
-        if (s.trim().isEmpty()) return null;
-        if (s.length() <= MAX_CHARS) return s;
-        // Do not cut a surrogate pair in half.
-        int end = Character.isHighSurrogate(s.charAt(MAX_CHARS - 1)) ? MAX_CHARS - 1 : MAX_CHARS;
-        return s.substring(0, end);
+        if (share != null) {
+            if (share.title != null) out.put("title", share.title);
+            if (share.text != null) out.put("text", share.text);
+            out.put("seq", share.seq);
+        }
+        call.resolve(out);
     }
 }

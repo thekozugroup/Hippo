@@ -100,7 +100,7 @@ function initialState(item: Item | null, draft: DraftItem | null): FormState {
     currency,
     quantity: String(item?.quantity ?? 1),
     importance: item?.importance ?? 'want',
-    notes: item?.notes ?? '',
+    notes: item?.notes ?? draft?.notes ?? '',
     categoryIds: item?.categoryIds ?? [],
     allowContributions: item?.allowContributions ?? false,
   }
