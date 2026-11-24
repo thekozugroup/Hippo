@@ -46,6 +46,21 @@ export function transitionDone(page) {
   return page.waitForFunction(() => document.documentElement.dataset.navDir === undefined)
 }
 
+/**
+ * Resolves once finite animations (a note rising in, a toast fading) have finished: axe measures
+ * contrast on the frame it sees, and a half-faded line is not what people read.
+ */
+export function animationsDone(page) {
+  return page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  )
+}
+
 export const ROOT = fileURLToPath(new URL('..', import.meta.url))
 export const SUBPATH = '/hippo/'
 

@@ -1,7 +1,7 @@
 // Deployment checks in Settings, and the opt-in link lookup. Own profiles; nothing is shared with other files.
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { test } from './harness.mjs'
+import { animationsDone, test } from './harness.mjs'
 import { assertNoProblems, newUser } from './flows.test.mjs'
 
 const { AxeBuilder } = createRequire(import.meta.url)('@axe-core/playwright')
@@ -39,6 +39,7 @@ test('settings: the deployment checks are collapsed at the bottom, open on deman
 
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
     await page.waitForTimeout(100)
+    await animationsDone(page)
     const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
     const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
     assert.deepEqual(bad.map((v) => `${v.id} ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`), [])
@@ -90,6 +91,8 @@ test('updates: the version check asks GitHub only when pressed, the policy allow
     assert.match(opened.searchParams.get('value') ?? '', /^# Keeps this copy of Hippo up to date/)
     assert.equal(await popup.evaluate(() => window.opener), null, 'opened without a link back to Hippo')
     await page.getByText('GitHub opened in a new tab for ada/hippo.', { exact: false }).waitFor()
+
+    await animationsDone(page)
 
     const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
     const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')

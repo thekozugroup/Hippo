@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { test, transitionDone } from './harness.mjs'
+import { animationsDone, test, transitionDone } from './harness.mjs'
 import { assertNoProblems, newUser } from './flows.test.mjs'
 import { serveNativeBuild } from './native.test.mjs'
 import { encodeTransferPayload } from '../src/core/protocol/transfer.ts'
@@ -16,6 +16,7 @@ const h1 = (page, name) => page.getByRole('heading', { level: 1, name })
 const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36'
 
 async function axe(page, label) {
+  await animationsDone(page)
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   return r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${label}: ${v.id} ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
 }
@@ -68,7 +69,8 @@ async function sliderChecks(browser, relay, state, baseUrl, label, app) {
     let u = await phone(browser, relay, `${label}-tap-${size.width}`, state, { size, app })
     await u.page.goto(baseUrl)
     await h1(u.page, /Make a wishlist/).waitFor()
-    assert.equal(await u.page.locator('.logo[data-intro]').count(), 1, 'the intro is playing')
+    // In the app the intro waits for the splash screen to go, which can be after the first step shows.
+    await u.page.locator('.logo[data-intro]').waitFor()
     let c = await control(u.page, 'Get started')
     await u.page.touchscreen.tap(c.box.x + c.box.width / 2, c.box.y + c.box.height / 2)
     await h1(u.page, /call you/).waitFor({ timeout: 3000 })

@@ -24,7 +24,8 @@ export default function UpdatePrompt() {
 
   useEffect(() => {
     if (!offlineReady) return
-    notify('Hippo is ready to work offline.')
+    // Never over a message someone may be reading (an import's result, a clock notice): after it.
+    notify('Hippo is ready to work offline.', { whenFree: true })
     setOfflineReady(false)
   }, [offlineReady, notify, setOfflineReady])
 

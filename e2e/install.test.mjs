@@ -3,7 +3,7 @@
 // choices, not the browsers' own install dialogs. Runs after onboarding.test.mjs (uses its link).
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { test } from './harness.mjs'
+import { animationsDone, test } from './harness.mjs'
 import { assertNoProblems } from './flows.test.mjs'
 
 const { AxeBuilder } = createRequire(import.meta.url)('@axe-core/playwright')
@@ -86,6 +86,7 @@ export async function emulateStandalone(context) {
 }
 
 async function axe(page, label) {
+  await animationsDone(page)
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   return r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${label}: ${v.id} ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
 }
