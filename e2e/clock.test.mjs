@@ -26,6 +26,7 @@ async function skewedUser(browser, relay, name, state, offsetMs) {
   return u
 }
 
+const clockNote = (page) => page.getByRole('note', { name: 'Device clock' })
 const taken = (page, title, who) => card(page, title).getByText(who === 'me' ? "You're getting this" : 'Someone is getting this')
 
 test('clock: givers with clocks an hour fast, an hour slow and a day fast agree on who is getting what', async ({ browser, relay, baseUrl, state }) => {
@@ -46,7 +47,8 @@ test('clock: givers with clocks an hour fast, an hour slow and a day fast agree 
   const fast = await skewedUser(browser, relay, 'clock-fast', state, HOUR)
   await fast.page.goto(link)
   await fast.page.getByRole('heading', { level: 1, name: 'Clock test' }).waitFor()
-  await fast.page.getByText('The clock on this device is about 1 hour ahead.', { exact: false }).waitFor()
+  // Told on the screen, where it stays until dismissed (the toast that also says it is soon replaced).
+  await clockNote(fast.page).getByText('The clock on this device is about 1 hour ahead.', { exact: false }).waitFor()
   assert.equal(await fast.page.evaluate(() => Math.round((Date.now() - performance.timeOrigin - performance.now()) / 60_000)), 60)
   await card(fast.page, 'Clock scarf').getByRole('button', { name: "I'll get this" }).click()
   await fast.page.getByRole('dialog', { name: 'Get this gift' }).getByRole('button', { name: "I'll get this" }).click()
@@ -57,7 +59,7 @@ test('clock: givers with clocks an hour fast, an hour slow and a day fast agree 
   const slow = await skewedUser(browser, relay, 'clock-slow', state, -HOUR)
   await slow.page.goto(link)
   await slow.page.getByRole('heading', { level: 1, name: 'Clock test' }).waitFor()
-  await slow.page.getByText('The clock on this device is about 1 hour behind.', { exact: false }).waitFor()
+  await clockNote(slow.page).getByText('The clock on this device is about 1 hour behind.', { exact: false }).waitFor()
   await taken(slow.page, 'Clock scarf', 'someone').waitFor()
   await card(slow.page, 'Clock lamp').getByRole('button', { name: "I'll get this" }).click()
   await slow.page.getByRole('dialog', { name: 'Get this gift' }).getByRole('button', { name: "I'll get this" }).click()

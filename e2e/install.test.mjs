@@ -166,8 +166,7 @@ test('install: on Android Chrome the step comes late; when the browser offers it
     await install.click()
     await page.getByText('Hippo is installed. Open it from your home screen.').first().waitFor()
     assert.equal(await page.evaluate(() => window.__prompted), 1)
-    // The same control now says Continue; presses less than 350 ms apart count once (a double tap).
-    await page.waitForTimeout(400)
+    // The same control now says Continue, and a press on it at once is a new decision.
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await h1(page, /from anywhere/).waitFor()

@@ -2,7 +2,7 @@
 // profiles; later tests build on earlier ones through `state.o`.
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
-import { test } from './harness.mjs'
+import { need, test, transitionDone } from './harness.mjs'
 import { assertNoProblems, newUser } from './flows.test.mjs'
 
 const { AxeBuilder } = createRequire(import.meta.url)('@axe-core/playwright')
@@ -197,7 +197,7 @@ test('setup: closing the app mid-flow resumes at the same step with the answers 
 test('a giver on a fresh device goes straight to the list: owner name in the header, the intro once', async ({ browser, relay, baseUrl, state }) => {
   const g = await newUser(browser, relay, 'o-giver', state)
   const { page } = g
-  await page.goto(state.o.link)
+  await page.goto(need(state, 'o.link', 'setup: a new owner answers each step with the keyboard'))
   await h1(page, 'Birthday 2027').waitFor()
   assert.equal(await page.getByRole('button', { name: 'Get started' }).count(), 0)
   await page.getByText('Ann’s list').waitFor()
@@ -230,7 +230,7 @@ test('a giver on a fresh device goes straight to the list: owner name in the hea
 })
 
 test('motion: route changes animate by direction; with reduced motion nothing animates', async ({ browser, relay, baseUrl, state }) => {
-  const { page } = state.o.owner
+  const { page } = need(state, 'o.owner', 'setup: a new owner answers each step with the keyboard')
   // Record the direction each transition was started with.
   await page.goto(baseUrl + '#/wishlist')
   await h1(page, 'Wishlist').waitFor()
@@ -244,10 +244,10 @@ test('motion: route changes animate by direction; with reduced motion nothing an
   })
   await page.getByRole('link', { name: /Wool scarf/ }).click()
   await h1(page, 'Edit wish').waitFor()
-  await page.waitForTimeout(400)
+  await transitionDone(page)
   await page.goBack()
   await h1(page, 'Wishlist').waitFor()
-  await page.waitForTimeout(400)
+  await transitionDone(page)
   const box = await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Lists' }).boundingBox()
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
   await h1(page, 'Lists').waitFor()
@@ -257,8 +257,9 @@ test('motion: route changes animate by direction; with reduced motion nothing an
   await page.goBack()
   await page.goForward()
   await h1(page, 'Birthday 2027').waitFor()
-  await page.waitForTimeout(500)
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.navDir), undefined)
+  // The direction goes once the last transition ends (it must never stay behind on the page).
+  await transitionDone(page)
+  assert.equal(new URL(page.url()).hash.startsWith('#/list/'), true)
 
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' })
   try {

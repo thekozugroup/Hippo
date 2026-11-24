@@ -121,10 +121,20 @@ function commit(): void {
   emit()
 }
 
+/** No transition is on its way any more: the direction it was styled by goes too. */
+function clearDirection(): void {
+  delete document.documentElement.dataset.navDir
+  delete document.documentElement.dataset.navScrolled
+}
+
 function render(shownBefore: string, to: string, dir: NavDirection): void {
   navigatedSinceCommit = true
   if (dir === 'none' || !canTransition()) {
     token += 1
+    // A transition still playing (Forward straight after Back, onto the screen it still shows) is
+    // overtaken: the latest address shows at once, and its direction must not stay behind on <html>.
+    running?.skipTransition()
+    clearDirection()
     commit()
     return
   }
@@ -150,8 +160,7 @@ function render(shownBefore: string, to: string, dir: NavDirection): void {
   const settle = () => {
     if (running === transition) running = null
     if (my !== token) return
-    delete root.dataset.navDir
-    delete root.dataset.navScrolled
+    clearDirection()
   }
   transition.finished.then(settle, settle)
   transition.ready.catch(() => undefined)

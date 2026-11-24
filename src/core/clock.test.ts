@@ -280,3 +280,44 @@ describe('the outcome a giver is told', () => {
     expect(again.outcome).toEqual({ kind: 'rejected', reason: 'future' })
   })
 })
+
+describe('TimeSync retries', () => {
+  it('measures again within seconds after a failed or untrusted measurement, backing off, and every half hour once it works', async () => {
+    const truth = testClock()
+    const timers: { fn: () => void; ms: number }[] = []
+    let answer: 'fail' | 'slow' | 'ok' = 'fail'
+    const sync = new TimeSync({
+      url: 'https://hippo.example/app/',
+      wallNow: () => truth.now() + HOUR,
+      monoNow: () => truth.now(),
+      fetch: () => {
+        if (answer === 'fail') return Promise.reject(new TypeError('Failed to fetch'))
+        const date = new Date(truth.now()).toUTCString()
+        // A round trip too slow to trust (a loaded device): the answer is discarded.
+        if (answer === 'slow') truth.advance(11_000)
+        return Promise.resolve(headers({ date }))
+      },
+      setTimer: (fn, ms) => timers.push({ fn, ms }),
+      clearTimer: () => undefined,
+    })
+    const next = async () => {
+      const t = timers.at(-1)
+      if (!t) throw new Error('no timer')
+      t.fn()
+      await waitFor(() => timers.length > before)
+    }
+    let before = 0
+    expect(await sync.refresh()).toBe(false)
+    expect(timers.at(-1)?.ms).toBe(5_000)
+    answer = 'slow'
+    before = timers.length
+    await next()
+    expect(sync.offset()).toBeUndefined()
+    expect(timers.at(-1)?.ms).toBe(15_000)
+    answer = 'ok'
+    before = timers.length
+    await next()
+    expect(Math.abs((sync.offset() ?? 0) + HOUR)).toBeLessThanOrEqual(1000)
+    expect(timers.at(-1)?.ms).toBe(30 * 60 * 1000)
+  })
+})

@@ -5,7 +5,7 @@ import { Skeleton } from '../ui/index.ts'
 import { useCore } from './core/context.ts'
 import { endBoot, isSetupBoot } from './core/boot.ts'
 import { homeRedirect, peekCaptureDraft } from './core/capture.ts'
-import { ClockNotice } from './core/ClockNotice.tsx'
+import { ClockNoticeProvider } from './core/ClockNotice.tsx'
 import { CoreProvider } from './core/CoreProvider.tsx'
 import { useGuestLists, useItems, useSettings, useSharedLists } from './core/data.ts'
 import { NotifyProvider } from './core/NotifyProvider.tsx'
@@ -254,18 +254,19 @@ export function App({ core }: { core?: Core }) {
         <ErrorBoundary>
           <StorageGate>
             <Router hook={useMotionLocation}>
-              <ThemeSync />
-              <InstallRecorder />
-              <ClockNotice />
-              <RouteFocus />
-              <BootFlag />
-              <DocumentTitle />
-              <Routes />
-              {import.meta.env.PROD && !__HIPPO_NATIVE__ && 'serviceWorker' in navigator ? (
-                <Suspense fallback={null}>
-                  <UpdatePrompt />
-                </Suspense>
-              ) : null}
+              <ClockNoticeProvider>
+                <ThemeSync />
+                <InstallRecorder />
+                <RouteFocus />
+                <BootFlag />
+                <DocumentTitle />
+                <Routes />
+                {import.meta.env.PROD && !__HIPPO_NATIVE__ && 'serviceWorker' in navigator ? (
+                  <Suspense fallback={null}>
+                    <UpdatePrompt />
+                  </Suspense>
+                ) : null}
+              </ClockNoticeProvider>
             </Router>
           </StorageGate>
         </ErrorBoundary>

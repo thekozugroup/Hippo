@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict'
 import { addItem, assertNoProblems, card, newUser, skipSetup } from './flows.test.mjs'
-import { test } from './harness.mjs'
+import { need, test } from './harness.mjs'
 
 test('fixes: a first visit paints the setup background before anything renders, with a render-blocking entry', async ({ browser, relay, baseUrl, state }) => {
   const u = await newUser(browser, relay, 'fx-first', state)
@@ -36,7 +36,7 @@ test('fixes: a first visit paints the setup background before anything renders, 
 })
 
 test('fixes: after "Share list" with the keyboard, focus is on Copy link and the result is announced', async ({ baseUrl, state }) => {
-  const { page, problems } = state.fx.owner
+  const { page, problems } = need(state, 'fx.owner', 'fixes: a first visit paints the setup background')
   await addItem(page, baseUrl, { title: 'Focus kettle' })
   await page.goto(baseUrl + '#/list/new')
   await page.getByRole('textbox', { name: 'List name' }).fill('Focus list')
@@ -60,7 +60,7 @@ test('fixes: when the sync servers accept the connection but never answer, a giv
   const g = await newUser(browser, relay, 'fx-silent', state)
   relay.silence()
   try {
-    await g.page.goto(state.fx.link)
+    await g.page.goto(need(state, 'fx.link', 'fixes: after "Share list" with the keyboard'))
     await g.page.getByText('Hippo cannot reach its sync servers').waitFor({ timeout: 20_000 })
     assert.equal(await g.page.getByText('We could not find this list.').count(), 0)
     assert.equal(await g.page.getByText('You are offline').count(), 0)
@@ -99,7 +99,7 @@ test('fixes: at 200% text size the main screens keep everything readable, with n
   const boxes = await Promise.all(['Nice to have', 'Want', 'Would love'].map((n) => page.getByText(n, { exact: true }).boundingBox()))
   assert.ok(boxes[0] && boxes[1] && boxes[2] && boxes[0].y + boxes[0].height <= boxes[1].y + 1 && boxes[1].y + boxes[1].height <= boxes[2].y + 1, 'importance options stack')
   // The giver view and its name chip: the label wraps instead of being cut off.
-  await page.goto(state.fx.link)
+  await page.goto(need(state, 'fx.link', 'fixes: after "Share list" with the keyboard'))
   await page.getByRole('heading', { level: 1, name: 'Focus list' }).waitFor()
   await noSideScroll('giver view')
   const chip = page.getByRole('button', { name: /^Add your name/ })

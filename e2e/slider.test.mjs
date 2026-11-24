@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { test } from './harness.mjs'
+import { test, transitionDone } from './harness.mjs'
 import { assertNoProblems, newUser } from './flows.test.mjs'
 import { serveNativeBuild } from './native.test.mjs'
 import { encodeTransferPayload } from '../src/core/protocol/transfer.ts'
@@ -72,29 +72,26 @@ async function sliderChecks(browser, relay, state, baseUrl, label, app) {
     let c = await control(u.page, 'Get started')
     await u.page.touchscreen.tap(c.box.x + c.box.width / 2, c.box.y + c.box.height / 2)
     await h1(u.page, /call you/).waitFor({ timeout: 3000 })
-    await u.page.waitForTimeout(400) // the route transition ends; a person reads the question
-    // A later step: a drag on Continue, then Back, Skip and an occasion with touch. (Presses less
-    // than 350 ms apart count once, as a double tap: a person reads the new question first.)
-    await u.page.waitForTimeout(400)
+    // A later step: a drag on Continue, then Back, Skip and an occasion with touch.
+    await transitionDone(u.page)
     c = await control(u.page, 'Continue')
     await touchDrag(u.page, u.cdp, c.knob, c.end)
     await h1(u.page, /the occasion/).waitFor({ timeout: 3000 })
-    await u.page.waitForTimeout(400) // the route transition ends; a person reads the question
-    await u.page.waitForTimeout(400)
+    await transitionDone(u.page)
     const choice = await u.page.locator('.setup-choice', { hasText: 'Birthday' }).boundingBox()
     await u.page.touchscreen.tap(choice.x + choice.width / 2, choice.y + choice.height / 2)
     assert.equal(await u.page.getByRole('radio', { name: 'Birthday' }).isChecked(), true)
     const back = await u.page.getByRole('button', { name: 'Back', exact: true }).boundingBox()
     await u.page.touchscreen.tap(back.x + back.width / 2, back.y + back.height / 2)
     await h1(u.page, /call you/).waitFor({ timeout: 3000 })
-    await u.page.waitForTimeout(400) // the route transition ends; a person reads the question
+    await transitionDone(u.page)
     const field = await u.page.getByRole('textbox', { name: 'Your name' }).boundingBox()
     await u.page.touchscreen.tap(field.x + 20, field.y + field.height / 2)
     assert.equal(await u.page.evaluate(() => document.activeElement?.getAttribute('autocomplete')), 'given-name')
     const skip = await u.page.getByRole('button', { name: 'Skip', exact: true }).boundingBox()
     await u.page.touchscreen.tap(skip.x + skip.width / 2, skip.y + skip.height / 2)
     await h1(u.page, /the occasion/).waitFor({ timeout: 3000 })
-    await u.page.waitForTimeout(400) // the route transition ends; a person reads the question
+    await transitionDone(u.page)
     const close = await u.page.getByRole('button', { name: 'Close setup' }).boundingBox()
     await u.page.touchscreen.tap(close.x + close.width / 2, close.y + close.height / 2)
     await u.page.waitForURL(/#\/$/)
@@ -112,7 +109,7 @@ async function sliderChecks(browser, relay, state, baseUrl, label, app) {
     assert.equal(await u.page.locator('.slide-btn__knob').evaluate((k) => k.style.transform), '')
     await touchDrag(u.page, u.cdp, c.knob, c.end)
     await h1(u.page, /call you/).waitFor({ timeout: 3000 })
-    await u.page.waitForTimeout(400) // the route transition ends; a person reads the question
+    await transitionDone(u.page)
     await u.page.goBack()
     await h1(u.page, /Make a wishlist/).waitFor()
     await u.page.waitForTimeout(2500)
@@ -120,7 +117,7 @@ async function sliderChecks(browser, relay, state, baseUrl, label, app) {
     c = await control(u.page, 'Get started')
     await touchDrag(u.page, u.cdp, c.knob, c.end)
     await h1(u.page, /call you/).waitFor({ timeout: 3000 })
-    await u.page.waitForTimeout(400) // the route transition ends; a person reads the question
+    await transitionDone(u.page)
     // Exactly one step on: a drag never sends a second activation.
     await u.page.waitForTimeout(500)
     assert.ok(await h1(u.page, /call you/).isVisible())

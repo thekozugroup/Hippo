@@ -27,6 +27,25 @@ export function test(name, fn) {
   tests.push({ name, fn })
 }
 
+/**
+ * Reads state an earlier test made (`key` may be dotted, like 'fx.link'). When that test failed or
+ * was filtered out, this fails at once and says what is missing, instead of a TypeError later.
+ */
+export function need(state, key, maker) {
+  const value = key.split('.').reduce((v, k) => (v === undefined || v === null ? undefined : v[k]), state)
+  if (value === undefined || value === null) throw new Error(`missing prerequisite: state.${key}, made by the test "${maker}", which failed or did not run`)
+  return value
+}
+
+/**
+ * Resolves once no route transition is playing (the app clears html[data-nav-dir] when the latest
+ * one ends). While one plays, the browser hit-tests its snapshot: a tap is replayed on the real
+ * control, but a drag that starts then has nothing to drag.
+ */
+export function transitionDone(page) {
+  return page.waitForFunction(() => document.documentElement.dataset.navDir === undefined)
+}
+
 export const ROOT = fileURLToPath(new URL('..', import.meta.url))
 export const SUBPATH = '/hippo/'
 

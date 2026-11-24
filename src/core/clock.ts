@@ -53,6 +53,12 @@ const MAX_ROUND_TRIP_MS = 10_000
 const JUMP_TOLERANCE_MS = 2_000
 const DEFAULT_REFRESH_MS = 30 * 60 * 1000
 const DEFAULT_READY_TIMEOUT_MS = 3_000
+/**
+ * After a measurement that failed or could not be trusted (no answer, a slow round trip under load),
+ * the next try comes this soon, then three times later each time, up to the normal refresh: a
+ * device whose clock is wrong is corrected (and told) within seconds, not half an hour later.
+ */
+const DEFAULT_RETRY_MS = 5_000
 /** A stored offset is used for this long, until a new measurement replaces it. */
 const STORED_MAX_AGE_MS = 24 * 60 * 60 * 1000
 export const CLOCK_STORAGE_KEY = 'hippo:clock'
@@ -100,6 +106,8 @@ export interface TimeSyncOptions {
   refreshMs?: number
   /** `ready()` resolves after this long even without an answer. */
   readyTimeoutMs?: number
+  /** The first retry after a failed measurement; later ones back off up to `refreshMs`. */
+  retryMs?: number
   /** Timers; tests pass fakes. */
   setTimer?: (fn: () => void, ms: number) => unknown
   clearTimer?: (id: unknown) => void
@@ -126,6 +134,9 @@ export class TimeSync implements Clock {
   private readonly storage: TimeSyncOptions['storage']
   private readonly refreshMs: number
   private readonly readyTimeoutMs: number
+  private readonly retryMs: number
+  /** Measurements in a row that failed; the retry backs off with it. */
+  private failures = 0
   private readonly setTimer: NonNullable<TimeSyncOptions['setTimer']>
   private readonly clearTimer: NonNullable<TimeSyncOptions['clearTimer']>
   private readonly listeners = new Set<() => void>()
@@ -143,6 +154,7 @@ export class TimeSync implements Clock {
     this.storage = options.storage ?? null
     this.refreshMs = options.refreshMs ?? DEFAULT_REFRESH_MS
     this.readyTimeoutMs = options.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS
+    this.retryMs = options.retryMs ?? DEFAULT_RETRY_MS
     this.setTimer = options.setTimer ?? ((fn, ms) => setTimeout(fn, ms))
     this.clearTimer = options.clearTimer ?? ((id) => clearTimeout(id as ReturnType<typeof setTimeout>))
     this.loadStored()
@@ -184,10 +196,14 @@ export class TimeSync implements Clock {
   /** Measures now unless a measurement is running. Resolves true when the offset was measured. Never throws. */
   refresh(): Promise<boolean> {
     if (this.stopped) return Promise.resolve(false)
-    this.inflight ??= this.measure().finally(() => {
-      this.inflight = null
-      this.scheduleRefresh()
-    })
+    this.inflight ??= this.measure()
+      .catch(() => false)
+      .then((ok) => {
+        this.inflight = null
+        this.failures = ok ? 0 : this.failures + 1
+        this.scheduleRefresh()
+        return ok
+      })
     return this.inflight
   }
 
@@ -206,10 +222,11 @@ export class TimeSync implements Clock {
   private scheduleRefresh(): void {
     if (this.stopped) return
     if (this.refreshTimer !== undefined) this.clearTimer(this.refreshTimer)
+    const delay = this.failures === 0 ? this.refreshMs : Math.min(this.refreshMs, this.retryMs * 3 ** (this.failures - 1))
     this.refreshTimer = this.setTimer(() => {
       this.refreshTimer = undefined
       void this.refresh()
-    }, this.refreshMs)
+    }, delay)
   }
 
   private async measure(): Promise<boolean> {

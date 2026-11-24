@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { SlideButton } from './SlideButton.tsx'
 import { StepScreen } from './StepScreen.tsx'
-import { completesAt, dragIntent, isRepeat, knobOffset, labelOpacity, slideProgress, SLIDE_THRESHOLD } from './slide.ts'
+import { completesAt, dragIntent, isRepeatPress, knobOffset, labelOpacity, slideProgress, SLIDE_THRESHOLD } from './slide.ts'
 
 describe('slide logic', () => {
   it('tells a slide from a scroll only once the press has moved past the slop', () => {
@@ -33,10 +33,12 @@ describe('slide logic', () => {
     expect(labelOpacity(0.6)).toBe(0)
   })
 
-  it('counts activations close together once', () => {
-    expect(isRepeat(100, undefined, 700)).toBe(false)
-    expect(isRepeat(500, 100, 700)).toBe(true)
-    expect(isRepeat(900, 100, 700)).toBe(false)
+  it('counts a double tap once, and only on the control that took its first tap', () => {
+    expect(isRepeatPress(1, undefined)).toBe(false)
+    expect(isRepeatPress(1, 1)).toBe(false) // a new single press, however soon
+    expect(isRepeatPress(2, 1)).toBe(true)
+    expect(isRepeatPress(3, 2)).toBe(true)
+    expect(isRepeatPress(2, undefined)).toBe(false) // its first tap went to another control
   })
 })
 
@@ -105,14 +107,11 @@ describe('SlideButton', () => {
     expect(btn.tagName).toBe('BUTTON')
     await userEvent.click(btn)
     expect(onActivate).toHaveBeenCalledTimes(1)
-    vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 10_000)
     btn.focus()
     await userEvent.keyboard('{Enter}')
     expect(onActivate).toHaveBeenCalledTimes(2)
-    vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 20_000)
     await userEvent.keyboard(' ')
     expect(onActivate).toHaveBeenCalledTimes(3)
-    vi.restoreAllMocks()
   })
 
   it('a slide past the threshold activates once, sends slidecomplete, and a tap during the settle does nothing', () => {

@@ -139,6 +139,22 @@
   font-weight: 500;
 }
 
+/* The device clock notice at the top of the sheet: the text, then a dismiss button at the end. */
+.clock-note {
+  align-items: center;
+  padding-block: var(--sp-3);
+  padding-inline-end: var(--sp-2);
+}
+.clock-note > .app-banner__body {
+  flex: 1;
+}
+.clock-note > .app-banner__body > p {
+  margin: 0;
+}
+.clock-note__close {
+  flex: none;
+}
+
 /* Chip rows that scroll sideways rather than wrap */
 .app-chips {
   display: flex;

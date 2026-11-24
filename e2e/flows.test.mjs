@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { test } from './harness.mjs'
+import { need, test } from './harness.mjs'
 
 const { AxeBuilder } = createRequire(import.meta.url)('@axe-core/playwright')
 
@@ -92,7 +92,7 @@ test('first run: setup opens, closing it at step 1 lands on Home, with the stric
 })
 
 test('add categories and items; filter and sort the wishlist', async ({ baseUrl, state }) => {
-  const { page, problems } = state.owner
+  const { page, problems } = need(state, 'owner', 'first run: setup opens')
   await addItem(page, baseUrl, { title: 'Espresso machine', price: '249.00', love: true, contrib: true, newCategory: 'Kitchen' })
   await addItem(page, baseUrl, { title: 'Wool socks', price: '18', qty: 3 })
   await addItem(page, baseUrl, { title: 'Board game night', price: '45.50' })
@@ -120,7 +120,7 @@ test('add categories and items; filter and sort the wishlist', async ({ baseUrl,
 })
 
 test('create and publish a list, with per-server feedback', async ({ baseUrl, state }) => {
-  const { page, problems } = state.owner
+  const { page, problems } = need(state, 'owner', 'first run: setup opens')
   await page.goto(baseUrl + '#/list/new')
   await page.getByRole('textbox', { name: 'List name' }).fill('Birthday 2027')
   await page.getByRole('textbox', { name: 'Message to friends (optional)' }).fill('Thank you!')
@@ -139,7 +139,7 @@ test('a giver sets a nickname, claims one item and pledges on another', async ({
   const giver = await newUser(browser, relay, 'giver', state)
   state.giver = giver
   const { page } = giver
-  await page.goto(state.link)
+  await page.goto(need(state, 'link', 'create and publish a list'))
   await page.getByRole('heading', { level: 1, name: 'Birthday 2027' }).waitFor()
   await page.getByText('Thank you!').waitFor()
 
@@ -169,7 +169,7 @@ test('a third person sees the claim, the pledge and the nickname', async ({ brow
   const third = await newUser(browser, relay, 'third', state)
   state.third = third
   const { page } = third
-  await page.goto(state.link)
+  await page.goto(need(state, 'link', 'create and publish a list'))
   await card(page, 'Wool socks').getByText('Maya is getting 2 of these').waitFor()
   await card(page, 'Wool socks').getByText('1 of 3 still wanted').waitFor()
   await card(page, 'Espresso machine').getByText('Maya chipped in $50.00').waitFor()
@@ -180,9 +180,9 @@ test('a third person sees the claim, the pledge and the nickname', async ({ brow
   await card(page, 'Board game night').getByRole('button', { name: "I'll get this" }).waitFor()
   assert.equal(await card(page, 'Board game night').locator('.status-pill').count(), 0)
   // Lists shared with me (FR-24)
-  await page.goto(state.link.replace(/#.*$/, '#/lists'))
+  await page.goto(need(state, 'link', 'create and publish a list').replace(/#.*$/, '#/lists'))
   await page.getByRole('link', { name: /Birthday 2027/ }).waitFor()
-  await page.goto(state.link)
+  await page.goto(need(state, 'link', 'create and publish a list'))
   await card(page, 'Wool socks').waitFor()
   assertNoProblems(third.problems)
 })
@@ -210,8 +210,8 @@ test('no serious accessibility violations on the main screens (axe, WCAG 2.2 AA)
       [],
     )
   }
-  await scan(state.third.page, 'giver view')
-  const { page } = state.owner
+  await scan(need(state, 'third', 'a third person sees the claim').page, 'giver view')
+  const { page } = need(state, 'owner', 'first run: setup opens')
   for (const [route, label] of [
     ['#/', 'home'],
     ['#/wishlist', 'wishlist'],
@@ -224,14 +224,14 @@ test('no serious accessibility violations on the main screens (axe, WCAG 2.2 AA)
     await page.waitForTimeout(300)
     await scan(page, label)
   }
-  await page.goto(state.listUrl)
+  await page.goto(need(state, 'listUrl', 'create and publish a list'))
   await page.getByRole('textbox', { name: 'Share link' }).waitFor()
   await scan(page, 'list editor')
 })
 
 test('the owner sees no claim state and never requests claims', async ({ state }) => {
-  const { page, frames, problems } = state.owner
-  await page.goto(state.listUrl)
+  const { page, frames, problems } = need(state, 'owner', 'first run: setup opens')
+  await page.goto(need(state, 'listUrl', 'create and publish a list'))
   await page.getByRole('heading', { level: 1, name: 'Birthday 2027' }).waitFor()
   await page.waitForTimeout(1500) // let the repair fetch run
   const text = (await page.locator('body').textContent()) ?? ''
@@ -252,40 +252,40 @@ test('the owner sees no claim state and never requests claims', async ({ state }
 })
 
 test('an item edit reaches givers live', async ({ state }) => {
-  const { page, problems } = state.owner
-  await page.goto(state.link.replace(/#.*$/, '#/wishlist'))
+  const { page, problems } = need(state, 'owner', 'first run: setup opens')
+  await page.goto(need(state, 'link', 'create and publish a list').replace(/#.*$/, '#/wishlist'))
   await page.getByRole('link', { name: /Board game night/ }).click()
   await page.getByRole('textbox', { name: 'Name' }).fill('Board game night (co-op)')
   await page.getByRole('textbox', { name: 'Price' }).fill('40')
   await page.getByRole('button', { name: 'Save changes' }).click()
   await page.waitForURL(/#\/wishlist$/)
-  const third = state.third.page
+  const third = need(state, 'third', 'a third person sees the claim').page
   await card(third, 'Board game night (co-op)').getByText('$40.00').waitFor({ timeout: 10_000 })
   assertNoProblems(problems)
 })
 
 test('opening your own link is refused with an explanation (FR-25)', async ({ state }) => {
-  const { page, problems } = state.owner
-  await page.goto(state.link)
+  const { page, problems } = need(state, 'owner', 'first run: setup opens')
+  await page.goto(need(state, 'link', 'create and publish a list'))
   await page.getByRole('heading', { level: 1, name: 'This is your own list' }).waitFor()
   await page.getByRole('link', { name: 'Open list settings' }).waitFor()
   assertNoProblems(problems)
 })
 
 test('a broken link shows a helpful error', async ({ state }) => {
-  const { page } = state.third
-  await page.goto(state.link.replace(/#\/l\/.*$/, '#/l/AAAAnot-a-real-link'))
+  const { page } = need(state, 'third', 'a third person sees the claim')
+  await page.goto(need(state, 'link', 'create and publish a list').replace(/#\/l\/.*$/, '#/l/AAAAnot-a-real-link'))
   await page.getByRole('heading', { level: 1, name: 'This link does not work' }).waitFor()
-  await page.goto(state.link.slice(0, -10))
+  await page.goto(need(state, 'link', 'create and publish a list').slice(0, -10))
   await page.getByRole('heading', { level: 1, name: 'This link does not work' }).waitFor()
 })
 
 test('a link that points at a loopback or private-network relay is refused', async ({ state }) => {
-  const { page } = state.third
-  const keys = Buffer.from(state.link.split('#/l/')[1], 'base64url').subarray(1, 65)
+  const { page } = need(state, 'third', 'a third person sees the claim')
+  const keys = Buffer.from(need(state, 'link', 'create and publish a list').split('#/l/')[1], 'base64url').subarray(1, 65)
   for (const relay of ['wss://192.168.1.1', 'ws://127.0.0.1:9222', 'wss://printer.local']) {
     const v2 = Buffer.concat([Buffer.from([2]), keys, Buffer.from(relay)]).toString('base64url')
-    await page.goto(state.link.replace(/#\/l\/.*$/, `#/l/${v2}`))
+    await page.goto(need(state, 'link', 'create and publish a list').replace(/#\/l\/.*$/, `#/l/${v2}`))
     await page.getByRole('heading', { level: 1, name: 'This link does not work' }).waitFor()
   }
 })
@@ -316,13 +316,13 @@ test('the ?relays= test override is loopback-only and lasts for one tab', async 
 })
 
 test('unpublishing tells givers the list is no longer shared', async ({ state }) => {
-  const { page, problems } = state.owner
-  await page.goto(state.listUrl)
+  const { page, problems } = need(state, 'owner', 'first run: setup opens')
+  await page.goto(need(state, 'listUrl', 'create and publish a list'))
   await page.getByRole('button', { name: 'Stop sharing' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Stop sharing' }).click()
   await page.getByRole('button', { name: 'Share again with the same link' }).waitFor()
-  const third = state.third.page
-  await third.goto(state.link)
+  const third = need(state, 'third', 'a third person sees the claim').page
+  await third.goto(need(state, 'link', 'create and publish a list'))
   await third.getByText('This list is no longer shared.').waitFor({ timeout: 10_000 })
   assertNoProblems(problems)
 })
@@ -364,8 +364,8 @@ test('share target and deep link prefill the Add form; hostile values are droppe
 })
 
 test('export a backup and import it on another device', async ({ browser, relay, state }) => {
-  const { page } = state.owner
-  await page.goto(state.link.replace(/#.*$/, '#/settings'))
+  const { page } = need(state, 'owner', 'first run: setup opens')
+  await page.goto(need(state, 'link', 'create and publish a list').replace(/#.*$/, '#/settings'))
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export' }).click()])
   assert.match(download.suggestedFilename(), /^hippo-backup-\d{4}-\d{2}-\d{2}\.json$/)
   const file = await download.path()
@@ -374,17 +374,17 @@ test('export a backup and import it on another device', async ({ browser, relay,
   assert.equal(json.items.length, 3)
 
   const other = await newUser(browser, relay, 'restore', state)
-  await other.page.goto(state.link.replace(/#.*$/, '#/settings'))
+  await other.page.goto(need(state, 'link', 'create and publish a list').replace(/#.*$/, '#/settings'))
   await other.page.getByTestId('import-file').setInputFiles(file)
   const dialog = other.page.getByRole('dialog', { name: 'Import this backup?' })
   await dialog.getByText(/3 wishes, 2 categories, 1 list/).waitFor()
   await dialog.getByRole('button', { name: 'Add to what is here' }).click()
   await other.page.getByText(/Imported 3 wishes/).waitFor()
-  await other.page.goto(state.link.replace(/#.*$/, '#/lists'))
+  await other.page.goto(need(state, 'link', 'create and publish a list').replace(/#.*$/, '#/lists'))
   await other.page.getByRole('link', { name: /Birthday 2027/ }).waitFor()
 
   // A file that is not a backup is rejected with a clear message.
-  await other.page.goto(state.link.replace(/#.*$/, '#/settings'))
+  await other.page.goto(need(state, 'link', 'create and publish a list').replace(/#.*$/, '#/settings'))
   await other.page.getByTestId('import-file').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"hello":1}') })
   await other.page.getByText('This is not a Hippo backup', { exact: false }).waitFor()
   assertNoProblems(other.problems)
@@ -392,8 +392,8 @@ test('export a backup and import it on another device', async ({ browser, relay,
 })
 
 test('the app shell reloads offline from the service worker', async ({ state }) => {
-  const { page, context, problems } = state.owner
-  await page.goto(state.link.replace(/#.*$/, '#/'))
+  const { page, context, problems } = need(state, 'owner', 'first run: setup opens')
+  await page.goto(need(state, 'link', 'create and publish a list').replace(/#.*$/, '#/'))
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready
   })
@@ -402,7 +402,7 @@ test('the app shell reloads offline from the service worker', async ({ state }) 
     await page.reload()
     await page.getByRole('heading', { level: 1 }).waitFor()
     await page.getByText('Espresso machine').waitFor()
-    await page.goto(state.link.replace(/#.*$/, '#/settings'))
+    await page.goto(need(state, 'link', 'create and publish a list').replace(/#.*$/, '#/settings'))
     await page.getByRole('heading', { level: 1, name: 'Settings' }).waitFor() // lazy chunk from the precache
   } finally {
     await context.setOffline(false)

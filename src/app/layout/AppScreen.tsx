@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { ArrowLeft, Gift, House, ListChecks, Settings } from 'lucide-react'
 import { BottomNav, IconLink, Logo, Screen, TopBar, cx } from '../../ui/index.ts'
+import { ClockNote } from '../core/ClockNotice.tsx'
 import './AppScreen.css'
 
 export type NavId = 'home' | 'wishlist' | 'lists' | 'settings'
@@ -60,6 +61,7 @@ export function AppScreen({ title, compactTitle, intro, back, backLabel = 'Back'
       nav={nav ? <BottomNav items={NAV} activeId={nav} label="Main" remember="main" /> : undefined}
     >
       <div className="app-sheet app-page" aria-busy={busy || undefined}>
+        <ClockNote />
         {children}
       </div>
     </Screen>

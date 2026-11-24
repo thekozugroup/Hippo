@@ -2,21 +2,25 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProp
 import { ArrowRight } from 'lucide-react'
 import { cx } from '../cx.ts'
 import { assignRef } from '../refs.ts'
-import { completesAt, dragIntent, isRepeat, knobOffset, labelOpacity, slideProgress, type DragIntent } from './slide.ts'
+import { completesAt, dragIntent, isRepeatPress, knobOffset, labelOpacity, slideProgress, type DragIntent } from './slide.ts'
 import './SlideButton.css'
 
 /** The event a completed slide sends (it bubbles), so the app can add touch feedback without this component knowing about it. */
 export const SLIDE_COMPLETE_EVENT = 'slidecomplete'
 
 /**
- * Pointer activations of one control closer together than this count once: a double tap, or a tap
- * during the settle after a slide. The lock belongs to one control instance; a setup step that
- * changes gets a new instance (StepScreen keys it by step), so it never holds back a press on the
- * next question. Keyboard presses are not timed: a held-down Enter (key repeat) is ignored instead.
+ * One physical action is one activation. What would otherwise send a second one is held back, and
+ * nothing else is (no timer that could swallow a deliberate press):
+ * - the click a browser sends after a slide (for `SLIDE_CLICK_MS`);
+ * - a tap while the knob settles at the end after a completed slide;
+ * - the second tap of a double tap (the click's `detail` counts the taps), once this control has
+ *   already acted on the first: a control that changed (a new label, or a new setup step, which
+ *   StepScreen gives a new instance) takes it as a new press;
+ * - a held-down Enter (key repeat).
  */
-const REPEAT_LOCK_MS = 350
-/** How long after a slide ends the click a browser may still send for that same press is ignored. */
 const SLIDE_CLICK_MS = 400
+/** How long the knob rests at the end after a completed slide, once the work is done. */
+const SETTLE_MS = 350
 
 export interface SlideButtonProps extends Omit<ComponentPropsWithRef<'button'>, 'children' | 'onClick' | 'aria-label'> {
   /** The visible label and the button's accessible name ("Get started", "Continue"). */
@@ -73,7 +77,8 @@ export function SlideButton({
   const knob = useRef<HTMLSpanElement>(null)
   const text = useRef<HTMLSpanElement>(null)
   const drag = useRef<Drag | null>(null)
-  const lastActivation = useRef<number | undefined>(undefined)
+  /** The tap count of this control's last pointer activation (since its label last changed). */
+  const lastTaps = useRef<number | undefined>(undefined)
   const suppressClickUntil = useRef(0)
   const [dragging, setDragging] = useState(false)
   const [done, setDone] = useState(false)
@@ -94,7 +99,7 @@ export function SlideButton({
   useLayoutEffect(() => {
     place(0, 1, 1)
     // A press on the new label is a new decision, never a repeat of the press on the old one.
-    lastActivation.current = undefined
+    lastTaps.current = undefined
   }, [label])
 
   // After a completed slide the knob waits at the end; it goes back once the work is done.
@@ -103,27 +108,25 @@ export function SlideButton({
     const id = window.setTimeout(() => {
       setDone(false)
       place(0, 1, 1)
-    }, REPEAT_LOCK_MS)
+    }, SETTLE_MS)
     return () => window.clearTimeout(id)
   }, [done, busy])
 
   /**
-   * Whether an activation counts. Presses (a tap, a click, a slide) closer together than the lock
-   * count once; Enter and Space are never held back (implicit form submission sends them as clicks
-   * with `detail` 0), only by `busy`.
+   * Whether an activation counts. `taps` is the click's tap count (`detail`): 0 for Enter and Space
+   * (implicit form submission sends them as clicks with `detail` 0), which only `busy` holds back.
    */
-  const activate = (pointer: boolean): boolean => {
+  const activate = (taps: number): boolean => {
     if (blocked) return false
-    if (!pointer) return true
-    const now = performance.now()
-    if (isRepeat(now, lastActivation.current, REPEAT_LOCK_MS)) return false
-    lastActivation.current = now
+    if (taps === 0) return true
+    if (done || isRepeatPress(taps, lastTaps.current)) return false
+    lastTaps.current = taps
     return true
   }
 
   const onClick = (e: MouseEvent<HTMLButtonElement>) => {
     const pointer = e.detail > 0
-    if ((pointer && performance.now() < suppressClickUntil.current) || !activate(pointer)) {
+    if ((pointer && performance.now() < suppressClickUntil.current) || !activate(e.detail)) {
       e.preventDefault()
       return
     }
@@ -190,7 +193,7 @@ export function SlideButton({
     setDragging(false)
     // The browser may still send a click for this press; the slide decides instead.
     suppressClickUntil.current = performance.now() + SLIDE_CLICK_MS
-    if (!cancelled && completesAt(slideProgress(d.offset, d.max)) && activate(true)) {
+    if (!cancelled && completesAt(slideProgress(d.offset, d.max)) && activate(1)) {
       place(d.max, d.max, d.dir)
       setDone(true)
       const btn = own.current

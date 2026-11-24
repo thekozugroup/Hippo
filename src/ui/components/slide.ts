@@ -42,9 +42,10 @@ export function labelOpacity(progress: number): number {
 }
 
 /**
- * True when an activation at `now` comes too soon after the previous one at `last` (a tap during
- * the settle animation, or the click a browser sends after a drag), so it must be ignored.
+ * True when a press is a further tap of a multi-tap whose earlier tap this same control already
+ * acted on (`taps` is the click's tap count; `lastTaps` that of this control's last activation,
+ * undefined when it has none). A double tap is one intent; a single press never repeats one.
  */
-export function isRepeat(now: number, last: number | undefined, lockMs: number): boolean {
-  return last !== undefined && now - last >= 0 && now - last < lockMs
+export function isRepeatPress(taps: number, lastTaps: number | undefined): boolean {
+  return taps > 1 && lastTaps !== undefined && lastTaps < taps
 }

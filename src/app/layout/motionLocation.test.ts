@@ -82,4 +82,16 @@ describe('router history and transitions', () => {
     window.history.back()
     await waitForHash('#/settings')
   })
+
+  it('a navigation that does not animate, straight after one that does, leaves no direction behind', async () => {
+    navigate('/lists', { replace: true })
+    await settle()
+    navigate('/list/x') // animates forward; its snapshot still shows Lists
+    expect(document.documentElement.dataset.navDir).toBe('forward')
+    navigate('/list/y', { replace: true }) // a redirect: no transition of its own
+    await waitForHash('#/list/y')
+    await settle()
+    await settle()
+    expect(document.documentElement.dataset.navDir).toBeUndefined()
+  })
 })
