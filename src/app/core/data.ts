@@ -67,3 +67,21 @@ export function usePageLookupEnabled(): boolean | undefined {
   const { db } = useCore()
   return useLiveQuery(() => getPageLookupEnabled(db), [db])
 }
+
+export interface AccountFlags {
+  /** This device is signed in to a Hippo account (and was not told the code changed elsewhere). */
+  signedIn: boolean
+  /** The person confirmed they saved the recovery code. */
+  codeSaved: boolean
+}
+
+/** Cheap account flags for Home (the full status lives with the account screens). */
+export function useAccountFlags(): AccountFlags | undefined {
+  const { db } = useCore()
+  return useLiveQuery(async () => {
+    const [account, saved] = await db.settings.bulkGet(['account', 'recoverySavedAt'])
+    const v: unknown = account?.value
+    const signedIn = typeof v === 'object' && v !== null && typeof (v as { replacedAt?: unknown }).replacedAt !== 'number'
+    return { signedIn, codeSaved: typeof saved?.value === 'number' }
+  }, [db])
+}

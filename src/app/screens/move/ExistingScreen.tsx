@@ -4,7 +4,7 @@
 
 import { type ReactNode } from 'react'
 import { useLocation } from 'wouter'
-import { ChevronRight, FileUp, Globe, Smartphone } from 'lucide-react'
+import { ChevronRight, FileUp, Globe, KeyRound, Smartphone } from 'lucide-react'
 import { StepScreen, TwoTone } from '../../../ui/index.ts'
 import { BackupImport } from '../../lib/BackupImport.tsx'
 import { isNativeApp } from '../../native/platform.ts'
@@ -36,13 +36,17 @@ export default function ExistingScreen() {
       backLabel="Back to setup"
     >
       <div className="existing-choices" role="list">
+        {/* Your Hippo account: sign in first, a file last. */}
+        <div role="listitem">
+          <Choice icon={<KeyRound />} title="Sign in with my recovery code" line="The 13 words you saved. Your wishes come here and stay in step." onClick={() => navigate('/account/sign-in')} />
+        </div>
+        <div role="listitem">
+          <Choice icon={<Smartphone />} title="I have a link from my other device" line="Choose Add a device in Settings there, then open its link here." onClick={() => navigate('/move/receive')} />
+        </div>
         <div role="listitem">
           <BackupImport mergeOnly onImported={() => navigate('/', { replace: true })}>
             {(pick, busy) => <Choice icon={<FileUp />} title="From a backup file" line="Pick the file you saved with Export backup." onClick={pick} busy={busy} />}
           </BackupImport>
-        </div>
-        <div role="listitem">
-          <Choice icon={<Smartphone />} title="From another device" line="Open Move Hippo to another device in Settings there, then enter its link here." onClick={() => navigate('/move/receive')} />
         </div>
         {app ? (
           <div role="listitem">

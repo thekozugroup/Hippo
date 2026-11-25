@@ -41,13 +41,15 @@ export interface AppScreenProps {
    * two columns). Phones are the same either way.
    */
   width?: 'narrow' | 'wide'
+  /** The device clock notice as a plain line, not a banner (Home, while a more pressing notice shows). */
+  quietNotes?: boolean
   /** Busy state for the sheet (announced to assistive tech). */
   busy?: boolean
   children: ReactNode
 }
 
 /** Hero with top bar and h1, the sheet as `main`, and the navigation (bottom on phones, side on wider windows). */
-export function AppScreen({ title, compactTitle, intro, back, backLabel = 'Back', actions, nav, area, width = 'narrow', busy, children }: AppScreenProps) {
+export function AppScreen({ title, compactTitle, intro, back, backLabel = 'Back', actions, nav, area, width = 'narrow', quietNotes = false, busy, children }: AppScreenProps) {
   const section = nav ?? area
   // One navigation at a time: the bottom one on phones, the side one on wider windows (the CSS
   // hides the other as well, for the first frame of a resize).
@@ -80,7 +82,7 @@ export function AppScreen({ title, compactTitle, intro, back, backLabel = 'Back'
       nav={nav && compact ? <BottomNav items={NAV} activeId={nav} label="Main" remember="main" /> : undefined}
     >
       <div className={cx('app-sheet', 'app-page', width === 'wide' ? 'app-page--wide' : 'app-page--narrow')} aria-busy={busy || undefined}>
-        <ClockNote />
+        <ClockNote quiet={quietNotes} />
         {children}
       </div>
     </Screen>

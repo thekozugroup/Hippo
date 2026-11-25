@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  * <pre>
  *   /  /wishlist  /lists  /settings   a destination
  *   /l/&lt;payload&gt;                       a shared list
- *   /t/&lt;payload&gt;                       a transfer
+ *   /t/&lt;payload&gt;                       a device link (also the address-change hand-off)
  * </pre>
  *
  * A payload is 1 to 4096 characters of A-Z, a-z, 0-9, '_' and '-'. It is a secret (a list's key, or

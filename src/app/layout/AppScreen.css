@@ -139,6 +139,23 @@
   font-weight: 500;
 }
 
+/* A notice that is not the most pressing one on its screen: a plain line, no panel. */
+.app-banner--quiet {
+  align-items: center;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text-2);
+}
+.app-banner--quiet > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-3);
+}
+.app-banner--quiet .app-banner__title {
+  font-size: var(--fs-secondary);
+}
+
 /* The device clock notice at the top of the sheet: the text, then a dismiss button at the end. */
 .clock-note {
   align-items: center;
@@ -153,6 +170,9 @@
 }
 .clock-note__close {
   flex: none;
+}
+.app-banner--quiet.clock-note {
+  padding: 0;
 }
 
 /* Chip rows that scroll sideways rather than wrap */

@@ -5,6 +5,8 @@ import { applyRelayOverrideFromUrl, createCore, retryPendingSync, TimeSync, type
 import { startSyncRetry, type SyncRetry } from '../lib/sync-retry.ts'
 import { siteAddress } from '../lib/site-address.ts'
 import { clockFetch, isNativeApp } from '../native/index.ts'
+import { bootAccount, resumeAccount } from './account.ts'
+import { applySiteOverrideFromUrl } from '../screens/account/address.ts'
 
 let instance: Core | null = null
 let retry: SyncRetry | null = null
@@ -46,6 +48,7 @@ function startTimeSync(): TimeSync {
 export function getAppCore(): Core {
   if (!instance) {
     applyRelayOverrideFromUrl(window.location.href)
+    applySiteOverrideFromUrl(window.location.href)
     timeSync = startTimeSync()
     const core = createCore({ clock: timeSync })
     instance = core
@@ -53,6 +56,8 @@ export function getAppCore(): Core {
     // has accepted yet: at start, when back online, when the page becomes
     // visible, and on a backoff timer while anything is pending.
     retry = startSyncRetry(() => retryPendingSync(core))
+    // Your Hippo account: loads its sync engine only on a signed-in device.
+    bootAccount(core)
   }
   return instance
 }
@@ -64,6 +69,7 @@ export function getAppCore(): Core {
 export function appResumed(): void {
   if (!isNativeApp()) return
   retry?.resume()
+  resumeAccount()
   void timeSync?.refreshIfOlderThan(VISIBLE_REFRESH_MS)
 }
 

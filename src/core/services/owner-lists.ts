@@ -18,7 +18,7 @@ import { cacheIfNewer, deleteCachedTopic, getCachedEvents } from '../db/event-ca
 import type { CachedEvent, HippoDb } from '../db/schema.ts'
 import { getSettings } from '../db/settings.ts'
 import { HippoError } from '../errors.ts'
-import { SchemaError, readOptionalDate, readOptionalString, readString } from '../model/guards.ts'
+import { SchemaError, isObject, readOptionalDate, readOptionalString, readString } from '../model/guards.ts'
 import { LIMITS } from '../model/limits.ts'
 import type { Item, ItemPayload, ListMetaPayload, RetiredList, SharedList } from '../model/types.ts'
 import { parseListMetaPayload, tryParse } from '../model/validate.ts'
@@ -31,6 +31,7 @@ import {
   nextCreatedAt,
   type SignOptions,
 } from '../protocol/build.ts'
+import { receiveEvent } from '../protocol/receive.ts'
 import { itemSlot, metaSlot, parseSlot } from '../protocol/slots.ts'
 import type { NostrEvent, PublishResult } from '../transport/types.ts'
 import type { CoreDeps } from './deps.ts'
@@ -277,7 +278,11 @@ async function syncPublished(deps: CoreDeps, ctx: OwnerContext, list: SharedList
 
   const publishIfChanged = async (d: string, payload: ItemPayload | ListMetaPayload, kind: 'meta' | 'item'): Promise<void> => {
     const prev = cached.get(d)
-    const same = prev !== undefined && stableStringify(decryptJson(contentKey, prev.event.content, d)) === stableStringify(payload)
+    const prevPayload: unknown = prev === undefined ? undefined : decryptJson(contentKey, prev.event.content, d)
+    // Another device signed in to the same account published a newer version: never replace it
+    // with an older one; this device catches up through account sync (PROTOCOL.md section 12).
+    if (isObject(prevPayload) && typeof prevPayload.updatedAt === 'number' && prevPayload.updatedAt > payload.updatedAt) return
+    const same = prev !== undefined && stableStringify(prevPayload) === stableStringify(payload)
     if (same && !force && !expiresSoon(prev.event, now)) {
       if (prev.pending) out.push(await publishAndCache(deps, ctx, d, prev.event, 'republish'))
       return
@@ -472,7 +477,7 @@ function resendUnpublished(deps: CoreDeps, listId: string): Promise<SyncReport> 
 // ---- Retired lists (rotation and deletion) ----
 
 /** The retired record for a list's current keys, holding the secrets until the old link is cut off. */
-async function retiredRecordFor(deps: CoreDeps, list: SharedList, reason: RetiredList['reason']): Promise<RetiredList> {
+export async function retiredRecordFor(deps: Pick<CoreDeps, 'db' | 'now'>, list: SharedList, reason: RetiredList['reason']): Promise<RetiredList> {
   const { topic, slotKey } = deriveContentKeys(list.listSecret)
   const record: RetiredList = {
     topic,
@@ -639,6 +644,7 @@ export function repairOwnerList(deps: CoreDeps, listId: string, options: { timeo
     if (list.status === 'draft') return report(listId, [])
     const ctx = ownerContext(deps, list)
     const remote = await ctx.channel.fetchOwnEvents(options.timeoutMs)
+    await cacheVerifiedOwnEvents(deps, ctx, remote)
     const newestRemote = new Map<string, NostrEvent>()
     for (const e of remote) {
       const d = e.tags.find((t) => t[0] === 'd')?.[1]
@@ -663,6 +669,33 @@ export function repairOwnerList(deps: CoreDeps, listId: string, options: { timeo
     await repairRetiredLists(deps, { listId })
     return r
   })
+}
+
+/**
+ * Caches the newest verified meta and item events relays hold for my list (signed with its owner
+ * key: another device signed in to the same account may have published them). Claims never pass:
+ * owner code has no claims key, and the channel asks for the owner's own events only.
+ */
+async function cacheVerifiedOwnEvents(deps: CoreDeps, ctx: OwnerContext, events: readonly NostrEvent[]): Promise<number> {
+  let n = 0
+  for (const e of events) {
+    const r = receiveEvent(e, { topic: ctx.topic, ownerPubkey: ctx.ownerPubkey, contentKey: ctx.contentKey, now: deps.now })
+    if (!r.ok || r.accepted.type === 'claim') continue
+    if (await cacheIfNewer(deps.db, ctx.topic, r.accepted.d, r.accepted.event)) n++
+  }
+  return n
+}
+
+/**
+ * For a list this device just received through account sync: fetches what the list's owner key
+ * already published and caches it, so this device's next sync of the list replaces those events
+ * (a later `created_at`) instead of repeating or undercutting them. Publishes nothing.
+ */
+export async function primeOwnerCache(deps: CoreDeps, listId: string, options: { timeoutMs?: number } = {}): Promise<number> {
+  const list = await deps.db.sharedLists.get(listId)
+  if (!list || list.status === 'draft') return 0
+  const ctx = ownerContext(deps, list)
+  return cacheVerifiedOwnEvents(deps, ctx, await ctx.channel.fetchOwnEvents(options.timeoutMs))
 }
 
 export interface RetryReport {

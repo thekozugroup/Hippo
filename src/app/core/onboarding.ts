@@ -232,13 +232,14 @@ export interface ChecklistInput {
   hiddenAt: number | undefined
   wishes: number
   sharedLists: number
-  lastExportAt: number | undefined
+  /** The recovery code was saved (it replaces "Save a backup": it brings the wishlist back on any device, and the backup file stays in Settings). */
+  recoverySaved: boolean
   /** Installing: left out where it is not possible on this device; done once Hippo runs installed or was installed. */
   install?: { possible: boolean; done: boolean }
 }
 
 export interface ChecklistTask {
-  id: 'install' | 'wishes' | 'share' | 'backup'
+  id: 'install' | 'wishes' | 'share' | 'recovery'
   done: boolean
 }
 
@@ -251,7 +252,7 @@ export function setupChecklist(c: ChecklistInput): ChecklistTask[] | null {
     ...(c.install?.possible ? [{ id: 'install' as const, done: c.install.done }] : []),
     { id: 'wishes', done: c.wishes >= CHECKLIST_WISHES },
     { id: 'share', done: c.sharedLists > 0 },
-    { id: 'backup', done: c.lastExportAt !== undefined },
+    { id: 'recovery', done: c.recoverySaved },
   ]
   return tasks.every((t) => t.done) ? null : tasks
 }

@@ -79,6 +79,8 @@ export type TransferFailure =
   | 'invalid-backup'
   /** This browser cannot unpack it. */
   | 'unsupported'
+  /** A device link for another account than the one this device is signed in to. */
+  | 'other-account'
 
 export class TransferError extends Error {
   readonly reason: TransferFailure
@@ -277,6 +279,8 @@ export interface TransferManifest {
   encoding: TransferEncoding
   /** The one-time signing key, so the receiving device can clear the chunks from the sync servers once it has them. */
   key: string
+  /** A device link (PROTOCOL.md section 12.6): the account secret, so the receiving device signs in to the same account. */
+  account?: string
 }
 
 /** What replaces the manifest when the transfer ends: received on another device, or cancelled. */
@@ -297,7 +301,8 @@ export function parseManifestPayload(value: unknown, pubkey: string): ManifestSl
   if (length > chunks * TRANSFER_CHUNK_BYTES || length <= (chunks - 1) * TRANSFER_CHUNK_BYTES) return null
   if (!isHex(hash, 32) || (encoding !== 'gzip' && encoding !== 'none') || !isHex(key, 32)) return null
   if (publicKeyOf(key) !== pubkey) return null
-  return { v: 1, kind: 'manifest', chunks, length, sha256: hash, encoding, key }
+  if (value.account !== undefined && !isHex(value.account, 16)) return null
+  return { v: 1, kind: 'manifest', chunks, length, sha256: hash, encoding, key, ...(value.account !== undefined ? { account: value.account } : {}) }
 }
 
 // ------------------------------------------------------------------ events

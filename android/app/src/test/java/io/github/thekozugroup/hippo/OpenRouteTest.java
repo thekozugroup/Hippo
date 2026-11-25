@@ -49,6 +49,15 @@ public class OpenRouteTest {
     }
 
     @Test
+    public void accountScreensAreNotRoutesALinkCanOpen() {
+        // A device link and the address-change hand-off arrive as /t/<payload>; the account's own
+        // screens are reached from inside Hippo only.
+        for (String path : new String[] {"/account/code", "/account/sign-in", "/move", "/move/receive", "/existing", "/site", "/welcome/start"}) {
+            assertEquals(path, "/", OpenRoute.routeOf("hippo://open" + path));
+        }
+    }
+
+    @Test
     public void otherAddressesAreNotHippoOnes() {
         assertNull(OpenRoute.routeOf(null));
         assertNull(OpenRoute.routeOf("https://owner.github.io/Hippo/#/l/" + PAYLOAD));

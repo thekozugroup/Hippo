@@ -26,6 +26,14 @@ describe('the routes a browser may hand to the app', () => {
     }
   })
 
+  it('opens a device link (also what the address-change notice hands over), and no account screen', () => {
+    // The device link and the address-change hand-off are both /t/<payload>, with the account inside.
+    expect(appRouteFromOpenUrl(`hippo://open/t/${PAYLOAD}`)).toEqual({ kind: 'transfer', payload: PAYLOAD })
+    for (const path of ['/account/code', '/account/sign-in', '/move', '/move/receive', '/existing', '/site', '/welcome/start']) {
+      expect(appRouteFromOpenUrl(`hippo://open${path}`), path).toEqual(HOME_ROUTE)
+    }
+  })
+
   it('leaves other addresses to the other handlers', () => {
     expect(appRouteFromOpenUrl(`https://owner.github.io/Hippo/#/l/${PAYLOAD}`)).toBeNull()
     expect(appRouteFromOpenUrl('hippopotamus://open/')).toBeNull()

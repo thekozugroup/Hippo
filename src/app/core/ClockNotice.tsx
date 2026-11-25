@@ -9,13 +9,14 @@
 // stays at the top of each screen's sheet (`ClockNote`) until it is
 // dismissed: a giver is told even when the list takes a while to open.
 
-import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Clock, X } from 'lucide-react'
 import { IconButton } from '../../ui/index.ts'
 import { CLOCK_WARN_MS } from '../../core/index.ts'
 import { clockNoticeText } from './clockText.ts'
 import { useCore } from './context.ts'
 import { useNotify } from './notify.ts'
+import { ClockNoteContext } from './clockNote.ts'
 
 const TOLD_KEY = 'hippo:clock-told'
 
@@ -36,13 +37,6 @@ function writeTold(told: boolean): void {
   }
 }
 
-interface ClockNoteState {
-  /** The notice while it is on screen; null when there is none or it was dismissed. */
-  text: string | null
-  dismiss: () => void
-}
-
-const ClockNoteContext = createContext<ClockNoteState>({ text: null, dismiss: () => undefined })
 
 /** Watches the clock correction for the whole app and holds the notice until it is dismissed. */
 export function ClockNoticeProvider({ children }: { children: ReactNode }) {
@@ -75,12 +69,15 @@ export function ClockNoticeProvider({ children }: { children: ReactNode }) {
   return <ClockNoteContext value={value}>{children}</ClockNoteContext>
 }
 
-/** The clock notice at the top of a screen's sheet, until dismissed. Renders nothing otherwise. */
-export function ClockNote() {
+/**
+ * The clock notice at the top of a screen's sheet, until dismissed. Renders nothing otherwise.
+ * `quiet`: a plain line instead of a banner, when a more pressing notice is on the same screen.
+ */
+export function ClockNote({ quiet = false }: { quiet?: boolean }) {
   const { text, dismiss } = use(ClockNoteContext)
   if (!text) return null
   return (
-    <div className="app-banner app-banner--warn clock-note" role="note" aria-label="Device clock" data-testid="clock-note">
+    <div className={quiet ? 'app-banner app-banner--quiet clock-note' : 'app-banner app-banner--warn clock-note'} role="note" aria-label="Device clock" data-testid="clock-note">
       <Clock aria-hidden="true" />
       <div className="app-banner__body">
         <p>{text}</p>

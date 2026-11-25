@@ -111,17 +111,17 @@ describe('occasion answers', () => {
 describe('the Get set up checklist', () => {
   const done = stored({ status: 'completed', step: 4 })
   it('tracks real state and goes away when complete or hidden', () => {
-    expect(setupChecklist({ stored: done, hiddenAt: undefined, wishes: 1, sharedLists: 0, lastExportAt: undefined })).toEqual([
+    expect(setupChecklist({ stored: done, hiddenAt: undefined, wishes: 1, sharedLists: 0, recoverySaved: false })).toEqual([
       { id: 'wishes', done: false },
       { id: 'share', done: false },
-      { id: 'backup', done: false },
+      { id: 'recovery', done: false },
     ])
-    expect(setupChecklist({ stored: done, hiddenAt: undefined, wishes: 3, sharedLists: 1, lastExportAt: 9 })).toBeNull()
-    expect(setupChecklist({ stored: done, hiddenAt: 5, wishes: 0, sharedLists: 0, lastExportAt: undefined })).toBeNull()
+    expect(setupChecklist({ stored: done, hiddenAt: undefined, wishes: 3, sharedLists: 1, recoverySaved: true })).toBeNull()
+    expect(setupChecklist({ stored: done, hiddenAt: 5, wishes: 0, sharedLists: 0, recoverySaved: false })).toBeNull()
   })
   it('does not show before or during setup, or for people who never had setup', () => {
-    expect(setupChecklist({ stored: undefined, hiddenAt: undefined, wishes: 0, sharedLists: 0, lastExportAt: undefined })).toBeNull()
-    expect(setupChecklist({ stored: stored({}), hiddenAt: undefined, wishes: 0, sharedLists: 0, lastExportAt: undefined })).toBeNull()
+    expect(setupChecklist({ stored: undefined, hiddenAt: undefined, wishes: 0, sharedLists: 0, recoverySaved: false })).toBeNull()
+    expect(setupChecklist({ stored: stored({}), hiddenAt: undefined, wishes: 0, sharedLists: 0, recoverySaved: false })).toBeNull()
   })
 })
 
@@ -167,21 +167,21 @@ describe('where the install step goes', () => {
 
 describe('the install task on the checklist', () => {
   const done = stored({ status: 'completed', step: 4 })
-  const base = { stored: done, hiddenAt: undefined, wishes: 0, sharedLists: 0, lastExportAt: undefined }
+  const base = { stored: done, hiddenAt: undefined, wishes: 0, sharedLists: 0, recoverySaved: false }
   it('comes first where installing is possible, ticked once installed', () => {
     expect(setupChecklist({ ...base, install: { possible: true, done: false } })?.[0]).toEqual({ id: 'install', done: false })
     expect(setupChecklist({ ...base, install: { possible: true, done: true } })?.[0]).toEqual({ id: 'install', done: true })
   })
   it('is left out where installing is not possible', () => {
-    expect(setupChecklist({ ...base, install: { possible: false, done: false } })?.map((t) => t.id)).toEqual(['wishes', 'share', 'backup'])
+    expect(setupChecklist({ ...base, install: { possible: false, done: false } })?.map((t) => t.id)).toEqual(['wishes', 'share', 'recovery'])
   })
   it('counts towards the checklist going away', () => {
-    expect(setupChecklist({ ...base, wishes: 3, sharedLists: 1, lastExportAt: 9, install: { possible: true, done: false } })).toEqual([
+    expect(setupChecklist({ ...base, wishes: 3, sharedLists: 1, recoverySaved: true, install: { possible: true, done: false } })).toEqual([
       { id: 'install', done: false },
       { id: 'wishes', done: true },
       { id: 'share', done: true },
-      { id: 'backup', done: true },
+      { id: 'recovery', done: true },
     ])
-    expect(setupChecklist({ ...base, wishes: 3, sharedLists: 1, lastExportAt: 9, install: { possible: true, done: true } })).toBeNull()
+    expect(setupChecklist({ ...base, wishes: 3, sharedLists: 1, recoverySaved: true, install: { possible: true, done: true } })).toBeNull()
   })
 })

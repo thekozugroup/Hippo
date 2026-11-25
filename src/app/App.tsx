@@ -44,8 +44,11 @@ const GiverScreen = lazyScreen(() => import('./screens/giver/GiverScreen.tsx').t
 const GiverLinkScreen = lazyScreen(() => import('./screens/giver/GiverScreen.tsx').then((m) => m.GiverLinkScreen))
 const SettingsScreen = lazyScreen(() => import('./screens/settings/SettingsScreen.tsx').then((m) => m.default))
 const OnboardingScreen = lazyScreen(() => import('./screens/onboarding/OnboardingScreen.tsx').then((m) => m.default))
-const MoveScreen = lazyScreen(() => import('./screens/move/MoveScreen.tsx').then((m) => m.default))
-const ReceiveScreen = lazyScreen(() => import('./screens/move/ReceiveScreen.tsx').then((m) => m.default))
+// Your Hippo account: adding a device (/move), signing in with a link (/move/receive) or a recovery code, and the code.
+const AddDeviceScreen = lazyScreen(() => import('./screens/account/AddDeviceScreen.tsx').then((m) => m.default))
+const LinkScreen = lazyScreen(() => import('./screens/account/LinkScreen.tsx').then((m) => m.default))
+const SignInScreen = lazyScreen(() => import('./screens/account/SignInScreen.tsx').then((m) => m.default))
+const RecoveryCodeScreen = lazyScreen(() => import('./screens/account/RecoveryCodeScreen.tsx').then((m) => m.default))
 const ExistingScreen = lazyScreen(() => import('./screens/move/ExistingScreen.tsx').then((m) => m.default))
 const SiteScreen = lazyScreen(() => import('./screens/move/SiteScreen.tsx').then((m) => m.default))
 const GalleryScreen = lazy(() => import('./screens/GalleryScreen.tsx'))
@@ -57,8 +60,10 @@ function preloadFor(path: string): Promise<unknown> | undefined {
   if (path.startsWith('/g/') || path.startsWith('/l/')) return GiverScreen.preload()
   if (path === '/settings') return SettingsScreen.preload()
   if (path.startsWith('/welcome/')) return OnboardingScreen.preload()
-  if (path === '/move') return MoveScreen.preload()
-  if (path === '/move/receive') return ReceiveScreen.preload()
+  if (path === '/move') return AddDeviceScreen.preload()
+  if (path === '/move/receive') return LinkScreen.preload()
+  if (path === '/account/sign-in') return SignInScreen.preload()
+  if (path === '/account/code') return RecoveryCodeScreen.preload()
   if (path === '/existing') return ExistingScreen.preload()
   if (path === '/site') return SiteScreen.preload()
   return undefined
@@ -303,8 +308,10 @@ export function Routes() {
         <Route path="/settings">{() => <SettingsScreen />}</Route>
         <Route path="/welcome/:step">{(p) => <OnboardingScreen step={p.step} />}</Route>
         <Route path="/existing">{() => <ExistingScreen />}</Route>
-        <Route path="/move">{() => <MoveScreen />}</Route>
-        <Route path="/move/receive">{() => <ReceiveScreen />}</Route>
+        <Route path="/move">{() => <AddDeviceScreen />}</Route>
+        <Route path="/move/receive">{() => <LinkScreen />}</Route>
+        <Route path="/account/sign-in">{() => <SignInScreen />}</Route>
+        <Route path="/account/code">{() => <RecoveryCodeScreen />}</Route>
         <Route path="/t/:payload" component={TransferLinkRoute} />
         <Route path="/site">{() => (isNativeApp() ? <SiteScreen /> : <NotFoundScreen />)}</Route>
         <Route path="/design" component={GalleryScreen} />

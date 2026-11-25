@@ -15,6 +15,8 @@ const sidebar = (page) => page.getByRole('navigation', { name: 'Main' })
 async function axe(page, label) {
   await transitionDone(page)
   await animationsDone(page)
+  // Content that arrived after that (cards, a lazy notice) may still be fading in.
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Infinity))
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
   return r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => `${label}: ${v.id} ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)
 }
@@ -207,14 +209,20 @@ test('desktop: Back returns to where a long page was scrolled', async ({ baseUrl
   await h1(page, 'Wishlist').waitFor()
   await sidebar(page).getByRole('link', { name: 'Settings' }).click()
   await h1(page, 'Settings').waitFor()
-  const link = page.getByRole('link', { name: 'Move Hippo to another device' })
-  await link.scrollIntoViewIfNeeded()
-  await link.focus()
+  const link = page.getByRole('link', { name: 'Add a device' })
+  await link.waitFor()
+  // Scrolled well down with the link still in view, then focused without scrolling.
+  await link.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    const top = r.top + window.scrollY
+    window.scrollTo(0, Math.min(top - 8, Math.max(250, top + r.height - window.innerHeight + 8)))
+    el.focus({ preventScroll: true })
+  })
   // Read where the page is just before leaving (a click could scroll the link further into view).
   const y = await page.evaluate(() => window.scrollY)
   assert.ok(y > 200)
   await page.keyboard.press('Enter')
-  await h1(page, 'Move to another device').waitFor()
+  await h1(page, 'Add a device').waitFor()
   assert.ok((await page.evaluate(() => window.scrollY)) < 5, 'a new screen starts at the top')
   await page.goBack()
   await h1(page, 'Settings').waitFor()
@@ -237,8 +245,11 @@ test('desktop: axe on every screen at 1440 wide, light and dark (WCAG 2.2 AA)', 
     [listHref, 'list page'],
     ['#/list/new', 'new list'],
     ['#/settings', 'settings'],
-    ['#/move', 'move'],
-    ['#/move/receive', 'receive'],
+    ['#/move', 'add a device'],
+    ['#/move/receive', 'sign in with a link'],
+    ['#/account/sign-in', 'sign in with a code'],
+    ['#/account/code', 'recovery code'],
+    ['#/existing', 'I already use Hippo'],
     ['#/nowhere', 'not found'],
   ]
   const violations = []

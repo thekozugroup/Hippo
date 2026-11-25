@@ -2,12 +2,15 @@ import { Download, X } from 'lucide-react'
 import { IconButton } from '../../ui/index.ts'
 import { useBackupReminder } from '../core/storage.ts'
 
-/** Shown on Home when the browser would not promise to keep Hippo's data. */
-export function BackupReminder({ lastExportAt }: { lastExportAt: number | undefined }) {
+/**
+ * Shown on Home when the browser would not promise to keep Hippo's data. `quiet`: a plain line, when
+ * another notice already leads the screen.
+ */
+export function BackupReminder({ lastExportAt, quiet = false }: { lastExportAt: number | undefined; quiet?: boolean }) {
   const { show, dismiss } = useBackupReminder(lastExportAt)
   if (!show) return null
   return (
-    <div className="app-banner" role="note" aria-labelledby="backup-reminder-title">
+    <div className={quiet ? 'app-banner app-banner--quiet' : 'app-banner'} role="note" aria-labelledby="backup-reminder-title">
       <Download aria-hidden="true" />
       <div className="app-banner__body">
         <p id="backup-reminder-title" className="app-banner__title">

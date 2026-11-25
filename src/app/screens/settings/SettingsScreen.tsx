@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bookmark, Copy, Download, ExternalLink, Globe, Link2, RotateCcw, Send, Tags, Upload } from 'lucide-react'
+import { Bookmark, Copy, Download, ExternalLink, Globe, RotateCcw, Tags, Upload } from 'lucide-react'
 import { Button, LinkButton, SectionHeader, SegmentedControl, Switch, TextArea, TextField } from '../../../ui/index.ts'
 import {
   DEFAULT_RELAYS,
@@ -36,6 +36,7 @@ import { moveWishesNote, whyInstall } from '../../pwa/guide.ts'
 import { InstallGuide } from '../../pwa/InstallGuide.tsx'
 import { useInstallGuide } from '../../pwa/useInstall.ts'
 import { DeploymentChecks } from './DeploymentChecks.tsx'
+import { AccountSection } from '../account/AccountSection.tsx'
 import { isNativeApp } from '../../native/platform.ts'
 import './SettingsScreen.css'
 
@@ -203,7 +204,7 @@ function BackupSection() {
         Backup
       </h2>
       <p className="app-note">
-        Hippo has no server copy of your wishes. Save a backup file to move to a new phone or to restore after losing one.
+        A backup file brings your wishes back even if every device is lost and the sync servers have dropped them.
         {last ? ` Last backup: ${new Date(last).toLocaleDateString()}.` : ' You have not made a backup yet.'}
       </p>
       <p className="app-note">
@@ -221,26 +222,6 @@ function BackupSection() {
           </div>
         )}
       </BackupImport>
-    </section>
-  )
-}
-
-/** Moving to another device without a file (a transfer link), both ways. */
-function MoveSection() {
-  return (
-    <section className="app-stack" aria-labelledby="set-move">
-      <h2 id="set-move" className="app-section-title">
-        Another device
-      </h2>
-      <p className="app-note">Move your wishes and lists to another phone or browser with a link that works for 15 minutes. It is a one-time move: afterwards each device keeps its own copy.</p>
-      <div className="app-row app-row--fill">
-        <LinkButton href="#/move" variant="secondary" size="md" fullWidth icon={<Send />}>
-          Move Hippo to another device
-        </LinkButton>
-        <LinkButton href="#/move/receive" variant="secondary" size="md" fullWidth icon={<Link2 />}>
-          Enter a transfer link
-        </LinkButton>
-      </div>
     </section>
   )
 }
@@ -544,7 +525,7 @@ function AboutSection() {
         About and privacy
       </h2>
       <ul className="settings-facts">
-        <li>No accounts, no tracking, no ads. Hippo is a free, open-source app (MIT licence).</li>
+        <li>No accounts in the usual sense, no tracking, no ads. Hippo is a free, open-source app (MIT licence).</li>
         <li>Shared lists, and who is getting or chipping in on what, are end-to-end encrypted. The key is in the link, which is never sent to any server.</li>
         <li>Hiding gifts from you, the owner, is done by the Hippo app, not by encryption: Hippo cannot stop you from opening your own link in another browser. Please do not peek.</li>
         <li>Chipping in is a promise between friends. Hippo never handles money.</li>
@@ -585,8 +566,9 @@ export default function SettingsScreen() {
         </div>
       </section>
       {isNativeApp() ? null : <InstallSection />}
+      {/* Your Hippo account */}
+      <AccountSection />
       <BackupSection />
-      <MoveSection />
       {isNativeApp() ? <SiteSection /> : null}
       {isNativeApp() ? <AppCaptureSection /> : <CaptureSection />}
       {isNativeApp() ? <PageLookupSection /> : <LinkLookupSection />}

@@ -148,6 +148,21 @@ The list has these seven entries in this order, less any in `env.skip`. `unknown
 
 `exportData(db, now?, { record: false })` exports without setting "last backup".
 
+## Your Hippo account (`src/core/account/`, PROTOCOL.md section 12)
+
+Not re-exported from `index.ts`, so the app's first download stays small: import the modules directly, from code that loads on demand.
+
+| Function | What it does |
+|---|---|
+| `ensureAccount(deps)` | The device's account secret, made (with sync on) the first time it is needed. Nothing is sent before the first fetch. |
+| `signInToAccount(deps, secret, { codeSaved? })` | Signs in (code or device link); local data is merged on the first sync, never replaced; setup is marked done. Throws `AccountError('other-account')` while signed in to another account. |
+| `signOutOfAccount(db, { removeData })` | Forgets the secret; with `removeData`, also this device's wishes, lists and keys (never anything elsewhere). |
+| `setAccountSync(db, on)`, `markRecoveryCodeSaved(deps)`, `accountSecret(db)`, `accountSummary(db)` | Per-device switch, "I have saved it", the secret for the code screen, and the state Settings shows. |
+| `changeRecoveryCode(deps)` | New secret; records are re-sent under it and the old account is retired by the next pass. |
+| `recoveryWords(secret)`, `formatRecoveryCode`, `parseRecoveryCode(input)` (`recovery-code.ts`) | The 13-word code with its 15-bit checksum. Loads the word list: keep it in lazy screens. |
+| `new AccountSync(deps, { debounceMs?, onPending? })` | The engine: `start()` (watches local changes), `syncNow(fetch?)`, `stop()`, `subscribe`/`getStatus`. `runAccountSync(deps, options)` is one pass. |
+| `createTransfer(core, { siteBase, account })` | A device link (section 11 with the secret in the manifest); `receiveTransfer` then signs the device in (`signedIn`). |
+
 ## Other exports
 
 `resolveItemState`, `parseShareLink`, `extractSharePayload`, `isSafeHttpUrl` (check before rendering any URL as a link or image), `LIMITS`, `DEFAULT_RELAYS`, `MemoryTransport`/`MemoryNetwork`, `NostrTransport`, `createNostrTransportProvider`, `staticTransport`, `HippoDb`/`openDb`, and the model types.

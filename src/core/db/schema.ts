@@ -22,6 +22,34 @@ export interface SettingRow {
   value: unknown
 }
 
+/** When and on which device a synced field was last written: [ms on the corrected clock, device id]. */
+export type Stamp = [number, string]
+
+/**
+ * This device's view of one record of the account (PROTOCOL.md section 12): the merged state of
+ * every version it has seen or written, keyed by the record's slot on the sync servers.
+ */
+export interface AccountRecordRow {
+  /** The event's `d` slot. */
+  d: string
+  type: string
+  id: string
+  /** Field values (absent: no value). Empty for a deleted record. */
+  data: Record<string, unknown>
+  /** One stamp per field that was ever written. */
+  f: Record<string, Stamp>
+  /** Set once the record is deleted; deletion is final. */
+  del?: Stamp
+  /** Highest `created_at` of a valid event seen or sent for this slot (unix seconds). */
+  createdAt?: number
+  /** Expiration of the newest event for this slot (unix seconds). */
+  expiresAt?: number
+  /** This device holds a version the sync servers do not have yet. */
+  pending?: boolean
+  /** A record from the account this device will not apply (a list it holds as a guest is owned, for example). */
+  refused?: string
+}
+
 export const DB_NAME = 'hippo'
 
 export class HippoDb extends Dexie {
@@ -32,6 +60,7 @@ export class HippoDb extends Dexie {
   declare retiredLists: Table<RetiredList, string>
   declare events: Table<CachedEvent, [string, string]>
   declare settings: Table<SettingRow, string>
+  declare accountRecords: Table<AccountRecordRow, string>
 
   constructor(name: string = DB_NAME) {
     super(name)
@@ -53,6 +82,9 @@ export class HippoDb extends Dexie {
       .upgrade(async (tx) => {
         await tx.table('events').clear()
       })
+    // v3: your Hippo account (PROTOCOL.md section 12). A new table only: every existing row stays
+    // as it is, and nothing is synced until the person turns the account on.
+    this.version(3).stores({ accountRecords: 'd, type' })
   }
 }
 

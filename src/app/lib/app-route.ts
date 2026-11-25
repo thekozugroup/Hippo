@@ -10,7 +10,11 @@
 // The app accepts only these route shapes; anything else opens Home:
 //   /  /wishlist  /lists  /settings      a destination
 //   /l/<payload>                         a shared list (the payload holds the list's key)
-//   /t/<payload>                         a transfer (the payload holds the secret to every list)
+//   /t/<payload>                         a device link (PROTOCOL.md section 12): the payload holds the
+//                                        secret to every list and to the account. The address-change
+//                                        notice hands a person to the new address with the same link.
+// The account's own screens (/account/code, /account/sign-in, /move, /move/receive) are reached from
+// inside Hippo only, never from a link, so they are not on the list.
 // A payload is checked for its alphabet and length only here; the screens validate it fully, as for
 // any share or transfer link. A payload is a secret: it is never logged, and the app keeps it out
 // of the address bar and history exactly as it does for links (GiverLinkScreen, transfer-inbox.ts).

@@ -10,7 +10,7 @@ const InstallSheet = lazy(() => import('../pwa/InstallSheet.tsx'))
 
 /**
  * "Get set up" on Home after first-run setup: tasks that track real state (Hippo installed where
- * that is possible, wishes on the device, a shared list, a saved backup). It goes away when all are
+ * that is possible, wishes on the device, a shared list, a saved recovery code). It goes away when all are
  * done or when hidden. The install task opens this device's steps in a sheet.
  */
 export function SetupChecklist({
@@ -39,7 +39,7 @@ export function SetupChecklist({
         },
     wishes: { title: 'Add three wishes', secondary: `${Math.min(wishes, CHECKLIST_WISHES)} of ${CHECKLIST_WISHES}`, href: '#/item/new' },
     share: { title: 'Share your list', secondary: 'Friends get a private link', href: draft ? `#/list/${draft.id}` : '#/list/new' },
-    backup: { title: 'Save a backup', secondary: 'A file that brings your wishes back on any device', href: '#/settings' },
+    recovery: { title: 'Save your recovery code', secondary: 'Opens your wishlist on your other devices', href: '#/account/code' },
   }
   return (
     <section className="app-stack app-stack--tight" aria-labelledby="setup-checklist">

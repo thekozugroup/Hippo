@@ -16,6 +16,8 @@ import './slider.test.mjs'
 import './site-setup.test.mjs'
 import './vercel.test.mjs'
 import './desktop.test.mjs'
+import './account.test.mjs'
+import './combined.test.mjs'
 
 if (!existsSync(ROOT + 'dist/index.html')) {
   console.error('dist/ is missing: run `npm run build` first (npm run test:e2e does this).')

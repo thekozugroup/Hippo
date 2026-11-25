@@ -1,7 +1,7 @@
 import { Plus, Share2 } from 'lucide-react'
 import { BigValue, LinkButton, List, ListRow, MoneyText, SectionHeader, Skeleton, Thumb, TwoTone } from '../../ui/index.ts'
 import { useCore } from '../core/context.ts'
-import { useGuestLists, useItems, useSettings, useSharedLists } from '../core/data.ts'
+import { useAccountFlags, useGuestLists, useItems, useSettings, useSharedLists } from '../core/data.ts'
 import { AppScreen } from '../layout/AppScreen.tsx'
 import { setupChecklist } from '../core/onboarding.ts'
 import { useInstallGuide } from '../pwa/useInstall.ts'
@@ -13,6 +13,10 @@ import { BackupReminder } from './BackupReminder.tsx'
 import { GuestListRow, OwnedListRow } from './lists/ListRows.tsx'
 import { SetupChecklist } from './SetupChecklist.tsx'
 import './HomeScreen.css'
+// Your Hippo account
+import { SiteMovedNotice } from './account/SiteMovedNotice.tsx'
+import { useSiteMoved } from './account/site-moved.ts'
+import { useClockNoteShowing } from '../core/clockNote.ts'
 
 const RECENT_SHOWN = 4
 const LISTS_SHOWN = 3
@@ -37,6 +41,7 @@ export function HomeScreen() {
   const lists = useSharedLists()
   const guests = useGuestLists()
   const settings = useSettings()
+  const account = useAccountFlags()
   const loading = items === undefined || lists === undefined || guests === undefined
   const count = items?.length ?? 0
   const empty = !loading && count === 0
@@ -47,6 +52,14 @@ export function HomeScreen() {
   // On Android, Chrome can say whether Hippo is already installed here (pwa/open-in-app.ts).
   const here = useInstalledHere(offersOpenInApp(guide))
   const installed = guide.kind === 'installed' || installedHere || settings?.seen.appInstalled !== undefined || here?.webApp === true
+  // Notices, at most one of them prominent: the address change first (wishes would stay behind at
+  // the old address), then the device clock, then the backup reminder; whichever is not first is a
+  // plain line. The checklist is not a notice, and the backup reminder waits until it is done. With
+  // the recovery code saved and the account on, the wishlist is kept elsewhere: no backup reminder.
+  const ownData = count + (lists?.length ?? 0) > 0
+  const moved = useSiteMoved(!loading && ownData)
+  const clockShowing = useClockNoteShowing()
+  const keptInStep = account?.signedIn === true && account.codeSaved
   const checklist =
     !loading && settings
       ? setupChecklist({
@@ -54,7 +67,7 @@ export function HomeScreen() {
           hiddenAt: settings.seen.setupChecklist,
           wishes: count,
           sharedLists: (lists ?? []).filter((l) => l.status === 'published').length,
-          lastExportAt: settings.lastExportAt,
+          recoverySaved: account?.codeSaved === true,
           // Only phones and tablets are asked to install; the Android app is already installed.
           install: { possible: guide.canInstall && guide.handheld && !isNativeApp(), done: installed },
         })
@@ -63,16 +76,21 @@ export function HomeScreen() {
   return (
     <AppScreen
       nav="home"
+      quietNotes={moved !== null}
       width="wide"
       busy={loading}
       title={
         empty ? (
           <TwoTone tone="on-hero" muted="Make a wishlist," bright="share it with family and friends" />
+        ) : account?.signedIn && account.codeSaved ? (
+          <TwoTone tone="on-hero" muted="Your wishlist," bright="kept in step on your devices" />
         ) : (
           <TwoTone tone="on-hero" muted="Your wishlist," bright="kept only on this device" />
         )
       }
     >
+      {moved ? <SiteMovedNotice moved={moved} /> : null}
+
       <div className="home-layout">
       <section className="app-stack home-layout__main" aria-labelledby="home-wishlist">
         {empty ? (
@@ -119,7 +137,7 @@ export function HomeScreen() {
           install={{ guide, installed: installedHere, ...(here?.androidApp ? { openHref: openInAppLink(HOME_ROUTE) } : {}) }}
         /> : empty ? <HowItWorks /> : null}
 
-      {!checklist && (count > 0 || (lists?.length ?? 0) > 0) ? <BackupReminder lastExportAt={settings?.lastExportAt} /> : null}
+      {!checklist && ownData && !keptInStep ? <BackupReminder lastExportAt={settings?.lastExportAt} quiet={moved !== null || clockShowing} /> : null}
 
       {lists && lists.length > 0 ? (
         <section aria-labelledby="home-lists">

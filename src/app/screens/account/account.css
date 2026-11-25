@@ -1,0 +1,107 @@
+/* Your Hippo account: the recovery code, the status line, the address notice. Tokens only. */
+
+.recovery-words {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 35em) {
+  .recovery-words {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.recovery-words__word {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-inline);
+  min-height: var(--h-md);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-tile);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.recovery-words__n {
+  min-width: 1.5em;
+  color: var(--text-3);
+  font-size: var(--fs-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+.recovery-words__text {
+  color: var(--text);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.account-status {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-inline);
+  margin: 0;
+  color: var(--text);
+}
+.account-status__dot {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--text-3);
+  transform: translateY(-1px);
+}
+.account-status--ok .account-status__dot {
+  background: var(--success);
+}
+.account-status--busy .account-status__dot {
+  background: var(--accent);
+}
+.account-status--warn .account-status__dot {
+  background: var(--tone-amber-fg);
+}
+
+.account-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-related);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.site-notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-related);
+  padding: var(--space-card);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+/* On a wide page (Home on computers) the notice keeps to a reading measure. */
+@media (min-width: 45em) and ((hover: hover) or (min-height: 32em)) {
+  .site-notice {
+    max-width: var(--measure);
+  }
+}
+.site-notice__text {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+@media (forced-colors: active) {
+  .recovery-words__word,
+  .site-notice {
+    border: 1px solid CanvasText;
+  }
+  .account-status__dot {
+    background: CanvasText;
+  }
+}

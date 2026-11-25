@@ -1,22 +1,22 @@
-// "Move Hippo to another device": the source side of a transfer (PROTOCOL.md section 11). It makes
-// a link that works for 15 minutes, shows it with Copy and Share, counts down, can cancel, and says
-// "Moved" once the other device has it. The open transfer is kept in memory for this app session,
-// so leaving this screen and coming back shows it again; it is never stored.
+// "Add a device": the sending side of a device link (PROTOCOL.md sections 11 and 12.6). It turns
+// the account on if needed, then makes a link that works once, for 15 minutes, and carries the
+// account (and a snapshot, so the other device is usable before its first sync). It shows the link
+// with Copy and Share, counts down, can cancel, and says when the other device is signed in. The
+// open link is kept in memory for this app session only; it is never stored.
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Check, Copy, Send, Share2, X } from 'lucide-react'
-import { Button, TextField } from '../../../ui/index.ts'
-import { cancelTransfer, createTransfer, watchTransfer, type OutgoingState, type OutgoingTransfer } from '../../../core/index.ts'
+import { Button, LinkButton, TextField } from '../../../ui/index.ts'
+import { cancelTransfer, watchTransfer, type Core, type OutgoingState, type OutgoingTransfer } from '../../../core/index.ts'
 import { useCore } from '../../core/context.ts'
 import { useNotify } from '../../core/notify.ts'
+import { makeDeviceLink } from './device-link.ts'
 import { AppScreen } from '../../layout/AppScreen.tsx'
 import { shareBaseUrl } from '../../lib/site-address.ts'
 import { SiteReachNote } from '../../lib/SiteReach.tsx'
 import { canShareSheet, shareSheet } from '../../native/index.ts'
-import { cameIn } from '../../lib/format.ts'
-import type { Core } from '../../../core/index.ts'
-import { timeLeftText, transferStartError } from './move-text.ts'
-import './move.css'
+import { timeLeftText, transferStartError } from '../move/move-text.ts'
+import '../move/move.css'
 
 type Phase = OutgoingState | 'expired'
 
@@ -56,7 +56,7 @@ function setPhase(phase: Phase): void {
   emit()
 }
 
-export default function MoveScreen() {
+export default function AddDeviceScreen() {
   const core = useCore()
   const notify = useNotify()
   const s = useSyncExternalStore(subscribe, current, current)
@@ -85,8 +85,7 @@ export default function MoveScreen() {
     setError(undefined)
     setProgress(0)
     try {
-      const t = await createTransfer(core, { siteBase: shareBaseUrl(), onProgress: setProgress })
-      start(core, t)
+      start(core, await makeDeviceLink(core, shareBaseUrl(), setProgress))
     } catch (e) {
       setError(transferStartError(e))
     } finally {
@@ -100,16 +99,16 @@ export default function MoveScreen() {
       await navigator.clipboard.writeText(s.transfer.url)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
-      notify('Link copied. Open it on the other device.')
+      notify('Link copied. Open it on your other device.')
     } catch {
-      document.querySelector<HTMLInputElement>('#transfer-link')?.select()
+      document.querySelector<HTMLInputElement>('#device-link')?.select()
       notify('Select the link and copy it.')
     }
   }
 
   const share = async () => {
     if (!s) return
-    const outcome = await shareSheet({ title: 'Hippo transfer link', url: s.transfer.url })
+    const outcome = await shareSheet({ title: 'Hippo device link', url: s.transfer.url })
     if (outcome === 'failed') notify('Sharing did not work here. Copy the link instead.')
   }
 
@@ -127,39 +126,38 @@ export default function MoveScreen() {
 
   const waiting = s?.phase === 'waiting'
   return (
-    <AppScreen area="settings" title="Move to another device" back="#/settings" backLabel="Back to Settings">
-      <section className="app-stack" aria-labelledby="move-how">
-        <h2 id="move-how" className="app-section-title">
+    <AppScreen area="settings" title="Add a device" back="#/settings" backLabel="Back to Settings">
+      <section className="app-stack" aria-labelledby="add-how">
+        <h2 id="add-how" className="app-section-title">
           How it works
         </h2>
-        <p className="app-note">Make a link here and open it on your other phone or browser within 15 minutes. Your wishes and lists come across, encrypted on the way.</p>
-        <p className="app-note">Both devices then hold the same lists. Hippo does not keep them in step afterwards, so carry on from one of them.</p>
+        <p className="app-note">Make a link here and open it on your other phone or browser within 15 minutes. That device signs in to your Hippo, and from then on both stay in step.</p>
       </section>
 
       <p className="move-status" role="status" aria-live="polite">
         {s?.phase === 'moved'
-          ? `Moved. ${cameIn(s.transfer.summary.items, s.transfer.summary.lists)} are on the other device now.`
+          ? 'Your other device is signed in.'
           : s?.phase === 'cancelled'
-            ? 'Transfer cancelled. The link no longer works.'
+            ? 'Link cancelled. It no longer works.'
             : s?.phase === 'expired'
               ? 'This link has expired. Make a new one if you still need it.'
               : busy
-                ? `Preparing the link${progress > 0 && progress < 1 ? ` (${Math.round(progress * 100)}%)` : ''}…`
+                ? `Making the link${progress > 0 && progress < 1 ? ` (${Math.round(progress * 100)}%)` : ''}…`
                 : ''}
       </p>
 
       {waiting && s ? (
-        <section className="app-stack motion-enter" aria-labelledby="move-link">
-          <h2 id="move-link" className="app-section-title">
-            Your transfer link
+        <section className="app-stack motion-enter" aria-labelledby="add-link">
+          <h2 id="add-link" className="app-section-title">
+            Your link
           </h2>
           <TextField
-            id="transfer-link"
-            label="Transfer link"
+            id="device-link"
+            label="Device link"
             readOnly
             value={s.transfer.url}
             onFocus={(e) => e.currentTarget.select()}
-            hint="Anyone who gets this link in the next 15 minutes can copy your wishlist and lists. Send it only to yourself."
+            hint="It works once. Anyone who opens it in the next 15 minutes can read and change your wishlist, so send it only to yourself."
             data-testid="transfer-link"
           />
           <SiteReachNote />
@@ -178,16 +176,15 @@ export default function MoveScreen() {
           </div>
           <div>
             <Button variant="ghost" size="md" icon={<X />} loading={cancelling} onClick={() => void cancel()}>
-              Cancel transfer
+              Cancel link
             </Button>
           </div>
         </section>
       ) : (
         <div className="app-stack">
-          {s?.phase === 'moved' ? <p className="app-note">Carry on from one device: changes you make on one do not appear on the other.</p> : null}
           <div>
             <Button variant="primary" icon={<Send />} loading={busy} onClick={() => void make()}>
-              {s ? 'Make a new link' : 'Make a transfer link'}
+              {s ? 'Make a new link' : 'Make a link'}
             </Button>
           </div>
           {error ? (
@@ -195,6 +192,12 @@ export default function MoveScreen() {
               {error}
             </p>
           ) : null}
+          <p className="app-note">No link at hand? Sign in on the other device with your recovery code instead.</p>
+          <div>
+            <LinkButton href="#/account/code" variant="ghost" size="md">
+              Show recovery code
+            </LinkButton>
+          </div>
         </div>
       )}
     </AppScreen>

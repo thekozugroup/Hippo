@@ -65,6 +65,8 @@ export interface IncomingTransfer {
   link: TransferLink
   file: ExportFile
   summary: TransferSummary
+  /** A device link: the account secret. Memory only. */
+  account?: string
   /** @internal */ manifest: TransferManifest
   /** @internal */ manifestCreatedAt: number
   /** @internal */ chunkEvents: NostrEvent[]
@@ -187,6 +189,8 @@ export interface CreateTransferOptions {
   siteBase: string
   /** Called with the share of chunks sent so far, 0 to 1. */
   onProgress?: (share: number) => void
+  /** A device link: the account secret travels with the snapshot, so the other device signs in (PROTOCOL.md section 12.6). */
+  account?: string
 }
 
 /**
@@ -222,7 +226,16 @@ export async function createTransfer(deps: CoreDeps, options: CreateTransferOpti
     options.onProgress?.(Math.min(1, (i + batch.length) / parts.length))
   }
   // The manifest last: a device that finds it finds every chunk too.
-  const manifest: TransferManifest = { v: 1, kind: 'manifest', chunks: parts.length, length: bytes.length, sha256: sha256Hex(plain), encoding, key: secretKey }
+  const manifest: TransferManifest = {
+    v: 1,
+    kind: 'manifest',
+    chunks: parts.length,
+    length: bytes.length,
+    sha256: sha256Hex(plain),
+    encoding,
+    key: secretKey,
+    ...(options.account !== undefined ? { account: options.account } : {}),
+  }
   if (!(await publishAll(transport, [buildManifestEvent(keys, manifest, sign)]))) throw new TransferError('offline')
   return { url, link, expiresAtMs, summary: summaryOf(file), chunks: parts.length, bytes: bytes.length, secretKey, createdAt }
 }
@@ -292,7 +305,15 @@ export async function fetchTransfer(deps: CoreDeps, input: string, options: Fetc
   } catch {
     throw new TransferError('invalid-backup')
   }
-  return { link, file, summary: summaryOf(file), manifest: got.manifest, manifestCreatedAt: got.manifestEvent.created_at, chunkEvents: got.chunkEvents }
+  return {
+    link,
+    file,
+    summary: summaryOf(file),
+    ...(got.manifest.account !== undefined ? { account: got.manifest.account } : {}),
+    manifest: got.manifest,
+    manifestCreatedAt: got.manifestEvent.created_at,
+    chunkEvents: got.chunkEvents,
+  }
 }
 
 /** True when this device already holds wishes or lists, so a transfer would be merged with them. */
@@ -304,6 +325,8 @@ export async function deviceHasData(deps: CoreDeps): Promise<boolean> {
 export interface ReceiveResult extends ImportResult {
   /** The sync servers were told the transfer is done (false: it simply expires in a few minutes). */
   cleared: boolean
+  /** A device link: this device is now signed in to the account. */
+  signedIn: boolean
 }
 
 /**
@@ -313,6 +336,12 @@ export interface ReceiveResult extends ImportResult {
  */
 export async function receiveTransfer(deps: CoreDeps, t: IncomingTransfer): Promise<ReceiveResult> {
   if (t.link.expiresAt * 1000 <= deps.now()) throw new TransferError('expired')
+  // Loaded only for a device link, so the account code stays out of the app's first download.
+  const account = t.account !== undefined ? await import('../account/service.ts') : undefined
+  if (t.account !== undefined) {
+    const cur = await account?.accountState(deps.db)
+    if (cur && cur.replacedAt === undefined && cur.secret !== t.account) throw new TransferError('other-account')
+  }
   let result: ImportResult
   try {
     result = await importData(deps.db, t.file, { mode: 'merge', now: deps.now() })
@@ -324,11 +353,21 @@ export async function receiveTransfer(deps: CoreDeps, t: IncomingTransfer): Prom
   if (!onboarding || onboarding.status === 'active') {
     await setOnboarding(deps.db, { status: 'completed', step: 0, answers: {}, updatedAt: deps.now() })
   }
+  let signedIn = false
+  if (t.account !== undefined && account) {
+    try {
+      await account.signInToAccount(deps, t.account)
+      signedIn = true
+    } catch (e) {
+      if (account.isAccountError(e, 'other-account')) throw new TransferError('other-account')
+      throw e
+    }
+  }
   let cleared = false
   try {
     cleared = await endTransfer(deps, t.link, t.manifest.key, t.manifest.chunks, t.manifestCreatedAt, 'done')
   } catch {
     cleared = false
   }
-  return { ...result, cleared }
+  return { ...result, cleared, signedIn }
 }

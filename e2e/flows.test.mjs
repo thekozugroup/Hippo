@@ -46,6 +46,9 @@ export function assertNoProblems(problems) {
 
 export async function addItem(page, baseUrl, { title, price, qty, love, contrib, newCategory }) {
   await page.goto(baseUrl + '#/item/new')
+  // The address changes before the screen does (a route transition holds the old screen while the
+  // editor's code loads): wait for the form, or "Name" could match a field on the screen being left.
+  await page.getByRole('heading', { level: 1, name: 'Add a wish' }).waitFor()
   await page.getByRole('textbox', { name: 'Name' }).fill(title)
   if (price) await page.getByRole('textbox', { name: 'Price' }).fill(price)
   if (qty) await page.getByRole('spinbutton', { name: 'How many?' }).fill(String(qty))

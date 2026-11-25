@@ -144,7 +144,7 @@ test('slide control: touch taps and drags work in the app build with the app glo
     await h1(u.page, /Make a wishlist/).waitFor()
     await u.page.getByRole('button', { name: 'I already use Hippo' }).click()
     await h1(u.page, /Hippo here/).waitFor()
-    for (const name of [/From a backup file/, /From another device/, /Use my own Hippo site/]) await u.page.getByRole('button', { name }).waitFor()
+    for (const name of [/Sign in with my recovery code/, /I have a link from my other device/, /From a backup file/, /Use my own Hippo site/]) await u.page.getByRole('button', { name }).waitFor()
     assert.deepEqual(await axe(u.page, 'existing (app)'), [])
     await u.page.getByRole('button', { name: /Use my own Hippo site/ }).click()
     await h1(u.page, 'Your Hippo site').waitFor()
@@ -203,7 +203,7 @@ test('setup: "I already use Hippo" brings wishes in from a backup file and lands
   await u.context.close()
 })
 
-test('transfer: moves wishes and a shared list to another browser, which can publish it again; the source sees "Moved"', async ({ browser, relay, baseUrl, state }) => {
+test('device link: signs another browser in with wishes and a shared list, which it can publish again; the source sees it signed in', async ({ browser, relay, baseUrl, state }) => {
   const src = await newUser(browser, relay, 'tr-src', state)
   const { page } = src
   await page.goto(baseUrl)
@@ -224,16 +224,16 @@ test('transfer: moves wishes and a shared list to another browser, which can pub
   const ownerPubkey = parseShareLink(shareLink).ownerPubkey
 
   await page.goto(baseUrl + '#/settings')
-  await page.getByRole('link', { name: 'Move Hippo to another device' }).click()
-  await h1(page, 'Move to another device').waitFor()
-  await page.getByRole('button', { name: 'Make a transfer link' }).click()
+  await page.getByRole('link', { name: 'Add a device' }).click()
+  await h1(page, 'Add a device').waitFor()
+  await page.getByRole('button', { name: 'Make a link' }).click()
   const linkField = page.getByTestId('transfer-link')
   await linkField.waitFor()
   const link = await linkField.inputValue()
   assert.match(link, /#\/t\/[A-Za-z0-9_-]{90,}$/)
   await page.getByText(/Works for 1[45] more minutes\./).waitFor()
-  await page.getByText('Anyone who gets this link in the next 15 minutes can copy your wishlist and lists. Send it only to yourself.').waitFor()
-  assert.deepEqual(await axe(page, 'move source'), [])
+  await page.getByText('It works once. Anyone who opens it in the next 15 minutes can read and change your wishlist, so send it only to yourself.').waitFor()
+  assert.deepEqual(await axe(page, 'add a device'), [])
   // The secret never reaches a relay: only derived values do.
   const payload = link.split('#/t/')[1]
   assert.ok(!relay.events.some((e) => JSON.stringify(e).includes(payload)))
@@ -243,17 +243,17 @@ test('transfer: moves wishes and a shared list to another browser, which can pub
   // The payload leaves the address bar at once, and is never in the title.
   assert.equal(new URL(dst.page.url()).hash, '#/move/receive')
   assert.ok(!(await dst.page.title()).includes(payload.slice(0, 12)))
-  await h1(dst.page, 'Receive from another device').waitFor()
+  await h1(dst.page, 'Sign in with a link').waitFor()
   await dst.page.getByTestId('transfer-summary').getByText('1 wish and 1 list.').waitFor({ timeout: 15000 })
-  assert.deepEqual(await axe(dst.page, 'receive'), [])
-  await dst.page.getByRole('button', { name: 'Bring them in' }).click()
+  assert.deepEqual(await axe(dst.page, 'sign in with a link'), [])
+  await dst.page.getByRole('button', { name: 'Sign in here' }).click()
   await dst.page.waitForURL(/#\/$/)
-  await dst.page.getByText(/1 wish and 1 list came in/).waitFor()
+  await dst.page.getByText('Signed in. This device now stays in step with your others.').waitFor()
   await dst.page.goto(baseUrl + '#/wishlist')
   await dst.page.getByText('Red wool scarf').waitFor()
 
-  // The source sees the move.
-  await page.getByText(/^Moved\./).waitFor({ timeout: 15000 })
+  // The source sees the other device signed in.
+  await page.getByText('Your other device is signed in.').waitFor({ timeout: 15000 })
 
   // The receiving device holds working list keys: it changes the moved list, the change is signed
   // with the same owner key, and a giver with the original link sees it.
@@ -279,30 +279,30 @@ test('transfer: moves wishes and a shared list to another browser, which can pub
   await Promise.all([src.context.close(), dst.context.close(), third.context.close()])
 })
 
-test('transfer: a cancelled link and an expired link are refused with their own message; pasted links work in Settings', async ({ browser, relay, baseUrl, state }) => {
+test('device link: a cancelled link and an expired link are refused with their own message; pasted links work in Settings', async ({ browser, relay, baseUrl, state }) => {
   const src = await newUser(browser, relay, 'tc-src', state)
   await src.page.goto(baseUrl)
   await src.page.getByRole('button', { name: 'Skip setup' }).click()
   await src.page.waitForURL(/#\/$/)
   await src.page.goto(baseUrl + '#/move')
-  await src.page.getByRole('button', { name: 'Make a transfer link' }).click()
+  await src.page.getByRole('button', { name: 'Make a link' }).click()
   const link = await src.page.getByTestId('transfer-link').inputValue()
-  await src.page.getByRole('button', { name: 'Cancel transfer' }).click()
-  await src.page.getByText('Transfer cancelled. The link no longer works.').waitFor()
+  await src.page.getByRole('button', { name: 'Cancel link' }).click()
+  await src.page.getByText('Link cancelled. It no longer works.').waitFor()
 
   const dst = await newUser(browser, relay, 'tc-dst', state)
   await dst.page.goto(baseUrl + '#/settings')
-  await dst.page.getByRole('link', { name: 'Enter a transfer link' }).click()
-  await h1(dst.page, 'Receive from another device').waitFor()
-  await dst.page.getByRole('textbox', { name: 'Transfer link' }).fill(`Here it is: ${link}`)
+  await dst.page.getByRole('link', { name: 'I have a link from another device' }).click()
+  await h1(dst.page, 'Sign in with a link').waitFor()
+  await dst.page.getByRole('textbox', { name: 'Link from your other device' }).fill(`Here it is: ${link}`)
   await dst.page.getByRole('button', { name: 'Open link' }).click()
   await dst.page.getByText('This transfer was cancelled on the other device.').waitFor()
 
   const expired = `${baseUrl}#/t/${encodeTransferPayload({ secret: '11'.repeat(32), pubkey: publicKeyOf(generateSigningKey()), expiresAt: Math.floor(Date.now() / 1000) - 60 })}`
-  await dst.page.getByRole('textbox', { name: 'Transfer link' }).fill(expired)
+  await dst.page.getByRole('textbox', { name: 'Link from your other device' }).fill(expired)
   await dst.page.getByRole('button', { name: 'Open link' }).click()
   await dst.page.getByText('This link has expired. Make a new one on the other device.').waitFor()
-  await dst.page.getByRole('textbox', { name: 'Transfer link' }).fill(`${baseUrl}#/t/Ag${'A'.repeat(100)}`)
+  await dst.page.getByRole('textbox', { name: 'Link from your other device' }).fill(`${baseUrl}#/t/Ag${'A'.repeat(100)}`)
   await dst.page.getByRole('button', { name: 'Open link' }).click()
   await dst.page.getByText('This link comes from a newer version of Hippo', { exact: false }).waitFor()
   assertNoProblems(src.problems)

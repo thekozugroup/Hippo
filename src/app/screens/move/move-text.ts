@@ -10,6 +10,7 @@ export function timeLeftText(ms: number): string {
 }
 
 export function transferStartError(e: unknown): string {
+  if (e instanceof Error && e.name === 'AccountError' && e.message === 'replaced') return 'Your recovery code was changed on another device. Sign in with the new code in Settings first.'
   if (isTransferError(e, 'too-large')) return 'Your wishlist is too large to send this way. Use Export backup in Settings and move the file instead.'
   if (isTransferError(e, 'offline')) return 'Hippo could not reach its sync servers. Check your connection and try again.'
   return 'The link could not be made. Please try again.'
@@ -28,6 +29,7 @@ const MESSAGES: Record<TransferFailure, string> = {
   'too-large': 'This transfer is too large to receive. Move a backup file instead.',
   'invalid-backup': 'What arrived is not a valid Hippo backup, so nothing was brought in.',
   unsupported: 'This browser cannot open this transfer. Try another browser, or move a backup file instead.',
+  'other-account': 'This device is signed in to a different Hippo. Sign out on this device in Settings first, then open the link again.',
 }
 
 export function transferErrorText(e: unknown): string {

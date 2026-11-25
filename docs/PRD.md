@@ -16,7 +16,7 @@ Status: v1 in development. License: MIT.
 ## 2. Non-goals (v1)
 
 - Payment processing or moving money. Pledges are records only; givers settle among themselves.
-- Accounts, email, passwords, notifications by email or push.
+- Accounts in the usual sense (a server that holds them, email, passwords, resets), notifications by email or push. "Your Hippo account" (FR-6d) is only a secret the person keeps.
 - Price tracking, affiliate links, store integrations.
 - App-store distribution. Hippo is an installable PWA, and an Android app built from the same code (FR-10d) that is published as an APK on GitHub Releases. There is no iOS app.
 - Automatic fetching of product pages by the website itself (not possible from a static site because of CORS). On the website the only automatic lookup is the opt-in link preview in FR-10a, which asks a third-party service. The Android app reads the page on the phone instead (FR-10e).
@@ -37,10 +37,12 @@ Status: v1 in development. License: MIT.
 - FR-2 Importance has three levels: `nice` (Nice to have), `want` (Want), `love` (Would love). Default `want`.
 - FR-3 Categories: create, rename, reorder, delete. An item can be in several categories. Deleting a category does not delete items.
 - FR-4 Filter by category and importance; sort by importance, date added, price.
-- FR-5 All private data is stored on the device (IndexedDB). Nothing is published until the owner shares a list.
+- FR-5 All private data is stored on the device (IndexedDB). Nothing is published until the owner shares a list or turns on their Hippo account (FR-6d), which sends it end-to-end encrypted.
 - FR-6 Export all data to a JSON file and import it again (backup, device move). The file also holds the owner's name, the Link lookup setting and whether first-run setup is done, so a restore on a new device opens Home with the data, not setup.
-- FR-6b Move to another device without a file: Settings, "Move Hippo to another device" makes a link that works for 15 minutes; opening it on another device (or pasting it under "Enter a transfer link") shows what will come in and, once confirmed, merges it. It is a one-time move, not sync. Protocol: PROTOCOL.md section 11.
-- FR-6c Existing setup at first run: the first setup screen offers "I already use Hippo" next to "Get started" and "Skip setup". It leads to one screen with the ways that apply here: a backup file, a transfer link, and in the Android app "Use my own Hippo site" (FR-10f). Whatever comes in, setup is marked done and Home opens; no first list is made.
+- FR-6b Add a device: Settings, "Your devices", "Add a device" makes a link that works once, for 15 minutes (also through the system share sheet); opening it on another device, pasting it, or sharing it into the Android app shows what will come in and, once confirmed, signs that device in to the same account (FR-6d) with the data merged. Protocol: PROTOCOL.md sections 11 and 12.6. A link from an older Hippo still copies once.
+- FR-6c Existing setup at first run: the first setup screen offers "I already use Hippo" next to "Get started" and "Skip setup". It leads to one screen with the ways that apply here, in this order: "Sign in with my recovery code", "I have a link from my other device", a backup file, and in the Android app "Use my own Hippo site" (FR-10f). Whatever comes in, setup is marked done and Home opens; no first list is made.
+- FR-6d Your Hippo account. A person's wishlist, categories, the lists they own (with their keys and retired links), the lists shared with them (with their giver identity and nickname), their name and the settings that follow a person sync between every device and web address they sign in on, with no server and no password. The account is one random secret, shown as a 13-word recovery code; it is made quietly the first time it is needed (showing the code, adding a device, moving to a new address). Sync is local-first (every screen reads the device's database; changes go out in the background and are merged record by record and field by field) and on by default once the account exists, with a switch per device. Settings, "Your devices": the state in plain words ("Up to date. Last synced 10:42", "Waiting for a connection"), Add a device, Show recovery code, Sync on this device, Change recovery code (for a code that may have leaked: everything moves to a new code and other devices are told to sign in again) and Sign out on this device (keeping or removing this device's copy). Home's "Get set up" checklist asks to "Save your recovery code" (in place of "Save a backup"); until the person confirms they saved it, nothing says their wishlist is safe on other devices. Protocol: PROTOCOL.md section 12.
+- FR-6e New address: when the website is opened at an address other than the one it was built for and the browser holds the person's own wishes or lists, Home says "This Hippo site now lives at <host>" with one button that carries them there, signed in, through a device link. Never automatic, and never for someone who only opened a shared list.
 - FR-6a Edits are not lost: saving a wish writes only the fields changed in that form onto the stored wish (another tab's changes to other fields stay), and says so when the same field was also changed elsewhere. Unsaved typing in the wish form is kept for the browser tab and comes back with a "Start over" action.
 
 ### 4.2 Capture
@@ -93,12 +95,16 @@ Threat model:
 
 | Party | Can see | Cannot see |
 |---|---|---|
-| Relay operator | Ciphertext, event sizes and timing, IP addresses | List content, claims, who is linked to whom by name |
+| Relay operator | Ciphertext, event sizes and timing, IP addresses; for a Hippo account, one more public key and topic, its number of records, their padded sizes and when they change | List content, claims, who is linked to whom by name; any account content, record types or ids |
 | Someone without the link | Nothing | Everything |
+| Someone who knows an account's topic only | The same as a relay | Everything else; they cannot change anything |
 | Giver with the link | List content, all claims and pledges, nicknames | Other givers' identities beyond nicknames |
-| Owner | Their own list content | Claims and pledges, as long as they use the app as intended |
+| Owner | Their own list content | Claims and pledges, as long as they use the app as intended, on every device signed in to their account |
+| Anyone with the recovery code (or an unused device link) | The whole account: wishes, lists and their keys, lists shared with the person and their gifts; they can change all of it | Claims on the person's own lists |
 
 Known limitation: hiding claims from the owner is enforced by the app, not by cryptography. The owner created the link and could open it in another browser as a giver. This is true of any link-shared registry without giver accounts.
+
+Your Hippo account: Hippo has no accounts in the usual sense and cannot reset anything. The recovery code is the account: anyone with it can read and change the wishlist, and nobody, Hippo included, can recover a lost one. The account's data is kept encrypted on public sync servers that keep it only as long as they choose, so a signed-in device or a saved backup file remains the safety net. Changing the code moves everything to a new secret and empties the old records, but whoever had the old code keeps whatever they already copied.
 
 ### 4.6 Edge cases
 
@@ -110,7 +116,7 @@ Known limitation: hiding claims from the owner is enforced by the app, not by cr
 - Relays reachable but silent: when no relay answers, the giver sees that Hippo cannot reach its sync servers and is retrying, with Try again; "this list could not be found" is shown only when relays answered and the list was not there. "You are offline" is shown only when the browser is offline.
 - Relay unavailable: the app works from its local cache and retries (at start, when back online, when the app returns to the foreground, and on a backoff timer); publishing shows which relays accepted. A list no relay has accepted yet is shown as not shared yet, without a link.
 - Owner stops sharing or replaces the link: givers see that the list is no longer shared, with the titles of what they had said they would get or chip in on.
-- Lost device: the owner restores from an export file. (Recovery code and multi-device sync are planned for a later milestone.)
+- Lost device: the owner signs in on a new device with the recovery code (FR-6d), or restores from a backup file; if the sync servers have dropped the account's records, only a device or a backup file can bring them back.
 
 ## 5. Non-functional requirements
 
@@ -165,6 +171,6 @@ Code layout:
 | M2 | Shared lists: publish, link, giver view | Done |
 | M3 | Claims, pledges, conflicts, owner-side hiding, device clock correction | Done |
 | M4 | Share target, deep link, bookmarklet, iOS Shortcut recipe | Done; the Shortcut recipe has not been checked on every iOS version |
-| M5 | Recovery code, multi-device sync, optional self-hosted relay | Planned |
+| M5 | Recovery code, multi-device sync, optional self-hosted relay | Recovery code and sync between devices built (FR-6d, FR-6e); self-hosted relay not started |
 | M6 | Android app: Capacitor shell, share target, on-device page reading, system bars, back, haptics, signed APK on Releases | Built; the APK compiles. The workflow's emulator check and behaviour on real phones are not yet confirmed |
 | M5a | Weekly relay health check (`relay-health` workflow) with 1, 4 and 12 week retention probes | Done; needs several months of runs before retention numbers mean anything |
