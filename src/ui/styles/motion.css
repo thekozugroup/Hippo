@@ -250,11 +250,11 @@
 
 /* Something new appears in place (a confirmation, a status pill, a new row): it rises a few
    pixels and fades in. Not on first paint: only once the app has booted (html[data-booted]). */
-:root[data-booted] .motion-enter {
+:root[data-booted] .motion-enter:not([data-shown]) {
   animation: motion-enter var(--dur) var(--ease-sheet) both;
 }
 /* Content replacing a loading placeholder cross-fades in place. */
-:root[data-booted] .motion-reveal {
+:root[data-booted] .motion-reveal:not([data-shown]) {
   animation: vt-fade-in var(--dur) var(--ease) both;
 }
 
@@ -271,7 +271,7 @@
   ::view-transition-new(*) {
     animation: none !important;
   }
-  :root[data-booted] .motion-enter {
+  :root[data-booted] .motion-enter:not([data-shown]) {
     animation: vt-fade-in var(--dur-press) linear both;
   }
 }

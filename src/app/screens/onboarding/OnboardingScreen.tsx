@@ -126,7 +126,7 @@ export default function OnboardingScreen({ step }: { step: string }) {
 
   if (!initial || !isWelcomeStep(step) || resolveStep(step) !== step) {
     return (
-      <div className="step-screen step-screen--blank" data-theme="dark" aria-busy="true" aria-label="Loading">
+      <div className="step-screen step-screen--blank" data-theme="dark" role="status" aria-busy="true" aria-label="Loading">
         <HeroBackground variant="night" />
       </div>
     )

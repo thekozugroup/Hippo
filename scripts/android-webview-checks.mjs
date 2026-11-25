@@ -18,6 +18,9 @@
 //             shared link in its link field, and the page lookup started or answered
 //             without blocking the form.
 //   share-none share-none <out> <label>: Add a wish did not open (an old share handed back).
+//   route     route <out> <label> <expected path> <heading pattern>: after "Open in the Hippo app"
+//             (hippo://open/<route>), the app shows that path with a matching heading and stays
+//             there (a route that is not allowed must end on Home).
 //   home      Leaves setup, runs the edge-to-edge checks on Home, scrolls the light
 //             sheet under the status bar and checks the fade layer and the status
 //             bar icon colour.
@@ -629,6 +632,43 @@ async function shareNone() {
   }
 }
 
+/** Where the app is: its route and the heading on screen. */
+function whereAmI() {
+  const hash = window.location.hash
+  return { path: '/' + hash.replace(/^#?\/?/, '').split('?')[0], heading: (document.querySelector('h1')?.textContent ?? '').replace(/\s+/g, ' ').trim() }
+}
+
+// route <label> <expected path> <heading pattern>: after the smoke script opened hippo://open/<route>,
+// the app must show the expected path with a matching heading and still show it a moment later.
+async function route() {
+  const [label = 'route', expected = '/', heading = '.'] = process.argv.slice(4)
+  const pattern = new RegExp(heading, 'i')
+  const { device, page } = await connect()
+  try {
+    let w = null
+    let since = 0
+    const start = Date.now()
+    // On the expected screen for 2 seconds in a row (a redirect afterwards would be a failure).
+    while (Date.now() - start < 60_000) {
+      try {
+        w = await page.evaluate(whereAmI)
+      } catch {
+        w = null // navigating: try again
+      }
+      const there = w !== null && w.path === expected && pattern.test(w.heading)
+      if (!there) since = 0
+      else if (since === 0) since = Date.now()
+      else if (Date.now() - since >= 2000) break
+      await sleep(250)
+    }
+    const ok = since > 0 && Date.now() - since >= 2000
+    check(ok, `${label}: ends on ${expected}`, w ? `address path ${w.path}, heading "${w.heading}", after ${Date.now() - start} ms` : 'no page to read')
+    screenshot(`route-${label.replace(/[^a-z0-9]+/gi, '-')}`)
+  } finally {
+    await device.close()
+  }
+}
+
 // A local check of the pixel analysis on saved screenshots: node scripts/android-webview-checks.mjs pixels <out> <png> <statusPx> <navPx>
 async function pixels() {
   const { readFileSync } = await import('node:fs')
@@ -636,7 +676,7 @@ async function pixels() {
   pixelChecks(file, readFileSync(file), { status: Number(status), nav: Number(nav) })
 }
 
-const phases = { launch, keyboard, home, share, 'share-none': shareNone, pixels }
+const phases = { launch, keyboard, home, share, 'share-none': shareNone, route, pixels }
 if (!phases[phase]) {
   console.error(`Unknown phase "${phase}". Use one of: ${Object.keys(phases).join(', ')}`)
   process.exit(2)

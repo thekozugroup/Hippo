@@ -176,6 +176,9 @@ function SkipLink() {
 function BootFlag() {
   useEffect(() => {
     const id = window.setTimeout(() => {
+      // What is already on screen has appeared: it must not fade in again when the flag turns the
+      // enter effects on (motion.css), which would blink every card and count once, ~1 s after load.
+      for (const el of document.querySelectorAll('.motion-reveal, .motion-enter')) el.setAttribute('data-shown', '')
       document.documentElement.dataset.booted = ''
     }, 800)
     return () => window.clearTimeout(id)
@@ -220,9 +223,9 @@ function ThemeSync() {
 
 function Loading() {
   // Likely a first run on its way to setup: an empty night field, not a light placeholder.
-  if (isSetupBoot()) return <div className="app-boot" aria-busy="true" aria-label="Loading" />
+  if (isSetupBoot()) return <div className="app-boot" role="status" aria-busy="true" aria-label="Loading" />
   return (
-    <div className="app-loading" aria-busy="true" aria-label="Loading">
+    <div className="app-loading" role="status" aria-busy="true" aria-label="Loading">
       <Skeleton height={200} shape="tile" />
     </div>
   )

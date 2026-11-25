@@ -30,6 +30,10 @@
 #    WebView, and the on-device page lookup started or answered without
 #    blocking the form. Also: after Android recreates the app with the share
 #    that started it, Add a wish does not open again.
+# 9. "Open in the Hippo app": hippo://open/lists (as a browser's intent link
+#    sends it, VIEW and BROWSABLE) ends on Lists, and a route that is not
+#    allowed (hippo://open/item/new) ends on Home, both while the app is running
+#    and from a cold start (read inside the WebView).
 #
 # Every check polls with a deadline and writes a PASS, FAIL or INFO line with
 # its numbers to <output>/checks.txt. Leaves screenshots at each point, UI dumps,
@@ -213,11 +217,32 @@ share_case() {
 }
 webview_share() { timeout 240 node scripts/android-webview-checks.mjs "$1" "$OUT" "${@:2}"; }
 
+# 9: "Open in the Hippo app". Sends the VIEW intent a browser's intent link sends, then checks the
+# route inside the WebView. Sets the named result variable.
+open_route() {
+  local var="$1" label="$2" uri="$3" expected="$4" heading="$5"
+  local result="FAILED" output
+  if dump "$OUT/before-route.xml"; then dismiss_not_responding "$OUT/before-route.xml"; fi
+  output="$(adb shell "am start -W -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d '$uri' $PKG" 2>&1 | tr -d '\r')" || true
+  echo "$output"
+  if echo "$output" | grep -q -E '^Error|Exception'; then
+    echo "FAIL $label: the intent was not delivered" | tee -a "$OUT/checks.txt"
+  elif webview_share route "$label" "$expected" "$heading"; then
+    result="passed"
+  fi
+  if [ "$result" != "passed" ]; then status=1; fi
+  printf -v "$var" '%s' "$result"
+}
+
 share_running="skipped"
 share_again="skipped"
 share_background="skipped"
 share_cold="skipped"
 share_redelivery="skipped"
+route_running="skipped"
+route_denied_running="skipped"
+route_cold="skipped"
+route_denied_cold="skipped"
 share_first="skipped"
 if [ "$first" = "passed" ]; then
   # 8a. The app in the foreground (on Home after the checks above).
@@ -248,6 +273,13 @@ if [ "$first" = "passed" ]; then
     share_redelivery="not run (the process was not stopped in the background)"
     echo "INFO recreated after a share: am kill did not stop the process; not checked" | tee -a "$OUT/checks.txt"
   fi
+  # 9. "Open in the Hippo app", while running (from Lists, so Home is a real move) and from a cold start.
+  open_route route_running "open lists while running" "hippo://open/lists" "/lists" "^Lists$"
+  open_route route_denied_running "disallowed route while running" "hippo://open/item/new" "/" "wishlist"
+  adb shell am force-stop "$PKG"; sleep 1
+  open_route route_cold "open lists from a cold start" "hippo://open/lists" "/lists" "^Lists$"
+  adb shell am force-stop "$PKG"; sleep 1
+  open_route route_denied_cold "disallowed route from a cold start" "hippo://open/item/new" "/" "wishlist"
   # 8f. A first-ever launch that begins with a share (the app's data cleared, as after installing).
   adb shell pm clear "$PKG" >/dev/null || true; sleep 1
   share_case share_first "first-launch share" "Red wool scarf" \
@@ -272,5 +304,9 @@ adb logcat -d -b crash > "$OUT/crash-log.txt" || true
   echo "cold-start share: $share_cold"
   echo "no second form after Android recreates the app: $share_redelivery"
   echo "first-launch share: $share_first"
+  echo "open in the app, hippo://open/lists while running: $route_running"
+  echo "open in the app, a disallowed route while running ends on Home: $route_denied_running"
+  echo "open in the app, hippo://open/lists from a cold start: $route_cold"
+  echo "open in the app, a disallowed route from a cold start ends on Home: $route_denied_cold"
 } > "$OUT/result.txt"
 exit "$status"

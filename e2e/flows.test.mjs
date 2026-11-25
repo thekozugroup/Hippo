@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { need, test } from './harness.mjs'
+import { need, test, transitionDone } from './harness.mjs'
 
 const { AxeBuilder } = createRequire(import.meta.url)('@axe-core/playwright')
 
@@ -215,16 +215,17 @@ test('no serious accessibility violations on the main screens (axe, WCAG 2.2 AA)
   }
   await scan(need(state, 'third', 'a third person sees the claim').page, 'giver view')
   const { page } = need(state, 'owner', 'first run: setup opens')
-  for (const [route, label] of [
-    ['#/', 'home'],
-    ['#/wishlist', 'wishlist'],
-    ['#/item/new', 'item editor'],
-    ['#/lists', 'lists'],
-    ['#/settings', 'settings'],
+  for (const [route, label, heading] of [
+    ['#/', 'home', /wishlist/i],
+    ['#/wishlist', 'wishlist', /^Wishlist$/],
+    ['#/item/new', 'item editor', /^Add a wish$/],
+    ['#/lists', 'lists', /^Lists$/],
+    ['#/settings', 'settings', /^Settings$/],
   ]) {
     await page.goto(baseUrl + route)
-    await page.getByRole('heading', { level: 1 }).waitFor()
-    await page.waitForTimeout(300)
+    // This screen's own heading: a route transition holds the screen being left while code loads.
+    await page.getByRole('heading', { level: 1, name: heading }).waitFor()
+    await transitionDone(page)
     await scan(page, label)
   }
   await page.goto(need(state, 'listUrl', 'create and publish a list'))
